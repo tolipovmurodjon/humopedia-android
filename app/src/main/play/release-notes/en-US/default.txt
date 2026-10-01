@@ -1,2 +1,3 @@
-• Opens in Chrome for a faster, smoother experience on every phone
-• Interactive lessons, practice with XP, streaks and leagues
+• Smarter, faster app: crash reports and speed checks so we fix problems before you see them
+• Daily reminders so you never lose your streak
+• Opens in Chrome for the smoothest experience
