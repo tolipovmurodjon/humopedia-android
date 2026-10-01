@@ -3,6 +3,7 @@ agp = "8.13.2"
 kotlin = "2.0.21"
 androidbrowserhelper = "2.7.3"
 junit = "4.13.2"
+playPublisher = "3.13.0"
 
 [libraries]
 androidbrowserhelper = { group = "com.google.androidbrowserhelper", name = "androidbrowserhelper", version.ref = "androidbrowserhelper" }
@@ -11,3 +12,4 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+play-publisher = { id = "com.github.triplet.play", version.ref = "playPublisher" }

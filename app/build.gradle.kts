@@ -1,8 +1,10 @@
+import com.github.triplet.gradle.androidpublisher.ReleaseStatus
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.play.publisher)
 }
 
 // The published app's key (build-rules AND-1/AND-2): passwords live in keystore.properties, outside git.
@@ -55,6 +57,15 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+}
+
+// One command to Google Play (`./gradlew publishBundle`) instead of clicking through Play Console. The service account
+// key is Boss's, outside git (AND-2); without it only the publish tasks fail.
+play {
+    serviceAccountCredentials.set(rootProject.file("serviceAccount-play.json"))
+    track.set("production")
+    releaseStatus.set(ReleaseStatus.COMPLETED)
+    defaultToAppBundles.set(true)
 }
 
 dependencies {
