@@ -9,7 +9,7 @@
 The Android app for **Humopedia**, the learning platform for kids aged 10 to 12 in Uzbekistan.
 
 [![build](https://github.com/tolipovmurodjon/humopedia-android/actions/workflows/build.yml/badge.svg)](https://github.com/tolipovmurodjon/humopedia-android/actions/workflows/build.yml)
-![version](https://img.shields.io/badge/version-2.0.0-3DC98C)
+![version](https://img.shields.io/badge/version-2.0.1-3DC98C)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-23A06C?logo=android&logoColor=white)
 
@@ -49,7 +49,7 @@ flowchart LR
 
 | | Version | What's inside |
 |:--:|---|---|
-| 🛠️ | **2.0.0** | The web app full screen: every lesson, quiz and game. **In progress** |
+| ✅ | **2.0.1** | The web app full screen: every lesson, quiz and game. **Live on Google Play** |
 | 📋 | 3.x | Native Jetpack Compose screens, replacing the web app one screen at a time |
 
 <br>
