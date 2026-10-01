@@ -3,4 +3,6 @@
     <!-- The web app's page ground, so the system bars and splash blend into the first frame. -->
     <color name="ground">#FFF9F0</color>
     <color name="humo_mint">#3DC98C</color>
+    <color name="icon_navy_top">#1E293B</color>
+    <color name="icon_navy_bottom">#0F172A</color>
 </resources>
