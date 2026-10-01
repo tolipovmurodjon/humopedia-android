@@ -89,7 +89,12 @@ keyPassword=…
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-**4 ·** Test it on a real phone, then upload it to Play Console → **Internal testing**.
+**4 ·** Test it on a real phone, then send it to Google Play in one command (needs `serviceAccount-play.json`, the
+Play API key, in the project root; git ignores it):
+
+```bash
+./gradlew publishBundle   # uploads to production and sends it for review, notes from app/src/main/play/release-notes/
+```
 
 </details>
 
