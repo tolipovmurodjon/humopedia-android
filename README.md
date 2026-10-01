@@ -1,60 +1,77 @@
 <div align="center">
 
-<img src="docs/assets/humo.png" width="112" alt="Humo, the Humopedia mascot">
+<img src="docs/assets/humo.png" width="120" alt="Humo, the Humopedia mascot">
 
-# Humopedia for Android
+# Humopedia
 
-**Learn maths and science like a game.** Lessons you play with your hands, not videos you watch.
+### Maths and science you play with your hands.
+
+The Android app for **Humopedia**, the learning platform for kids aged 10 to 12 in Uzbekistan.
 
 [![build](https://github.com/tolipovmurodjon/humopedia-android/actions/workflows/build.yml/badge.svg)](https://github.com/tolipovmurodjon/humopedia-android/actions/workflows/build.yml)
+![version](https://img.shields.io/badge/version-2.0.0-3DC98C)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
-![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-3DC98C?logo=jetpackcompose&logoColor=white)
-![minSdk 26](https://img.shields.io/badge/minSdk-26-23A06C)
-![targetSdk 36](https://img.shields.io/badge/targetSdk-36-23A06C)
+![Android 8+](https://img.shields.io/badge/Android-8.0%2B-23A06C?logo=android&logoColor=white)
 
-[humopedia.com](https://humopedia.com) · [Brand](https://design.humopedia.com) · [Google Play](https://play.google.com/store/apps/details?id=com.mcompany.humo)
+[**Website**](https://humopedia.com) &nbsp;·&nbsp; [**Brand**](https://design.humopedia.com) &nbsp;·&nbsp; [**Google Play**](https://play.google.com/store/apps/details?id=com.mcompany.humo) &nbsp;·&nbsp; [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
----
+<br>
 
-## What this is
-
-The Android app for Humopedia, a learning platform for children in Uzbekistan aged 10 to 12. Every lesson is a
-small simulation the child plays with: a balance scale for equations, squares you cut and move for Pythagoras.
-
-This repository is a **fresh start** (October 2026). Nothing is carried over from the old app; it is published
-under the same Play listing, package `com.mcompany.humo`.
-
-## Status
-
-| Version | What is inside | State |
-|---|---|---|
-| **2.0.0** | The Humopedia web app full-screen in a Trusted Web Activity: every lesson, quiz and game | In progress |
-| 3.x | Native Compose screens, replacing the web shell one screen at a time | Planned |
-
-## Stack
+## ✨ What makes it different
 
 | | |
-|---|---|
-| Language | Kotlin |
-| UI | Jetpack Compose, Material 3 |
-| Build | Gradle Kotlin DSL, version catalog (`gradle/libs.versions.toml`) |
-| Backend | Firebase project `humo-uz`, shared with the web app |
-| CI | GitHub Actions: unit tests and a debug build on every pull request |
+|:--:|---|
+| ⚖️ | **Every lesson is a toy.** Solve equations by balancing a scale. Prove Pythagoras by cutting squares. |
+| 🎮 | **It feels like a game.** Streaks, XP, leagues, and a friend called Humo who cheers you on. |
+| 🇺🇿 | **Made for Uzbekistan.** Uzbek first, built for cheap phones on slow networks. |
 
-## Run it
+<br>
 
-Requires Android Studio (latest stable) and JDK 17+.
+## 🧭 How it works
+
+Version 2 shows the Humopedia web app full screen, with no browser bar. This setup is called a
+**Trusted Web Activity**. The app and the website run the same code, so each website update reaches the app too,
+with no new Play release.
+
+```mermaid
+flowchart LR
+    A["📱 Tap the Humo icon"] --> B["🟢 Splash screen"]
+    B --> C{"🔐 Is the site verified?<br/>(assetlinks.json)"}
+    C -- yes --> D["✨ Full-screen app<br/>beta.humopedia.com/uz/app"]
+    C -- no --> E["🌐 Opens with a URL bar"]
+```
+
+<br>
+
+## 🗺️ Roadmap
+
+| | Version | What's inside |
+|:--:|---|---|
+| 🛠️ | **2.0.0** | The web app full screen: every lesson, quiz and game. **In progress** |
+| 📋 | 3.x | Native Jetpack Compose screens, replacing the web app one screen at a time |
+
+<br>
+
+## 🚀 Quick start
+
+> **You need:** Android Studio (latest) · JDK 17+ · an Android phone with USB debugging on
 
 ```bash
 git clone git@github.com:tolipovmurodjon/humopedia-android.git
 cd humopedia-android
-./gradlew installDebug        # builds and installs on a connected phone
+./gradlew installDebug
 ```
 
-Debug builds need nothing else. **Release builds** need the upload key: create `keystore.properties` in the
-project root (it is ignored by git, never commit it):
+That builds the app and installs it on your phone. 🎉
+
+<details>
+<summary><b>📦 Building a release for Google Play</b></summary>
+
+<br>
+
+**1 ·** Create `keystore.properties` in the project root. Git ignores it, so it is never committed.
 
 ```properties
 storeFile=/path/to/humopedia_keystore.jks
@@ -63,28 +80,44 @@ keyAlias=humopedia_key
 keyPassword=…
 ```
 
+**2 ·** Raise `versionCode` in `app/build.gradle.kts`. It must be higher than every version already on Play.
+
+**3 ·** Build:
+
 ```bash
-./gradlew bundleRelease       # app/build/outputs/bundle/release/app-release.aab
+./gradlew bundleRelease
+# → app/build/outputs/bundle/release/app-release.aab
 ```
 
-## Project layout
+**4 ·** Test it on a real phone, then upload it to Play Console → **Internal testing**.
+
+</details>
+
+<details>
+<summary><b>🗂️ Where things live</b></summary>
+
+<br>
 
 ```
-app/
-  src/main/java/com/mcompany/humo/   app code
-  src/main/res/                      resources
-  src/test/                          unit tests (JVM)
-  src/androidTest/                   device tests
-gradle/libs.versions.toml            every dependency version, in one place
-.github/workflows/build.yml          CI
+app/src/main/AndroidManifest.xml     what the app opens, its icon, splash, links
+app/src/main/res/values/strings.xml  the web address and the verified site
+app/src/test/                        unit tests
+gradle/libs.versions.toml            every library version, in one place
+.github/workflows/build.yml          CI: tests and a build on every pull request
 ```
 
-## Contributing
+</details>
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md): branches, commits, pull requests and how a release goes out.
+<br>
+
+## 🧱 Built with
+
+`Kotlin` · `Android Browser Helper (Trusted Web Activity)` · `Gradle Kotlin DSL` · `version catalog` · `GitHub Actions`
+
+<br>
 
 ---
 
 <div align="center">
-<sub>© 2026 HUMOPEDIA EDU MChJ · Tashkent · All rights reserved.</sub>
+<sub>Made in Tashkent by <b>HUMOPEDIA EDU MChJ</b> · © 2026 · All rights reserved</sub>
 </div>
