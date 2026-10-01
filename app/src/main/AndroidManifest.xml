@@ -14,6 +14,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Humopedia">
@@ -65,6 +66,16 @@
         </activity>
 
         <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+
+        <!-- LauncherActivity enables this screen by class name at start-up ("Manage site data" in system settings).
+             Undeclared, R8 renamed it and every release build crashed on launch (Play pre-launch report, 2026-10-01). -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+                android:value="@string/launch_url" />
+        </activity>
 
         <!-- Phones with no Custom Tabs browser still get the app, inside a WebView. -->
         <activity

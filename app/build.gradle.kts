@@ -20,9 +20,9 @@ android {
         applicationId = "com.mcompany.humo"
         minSdk = 26
         targetSdk = 36
-        // Play's last upload is 25 (v1.18.0); the old repo reached 26, so 27 is safely above both (AND-3).
-        versionCode = 27
-        versionName = "2.0.0"
+        // Only goes up (AND-3): 27 was uploaded to Play and crashed on launch (R8 renamed a TWA component).
+        versionCode = 28
+        versionName = "2.0.1"
 
     }
 
