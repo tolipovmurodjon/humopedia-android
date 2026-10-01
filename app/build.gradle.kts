@@ -37,9 +37,9 @@ android {
         applicationId = "com.mcompany.humo"
         minSdk = 26
         targetSdk = 36
-        // Only goes up (AND-3). 27 crashed on launch (R8 renamed a TWA component); 28 is live as 2.0.1.
-        versionCode = 29
-        versionName = "2.0.2"
+        // Only goes up (AND-3). 27 crashed on launch (R8 renamed a TWA component); 28 = 2.0.1, 29 = 2.0.2 (Chrome).
+        versionCode = 30
+        versionName = "2.1.0"
 
     }
 
