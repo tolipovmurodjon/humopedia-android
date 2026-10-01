@@ -1,15 +1,32 @@
 [versions]
 agp = "8.13.2"
-kotlin = "2.0.21"
+kotlin = "2.2.21"
 androidbrowserhelper = "2.7.3"
 junit = "4.13.2"
 playPublisher = "3.13.0"
+firebaseBom = "34.19.0"
+googleServices = "4.5.0"
+crashlyticsPlugin = "3.0.8"
+perfPlugin = "2.0.2"
+appDistributionPlugin = "5.3.0"
 
 [libraries]
 androidbrowserhelper = { group = "com.google.androidbrowserhelper", name = "androidbrowserhelper", version.ref = "androidbrowserhelper" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+firebase-config = { group = "com.google.firebase", name = "firebase-config" }
+firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
+firebase-appcheck-debug = { group = "com.google.firebase", name = "firebase-appcheck-debug" }
+firebase-perf = { group = "com.google.firebase", name = "firebase-perf" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 play-publisher = { id = "com.github.triplet.play", version.ref = "playPublisher" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }
+firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "perfPlugin" }
+firebase-appdistribution = { id = "com.google.firebase.appdistribution", version.ref = "appDistributionPlugin" }

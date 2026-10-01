@@ -7,6 +7,21 @@ plugins {
     alias(libs.plugins.play.publisher)
 }
 
+// Firebase reads app/google-services.json (Boss's, outside git, AND-2). CI has no copy, so the plugins apply only when it
+// is there, and a release build without it fails rather than shipping an app whose Firebase calls throw.
+val firebaseConfig = file("google-services.json")
+if (firebaseConfig.exists()) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+    apply(plugin = libs.plugins.firebase.crashlytics.get().pluginId)
+    apply(plugin = libs.plugins.firebase.perf.get().pluginId)
+    apply(plugin = libs.plugins.firebase.appdistribution.get().pluginId)
+}
+gradle.taskGraph.whenReady {
+    if (!firebaseConfig.exists() && allTasks.any { it.name.contains("Release") }) {
+        throw GradleException("app/google-services.json is missing: release builds need Firebase.")
+    }
+}
+
 // The published app's key (build-rules AND-1/AND-2): passwords live in keystore.properties, outside git.
 // Without the file a release build comes out unsigned (Play refuses it); it is never signed with the debug key.
 val keystoreFile = rootProject.file("keystore.properties")
@@ -70,5 +85,13 @@ play {
 
 dependencies {
     implementation(libs.androidbrowserhelper)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.config)
+    implementation(libs.firebase.appcheck.playintegrity)
+    implementation(libs.firebase.perf)
+    implementation(libs.firebase.messaging)
+    debugImplementation(libs.firebase.appcheck.debug)
     testImplementation(libs.junit)
 }
