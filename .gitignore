@@ -1,0 +1,18 @@
+# Build output and IDE state
+*.iml
+.gradle/
+.kotlin/
+build/
+/captures
+.externalNativeBuild
+.cxx
+.idea/
+.DS_Store
+local.properties
+/app/release/
+
+# Signing and service secrets: never in git (build-rules AND-2)
+*.jks
+*.keystore
+keystore.properties
+google-services.json
