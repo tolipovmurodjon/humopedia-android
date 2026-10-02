@@ -31,7 +31,15 @@ class HumoLauncherActivity : LauncherActivity() {
         }
         if (shouldAskForNotifications()) {
             preferences().edit().putBoolean(ASKED_NOTIFICATIONS, true).apply()
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATIONS_REQUEST)
+            try {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATIONS_REQUEST)
+            } catch (refused: SecurityException) {
+                // Android refuses the prompt when this screen is no longer in front (launched as a Play install was
+                // finishing, A05s 2026-10-02): open the site instead of crashing, and ask on a later launch.
+                preferences().edit().putBoolean(ASKED_NOTIFICATIONS, false).apply()
+                Firebase.analytics.logEvent("notifications_prompt_refused") {}
+                launchTwa()
+            }
         }
     }
 
