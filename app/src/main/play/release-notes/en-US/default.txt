@@ -1,2 +1,2 @@
-• The top bar now wears the same colour as the screen. Fashion.
-• Splash screen: whiter than a fresh notebook
+• Opening the app mid-install no longer makes it faint
+• Same white bars, same Humo, fewer surprises
