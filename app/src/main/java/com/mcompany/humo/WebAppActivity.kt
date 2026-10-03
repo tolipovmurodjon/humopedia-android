@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -14,9 +16,11 @@ import android.view.WindowInsetsController
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.window.OnBackInvokedDispatcher
 
@@ -29,6 +33,10 @@ class WebAppActivity : android.app.Activity() {
 
     private lateinit var webView: WebView
     private lateinit var statusBar: View
+    private lateinit var cover: HumoCover
+    // The address a main-frame load failed on, kept until it loads; null while the page is fine.
+    private var failedUrl: String? = null
+    private var network: ConnectivityManager.NetworkCallback? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,15 +56,21 @@ class WebAppActivity : android.app.Activity() {
         }
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
+        cover = HumoCover(this) { retry() }
+        val page = FrameLayout(this).apply {
+            addView(webView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+            addView(cover, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
             addView(statusBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
-            addView(webView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(page, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         }
         setContentView(root)
         fitBetweenSystemBars(root)
         listenForBack()
+        retryWhenOnline()
 
         if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
             webView.loadUrl((intent.data ?: Uri.parse(getString(R.string.launch_url))).toString())
@@ -105,8 +119,21 @@ class WebAppActivity : android.app.Activity() {
     override fun onBackPressed() = goBack()
 
     // The web app keeps its own history (the keypad, sheets and menus close on back), so back walks the page history.
+    // The page answers first: WebView skips history entries a page added without a tap, so the lesson's own entries
+    // (keypad, pencil, the leave sheet) are invisible to canGoBack and back closed the app (A05s, 2026-10-03). The page
+    // steps through them itself with history.back(), which is never skipped.
     private fun goBack() {
-        if (webView.canGoBack()) webView.goBack() else finish()
+        if (failedUrl != null) return walkBack()
+        webView.evaluateJavascript("window.humoBack ? window.humoBack() : false") { handled ->
+            if (handled != "true") walkBack()
+        }
+    }
+
+    private fun walkBack() {
+        if (!webView.canGoBack()) return finish()
+        // Back from the no-internet screen loads the page before; Humo stays on until it has drawn or fails too.
+        if (failedUrl != null) { failedUrl = null; cover.showLoading() }
+        webView.goBack()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -130,7 +157,28 @@ class WebAppActivity : android.app.Activity() {
         webView.saveState(outState)
     }
 
+    private fun retry(quiet: Boolean = false) {
+        val url = failedUrl ?: return
+        failedUrl = null
+        if (!quiet) cover.showLoading()
+        webView.loadUrl(url)
+    }
+
+    // A school Wi-Fi's DNS dropped our name for minutes while google.com resolved (A05s, 2026-10-03): the network never
+    // goes away, so no callback fires. The screen tries again by itself every few seconds, without flickering.
+    private val quietRetry = Runnable { if (cover.isOffline) retry(quiet = true) }
+
+    // Wi-Fi or data coming back loads the page again without a tap.
+    private fun retryWhenOnline() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        network = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(net: Network) { runOnUiThread { if (failedUrl != null && cover.isOffline) retry() } }
+        }.also { manager.registerDefaultNetworkCallback(it) }
+    }
+
     override fun onDestroy() {
+        network?.let { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(it) }
+        webView.removeCallbacks(quietRetry)
         webView.destroy()
         super.onDestroy()
     }
@@ -166,6 +214,19 @@ class WebAppActivity : android.app.Activity() {
         // here a watcher hands every change to the bridge.
         override fun onPageFinished(view: WebView, url: String) {
             view.evaluateJavascript(WATCH_THEME_COLOR, null)
+            pageShown()
+        }
+
+        // Humo covers the page until it has drawn, so a slow first load (an empty cache, a weak signal) is never a
+        // white screen, and a failed one never shows Android's "Webpage not available" (A05s, 2026-10-03).
+        override fun onPageCommitVisible(view: WebView, url: String) = pageShown()
+
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+            if (!request.isForMainFrame) return
+            failedUrl = request.url.toString()
+            cover.showOffline()
+            view.removeCallbacks(quietRetry)
+            view.postDelayed(quietRetry, QUIET_RETRY_MS)
         }
 
         // A crashed or killed renderer would leave a blank white screen; start the screen again instead.
@@ -173,6 +234,10 @@ class WebAppActivity : android.app.Activity() {
             recreate()
             return true
         }
+    }
+
+    private fun pageShown() {
+        if (failedUrl == null) cover.hide()
     }
 
     private inner class Bridge {
@@ -185,6 +250,7 @@ class WebAppActivity : android.app.Activity() {
 
     private companion object {
         const val SITE = "humopedia.com"
+        const val QUIET_RETRY_MS = 5_000L
         const val WATCH_THEME_COLOR = """(function () {
             if (window.__humoBar) return; window.__humoBar = true;
             var send = function () {

@@ -5,4 +5,7 @@
     <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://beta.humopedia.com\"}}]</string>
     <string name="notification_channel_id" translatable="false">reminders</string>
     <string name="notification_channel_name">Eslatmalar</string>
+    <string name="offline_title">Internet yoʻq</string>
+    <string name="offline_line">Internetga ulaning, Humo shu yerda kutadi.</string>
+    <string name="offline_retry">Qayta urinish</string>
 </resources>

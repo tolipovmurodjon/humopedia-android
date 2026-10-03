@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- The keypad and the right/wrong sounds buzz the phone through navigator.vibrate. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The no-internet screen tries again by itself when the phone is back online. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".HumoApp"
