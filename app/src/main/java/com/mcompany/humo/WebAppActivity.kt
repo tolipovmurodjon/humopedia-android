@@ -140,13 +140,18 @@ class WebAppActivity : android.app.Activity() {
         return uri.scheme == "https" && (host == getString(R.string.web_host) || host == SITE || host.endsWith(".$SITE"))
     }
 
+    // A page link may name an app (payment apps use intent: links). It may only open what a browser link could open:
+    // no direct component, and a fallback page only over https.
     private fun openOutside(uri: Uri) {
-        val intent = if (uri.scheme == "intent") Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME) else Intent(Intent.ACTION_VIEW, uri)
+        val intent = if (uri.scheme == "intent") {
+            try { Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME) } catch (_: java.net.URISyntaxException) { return }
+                .apply { component = null; selector = null }
+        } else Intent(Intent.ACTION_VIEW, uri)
         try {
             startActivity(intent.addCategory(Intent.CATEGORY_BROWSABLE))
         } catch (_: ActivityNotFoundException) {
-            // A payment app that is not installed: its intent link usually names a web page to use instead.
-            intent.getStringExtra("browser_fallback_url")?.let { webView.loadUrl(it) }
+            val fallback = intent.getStringExtra("browser_fallback_url")?.let(Uri::parse) ?: return
+            if (fallback.scheme == "https") openOutside(fallback)
         }
     }
 
