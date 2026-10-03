@@ -38,6 +38,7 @@ class WebAppActivity : android.app.Activity() {
 
     private lateinit var webView: WebView
     private lateinit var statusBar: View
+    private lateinit var root: LinearLayout
     private lateinit var cover: HumoCover
     // The address a main-frame load failed on, kept until it loads; null while the page is fine.
     private var failedUrl: String? = null
@@ -66,7 +67,7 @@ class WebAppActivity : android.app.Activity() {
             addView(webView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
             addView(cover, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         }
-        val root = LinearLayout(this).apply {
+        root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
             addView(statusBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
@@ -278,6 +279,14 @@ class WebAppActivity : android.app.Activity() {
             val colour = parseCssColour(css) ?: return
             runOnUiThread { paintStatusBar(colour) }
         }
+
+        // The strip behind the navigation bar is this layout's own background (the page stops above the bar): it takes
+        // the colour at the page's bottom, so a lesson's pink or green sheet runs to the screen's edge like Duolingo's.
+        @JavascriptInterface
+        fun navBar(css: String) {
+            val colour = parseCssColour(css) ?: return
+            runOnUiThread { root.setBackgroundColor(colour) }
+        }
     }
 
     private companion object {
@@ -292,6 +301,8 @@ class WebAppActivity : android.app.Activity() {
             var send = function () {
               var m = document.querySelector('meta[name="theme-color"]');
               if (m && window.HumoBridge) HumoBridge.statusBar(m.content);
+              var n = document.querySelector('meta[name="humo-nav-color"]');
+              if (window.HumoBridge && HumoBridge.navBar) HumoBridge.navBar(n ? n.content : '#FFFFFF');
             };
             new MutationObserver(send).observe(document.head, { subtree: true, childList: true, attributes: true, attributeFilter: ['content'] });
             send();
