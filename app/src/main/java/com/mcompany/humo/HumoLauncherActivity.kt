@@ -1,6 +1,7 @@
 package com.mcompany.humo
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -52,6 +53,12 @@ class HumoLauncherActivity : LauncherActivity() {
             Firebase.analytics.logEvent("notifications_permission") { param("granted", granted.toString()) }
             launchTwa()
         }
+    }
+
+    // The site opens in our own WebView, not Chrome's TWA: Chrome 154 gave the TWA white navigation icons on a white bar.
+    override fun launchTwa() {
+        startActivity(Intent(this, WebAppActivity::class.java).setData(launchingUrl).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+        finish()
     }
 
     override fun createTwaLauncher(): TwaLauncher =

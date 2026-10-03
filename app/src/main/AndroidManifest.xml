@@ -9,6 +9,8 @@
     </queries>
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The keypad and the right/wrong sounds buzz the phone through navigator.vibrate. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".HumoApp"
@@ -88,6 +90,13 @@
         </activity>
 
         <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
+
+        <activity
+            android:name=".WebAppActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode|density"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- LauncherActivity enables this screen by class name at start-up ("Manage site data" in system settings).
              Undeclared, R8 renamed it and every release build crashed on launch (Play pre-launch report, 2026-10-01). -->
