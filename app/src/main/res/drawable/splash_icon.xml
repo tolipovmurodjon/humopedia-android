@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ draws an icon without a background in a 288 dp box and shows only its middle 192 dp circle: the inset
+     keeps all of puffy Humo inside it, at the size HumoCover then shows, so the splash hands over without a jump. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash"
+    android:inset="16.7%" />

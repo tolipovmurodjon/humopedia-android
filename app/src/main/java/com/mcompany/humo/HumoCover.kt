@@ -50,8 +50,10 @@ class HumoCover(context: Context, onRetry: () -> Unit) : LinearLayout(context) {
         gravity = Gravity.CENTER
         setBackgroundColor(Color.WHITE)
         isClickable = true
-        setPadding(dp(24), 0, dp(24), dp(24))
-        addView(ImageView(context).apply { setImageResource(R.drawable.splash); contentDescription = null }, LayoutParams(dp(180), dp(180)))
+        // Android's splash centres Humo on the whole screen, this cover between the bars: 20 dp on top puts him on the
+        // same pixel, at the splash's 192 dp, so the hand-over does not jump (measured from a recording, A05s).
+        setPadding(dp(24), dp(20), dp(24), 0)
+        addView(ImageView(context).apply { setImageResource(R.drawable.splash); contentDescription = null }, LayoutParams(dp(192), dp(192)))
         addView(title, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(16) })
         addView(line, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
         addView(button, LayoutParams(LayoutParams.MATCH_PARENT, dp(56)).apply { topMargin = dp(32) })
@@ -69,7 +71,8 @@ class HumoCover(context: Context, onRetry: () -> Unit) : LinearLayout(context) {
 
     private fun show(offline: Boolean) {
         isOffline = offline
-        val words = if (offline) VISIBLE else INVISIBLE
+        // While loading Humo sits alone in the middle, where the splash left him.
+        val words = if (offline) VISIBLE else GONE
         title.visibility = words
         line.visibility = words
         button.visibility = words

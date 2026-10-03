@@ -41,41 +41,16 @@
             android:name="asset_statements"
             android:resource="@string/asset_statements" />
 
-        <activity
-            android:name=".HumoLauncherActivity"
-            android:exported="true"
-            android:label="@string/app_name">
-            <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="@string/launch_url" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                android:resource="@color/ground" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                android:resource="@color/ground" />
-            <!-- The library reads this key with its own "androix" spelling. -->
-            <meta-data
-                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR"
-                android:resource="@color/ground" />
-            <!-- Without Chrome, Samsung Internet or Edge (Yandex or Opera only, common here) the app opens in its own
-                 WebView, full screen, instead of a Custom Tab with a URL bar. -->
-            <meta-data
-                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
-                android:value="webview" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
-                android:resource="@drawable/splash" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                android:resource="@color/ground" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
-                android:value="300" />
-            <meta-data
-                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
-                android:value="com.mcompany.humo.fileprovider" />
+        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
 
+        <!-- The one screen, opened straight from the icon and from links. A launcher activity that handed over to it
+             showed the home screen and a second splash for a second (A05s, 2026-10-03). -->
+        <activity
+            android:name=".WebAppActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode|density"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -90,15 +65,6 @@
                     android:scheme="https" />
             </intent-filter>
         </activity>
-
-        <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
-
-        <activity
-            android:name=".WebAppActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode|density"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize" />
 
         <!-- LauncherActivity enables this screen by class name at start-up ("Manage site data" in system settings).
              Undeclared, R8 renamed it and every release build crashed on launch (Play pre-launch report, 2026-10-01). -->

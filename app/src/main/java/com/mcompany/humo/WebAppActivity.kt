@@ -1,9 +1,11 @@
 package com.mcompany.humo
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.Network
@@ -23,6 +25,9 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.window.OnBackInvokedDispatcher
+import com.google.firebase.Firebase
+import com.google.firebase.analytics.analytics
+import com.google.firebase.analytics.logEvent
 
 /**
  * The web app in our own WebView instead of Chrome's Trusted Web Activity. In the TWA, Chrome 154 owns the window and
@@ -73,7 +78,14 @@ class WebAppActivity : android.app.Activity() {
         retryWhenOnline()
 
         if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
-            webView.loadUrl((intent.data ?: Uri.parse(getString(R.string.launch_url))).toString())
+            webView.loadUrl((intent.data ?: plainLaunchUrl()).toString())
+        }
+        if (savedInstanceState == null) {
+            Firebase.analytics.logEvent("twa_launch") {
+                param("browser", "webview")
+                param("launch_path", RemoteFlags.launchPath())
+            }
+            askForNotificationsOnce()
         }
     }
 
@@ -155,6 +167,26 @@ class WebAppActivity : android.app.Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         webView.saveState(outState)
+    }
+
+    // A link into the site keeps its own address; only a plain launch takes the Remote Config path, so it can be A/B tested.
+    private fun plainLaunchUrl(): Uri = Uri.parse("https://${getString(R.string.web_host)}${RemoteFlags.launchPath()}")
+
+    // Android 13+ asks once, on the first launch, over the page as it loads.
+    private fun askForNotificationsOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        val preferences = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+        if (preferences.getBoolean(ASKED_NOTIFICATIONS, false)) return
+        preferences.edit().putBoolean(ASKED_NOTIFICATIONS, true).apply()
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATIONS_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != NOTIFICATIONS_REQUEST) return
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        Firebase.analytics.logEvent("notifications_permission") { param("granted", granted.toString()) }
     }
 
     private fun retry(quiet: Boolean = false) {
@@ -251,6 +283,10 @@ class WebAppActivity : android.app.Activity() {
     private companion object {
         const val SITE = "humopedia.com"
         const val QUIET_RETRY_MS = 5_000L
+        // The launcher's old preference file, so a learner who was asked under the TWA is not asked again.
+        const val PREFERENCES = "launcher"
+        const val ASKED_NOTIFICATIONS = "asked_notifications"
+        const val NOTIFICATIONS_REQUEST = 1
         const val WATCH_THEME_COLOR = """(function () {
             if (window.__humoBar) return; window.__humoBar = true;
             var send = function () {
