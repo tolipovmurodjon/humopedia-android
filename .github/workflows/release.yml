@@ -1,0 +1,61 @@
+name: release
+
+# One button (or `gh workflow run release.yml`) builds the signed bundle and sends it to Google Play, so a release no
+# longer needs the laptop: the Oracle server is ARM and Android's build tools run only on x86 (2026-10-04).
+# Boss's keys live only in GitHub Secrets (AND-2); this file never holds or prints them.
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Play track (internal, alpha, beta, production)
+        default: production
+        required: true
+      publish:
+        description: Send to Play (off = build and check the signature only)
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Put the keys in place
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          for v in KEYSTORE_B64 KEYSTORE_PROPERTIES GOOGLE_SERVICES_JSON PLAY_SERVICE_ACCOUNT_JSON; do
+            [ -n "${!v}" ] || { echo "missing secret $v"; exit 1; }
+          done
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          # storeFile points at the copy above; the other three lines come from Boss's keystore.properties
+          { grep -v '^storeFile' <<< "$KEYSTORE_PROPERTIES"; echo "storeFile=$RUNNER_TEMP/release.keystore"; } > keystore.properties
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > serviceAccount-play.json
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest
+      - name: Build and publish to Play
+        if: inputs.publish
+        run: ./gradlew publishBundle --track "${{ inputs.track }}"
+      - name: Build only and show the signing key
+        if: ${{ !inputs.publish }}
+        # The fingerprint is public (it sits in assetlinks.json); upload key 3F:C6... means the right key signed it.
+        run: |
+          ./gradlew bundleRelease
+          keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab | grep SHA256
+      - name: Remove the keys
+        if: always()
+        run: rm -f keystore.properties app/google-services.json serviceAccount-play.json "$RUNNER_TEMP/release.keystore"
