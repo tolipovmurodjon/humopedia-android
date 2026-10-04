@@ -14,6 +14,14 @@ on:
         description: Send to Play (off = build and check the signature only)
         type: boolean
         default: true
+      listing:
+        description: Also send the store page (texts, icon, screenshots in app/src/main/play)
+        type: boolean
+        default: false
+      test_apk:
+        description: Also build a test APK (download it, then firebase appdistribution:distribute)
+        type: boolean
+        default: false
 
 concurrency:
   group: release
@@ -50,6 +58,18 @@ jobs:
       - name: Build and publish to Play
         if: inputs.publish
         run: ./gradlew publishBundle --track "${{ inputs.track }}"
+      - name: Send the store page to Play
+        if: inputs.listing
+        run: ./gradlew publishListing
+      - name: Build the test APK
+        if: inputs.test_apk
+        run: ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        if: inputs.test_apk
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
       - name: Build only and show the signing key
         if: ${{ !inputs.publish }}
         # The fingerprint is public (it sits in assetlinks.json); upload key 3F:C6... means the right key signed it.
