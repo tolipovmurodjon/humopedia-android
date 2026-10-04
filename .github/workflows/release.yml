@@ -10,6 +10,10 @@ on:
         description: Play track (internal, alpha, beta, production)
         default: production
         required: true
+      publish:
+        description: Send to Play (off = build and check the signature only)
+        type: boolean
+        default: true
 
 concurrency:
   group: release
@@ -44,7 +48,14 @@ jobs:
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
       - name: Build and publish to Play
+        if: inputs.publish
         run: ./gradlew publishBundle --track "${{ inputs.track }}"
+      - name: Build only and show the signing key
+        if: ${{ !inputs.publish }}
+        # The fingerprint is public (it sits in assetlinks.json); upload key 3F:C6... means the right key signed it.
+        run: |
+          ./gradlew bundleRelease
+          keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab | grep SHA256
       - name: Remove the keys
         if: always()
         run: rm -f keystore.properties app/google-services.json serviceAccount-play.json "$RUNNER_TEMP/release.keystore"
