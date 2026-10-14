@@ -29,6 +29,7 @@ class HumoLauncherActivity : LauncherActivity() {
             param("browser", preferredBrowser() ?: "default")
             param("launch_path", RemoteFlags.launchPath())
         }
+        DailyPush.onLaunch(intent, packageManager.getPackageInfo(packageName, 0).versionName.orEmpty())
         if (shouldAskForNotifications()) {
             preferences().edit().putBoolean(ASKED_NOTIFICATIONS, true).apply()
             try {
