@@ -38,8 +38,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Only goes up (AND-3). 27 crashed on launch (R8 renamed a TWA component); 28 = 2.0.1, 29 = 2.0.2 (Chrome).
-        versionCode = 32
-        versionName = "2.1.2"
+        versionCode = 33
+        versionName = "2.2.0"
 
     }
 
