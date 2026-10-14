@@ -38,8 +38,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Only goes up (AND-3). 27 crashed on launch (R8 renamed a TWA component); 28 = 2.0.1, 29 = 2.0.2 (Chrome).
-        versionCode = 33
-        versionName = "2.2.0"
+        versionCode = 34
+        versionName = "2.3.0"
 
     }
 
@@ -92,6 +92,8 @@ dependencies {
     implementation(libs.firebase.appcheck.playintegrity)
     implementation(libs.firebase.perf)
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.functions)
+    implementation(libs.firebase.installations)
     debugImplementation(libs.firebase.appcheck.debug)
     testImplementation(libs.junit)
 }
