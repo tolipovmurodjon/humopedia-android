@@ -178,7 +178,7 @@ private fun Stone(level: Level, stone: StoneState, layout: PathLayout, i: Int, c
     }
     // The level's name beside its stone, on the side the river swings away from.
     val labelLeft = layout.x(i) > layout.width / 2f
-    val labelW = 132.dp
+    val labelW = 140.dp
     val labelX = if (labelLeft) x - size / 2 - labelW - 4.dp else x + size / 2 + 4.dp
     if (stone == StoneState.Current) {
         Pane(
@@ -187,7 +187,7 @@ private fun Stone(level: Level, stone: StoneState, layout: PathLayout, i: Int, c
         ) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).clearAndSetSemantics {}) {
                 Text("Level ${level.n}", style = MaterialTheme.typography.labelSmall, color = Glass.PrimaryInk, fontWeight = FontWeight.SemiBold)
-                Text(level.title, style = MaterialTheme.typography.titleMedium, color = Glass.Ink, maxLines = 2)
+                Text(level.title, style = MaterialTheme.typography.titleMedium, color = Glass.Ink, maxLines = 3)
             }
         }
     } else {
@@ -198,7 +198,8 @@ private fun Stone(level: Level, stone: StoneState, layout: PathLayout, i: Int, c
         ) {
             Text("Level ${level.n}", style = MaterialTheme.typography.labelSmall, color = Glass.Muted)
             Text(
-                level.title, style = MaterialTheme.typography.bodyMedium, color = Glass.Ink, maxLines = 2,
+                // Three lines: at 1.5x font "Rotations and Translations" needs them (CI screenshot 05).
+                level.title, style = MaterialTheme.typography.bodyMedium, color = Glass.Ink, maxLines = 3,
                 textAlign = if (labelLeft) TextAlign.End else TextAlign.Start,
             )
         }

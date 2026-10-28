@@ -123,12 +123,12 @@ fun AppShell(
                         onClick = { if (selected != i) selected = i },
                         modifier = Modifier.semantics { contentDescription = tab.label; this.selected = isSelected },
                     ) {
-                        // Icons only (Boss 2026-10-28). Ink at 72 % on the glass; the bar's top layer tints the
-                        // selected one mint, and it is drawn filled.
+                        // Icons only (Boss 2026-10-28). Ink at 72 % on the glass; the selected one is filled and mint
+                        // #1C7E69 itself, so it reads mint even where the lens layer is off (old phones, first frame).
                         Icon(
                             if (isSelected) tab.selectedIcon else tab.icon,
                             contentDescription = null,
-                            tint = Glass.Ink.copy(alpha = 0.72f),
+                            tint = if (isSelected) Glass.Primary else Glass.Ink.copy(alpha = 0.72f),
                             modifier = Modifier.size(if (compact) 24.dp else 26.dp),
                         )
                     }

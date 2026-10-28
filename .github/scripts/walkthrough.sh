@@ -80,19 +80,19 @@ tap "Bosh sahifa"; shot back-home
 has "Level 3, Rotations, current"
 
 SIZE=$(screen_size); W=${SIZE%x*}; H=${SIZE#*x}
-log "-- scroll the path up into the clouds and back"
+log "-- scroll the path up into the clouds, to the course title"
 $T adb shell input swipe $((W / 2)) $((H * 30 / 100)) $((W / 2)) $((H * 75 / 100)) 400
 shot path-up
-$T adb shell input swipe $((W / 2)) $((H * 30 / 100)) $((W / 2)) $((H * 75 / 100)) 400
+for i in 1 2 3 4 5 6; do $T adb shell input swipe $((W / 2)) $((H * 25 / 100)) $((W / 2)) $((H * 80 / 100)) 250; sleep 0.5; done
 shot path-top
 has "Coordinate Transformations"
-$T adb shell input swipe $((W / 2)) $((H * 75 / 100)) $((W / 2)) $((H * 25 / 100)) 400
-$T adb shell input swipe $((W / 2)) $((H * 75 / 100)) $((W / 2)) $((H * 25 / 100)) 400
-shot path-down
+has "Level 14, Stretching, locked"
+
+log "-- leave Home and come back: the path opens at the current stone again"
+tap Jang; sleep 1; tap "Bosh sahifa"; shot path-at-current
+has "Level 3, Rotations, current"
 
 log "-- one tap on the current stone opens its lesson"
-# The stone may have scrolled off; bring it back by relaunching to the path's own opening place.
-grep -q 'content-desc="Level 3, Rotations, current"' "$LAST" || { $T adb shell input swipe $((W / 2)) $((H * 40 / 100)) $((W / 2)) $((H * 60 / 100)) 300; shot path-find-current; }
 tap "Level 3, Rotations, current"; shot lesson
 has "Lesson 3.1 · Rotation Around the Origin"
 $T adb shell input keyevent 4; shot back-from-lesson
