@@ -2,8 +2,13 @@ import com.github.triplet.gradle.androidpublisher.ReleaseStatus
 import java.util.Properties
 
 plugins {
+    // AGP 9 compiles Kotlin itself (built-in Kotlin): no org.jetbrains.kotlin.android plugin.
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.roborazzi)
     alias(libs.plugins.play.publisher)
 }
 
@@ -29,18 +34,16 @@ val keystore = Properties().apply { if (keystoreFile.exists()) keystoreFile.inpu
 
 android {
     namespace = "com.mcompany.humo"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.mcompany.humo"
         minSdk = 26
         targetSdk = 36
-        // Only goes up (AND-3). 27 crashed on launch (R8 renamed a TWA component); 28 = 2.0.1, 29 = 2.0.2 (Chrome).
-        versionCode = 34
-        versionName = "2.3.0"
-
+        // Only goes up (AND-3). 34 = 2.3.0, the last TWA build. 35 = the first native build (NATIVE-BRIEF N0).
+        versionCode = 35
+        versionName = "3.0.0-alpha01"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -69,8 +72,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        // Robolectric (Compose UI and screenshot tests on the JVM) needs the merged resources.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -84,16 +93,58 @@ play {
 }
 
 dependencies {
-    implementation(libs.androidbrowserhelper)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.activity.compose)
+
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.util)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
+
+    // Real liquid glass on the chrome (the bottom bar first)
+    implementation(libs.kyant.backdrop)
+    implementation(libs.kyant.shapes)
+
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+
+    // The learner's progress on the path (small, local; the server copy comes with accounts)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
+
+    // Push, analytics and crash reports, as in 2.x
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.config)
     implementation(libs.firebase.appcheck.playintegrity)
     implementation(libs.firebase.perf)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.functions)
     implementation(libs.firebase.installations)
     debugImplementation(libs.firebase.appcheck.debug)
+
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

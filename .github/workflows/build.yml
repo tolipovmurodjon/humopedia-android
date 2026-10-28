@@ -1,9 +1,11 @@
 name: build
 
+# The laptop's disk is nearly full and the Oracle server is ARM, so CI is where the native app compiles and is judged
+# (copied from PAGEL's build.yml, 2026-10-28).
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
 
 concurrency:
   group: build-${{ github.ref }}
@@ -12,7 +14,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -20,5 +22,57 @@ jobs:
           distribution: zulu
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests and debug build
-        run: ./gradlew testDebugUnitTest assembleDebug
+      # roborazzi.test.record: the screenshot tests save their PNGs (app/build/outputs/roborazzi) for the artifact.
+      - name: Unit tests, screenshot tests and debug build
+        run: ./gradlew testDebugUnitTest assembleDebug -Proborazzi.test.record=true
+      - name: Keep the screenshots and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-and-reports
+          path: |
+            app/build/outputs/roborazzi/
+            app/build/reports/tests/
+            app/build/test-results/
+          retention-days: 7
+      - name: Keep the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: humopedia-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+  # A real Android runtime opens the APK and a script uses it like a child: unit tests cannot see a crash at launch,
+  # a frozen first frame or a broken manifest; this can.
+  walkthrough:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: humopedia-debug-apk
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # ReactiveCircus/android-emulator-runner (vetted for PAGEL 2026-10-27).
+      - name: Emulator walkthrough (API 34)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash .github/scripts/walkthrough.sh
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkthrough-evidence
+          path: smoke-out/
+          retention-days: 7

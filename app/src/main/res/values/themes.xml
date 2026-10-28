@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Edge to edge: MainActivity draws under both system bars (the glass bar sits above the navigation bar). -->
     <style name="Theme.Humopedia" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/ground</item>
-        <item name="android:statusBarColor">@color/ground</item>
-        <item name="android:navigationBarColor">@color/ground</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
