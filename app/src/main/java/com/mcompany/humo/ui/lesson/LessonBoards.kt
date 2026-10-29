@@ -308,7 +308,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
         disp.animateTo(to, tween(700, easing = GlideEase))
     }
 
-    val frameH = (12f + page.graph.boxH) * u
+    val frameH = u * (12f + page.graph.boxH)
     Column(Modifier.width(width), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.width(width).border(1.5.dp * (u / 1.dp), Color(0xFFE5E5E5), RoundedCornerShape(6.dp * (u / 1.dp)))) {
             val described = buildString {
