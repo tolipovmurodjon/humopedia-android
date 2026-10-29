@@ -1,13 +1,16 @@
 package com.mcompany.humo.ui.path
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.IntOffset
@@ -16,15 +19,17 @@ import com.mcompany.humo.R
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
  * The SR-71 as 16 pre-rendered 3D frames (Boss 2026-10-29 "go sprite", the Clash of Clans method):
  * docs/design/2026-10-28-app-redesign/round-07-models/sr71-sprites, rendered from sr71.blend. Frame k faces k × 22.5°
- * clockwise from nose-up; the bitmap is never rotated (a rotated render looked upside down), only the nearest frame
- * is picked. Banking is a small squash across the wings. The render's camera looks down at a tilt, so up-down
- * distances in a frame are 0.82 of left-right ones: the nozzles are placed through the same squash.
+ * clockwise from nose-up; the bitmap is never rotated (a rotated render looked upside down). Between two frames the
+ * jet is a crossfade of both by the fractional heading (Boss on alpha05: "turning sharp, tick tick"), so a turn is
+ * smooth. Banking is a small squash across the wings. The render's camera looks down at a tilt, so up-down distances
+ * in a frame are 0.82 of left-right ones: the nozzles are placed through the same squash.
  */
 internal object Jet {
     val Frames = listOf(
@@ -33,6 +38,7 @@ internal object Jet {
         R.drawable.sr71_08, R.drawable.sr71_09, R.drawable.sr71_10, R.drawable.sr71_11,
         R.drawable.sr71_12, R.drawable.sr71_13, R.drawable.sr71_14, R.drawable.sr71_15,
     )
+    private const val STEP = 360f / 16f
 
     /** The render's vertical foreshortening (measured: tail 0.35 of the frame below centre nose-up, 0.43 nose-right). */
     private const val TILT = 0.82f
@@ -42,56 +48,90 @@ internal object Jet {
 
     private val ShadowTint = ColorFilter.tint(Color(0xFF1F5E57), BlendMode.SrcIn)
     private val Smoke = Color(0xFF787C84)
+    /** Shadow strength (Boss on alpha05 saw "2 ones": the old 18 % sharp copy read as a second jet). */
+    const val SHADOW_ALPHA = 0.12f
 
     /** The lesson's afterburner: a radial #FFFBE6 → #FFD45C → #FF8A2A that fades out. */
     private val FlameStops = arrayOf(0f to Color(0xFFFFFBE6), 0.18f to Color(0xFFFFFBE6), 0.32f to Color(0xFFFFD45C), 0.55f to Color(0xFFFF8A2A), 0.75f to Color(0x00FF501E))
 
-    /** [heading] is radians, y down, 0 = moving right; the frame's angle counts clockwise from nose-up. */
-    fun frameOf(heading: Float): Int {
-        val deg = Math.toDegrees((heading + PI / 2).toDouble())
-        return (((deg / 22.5).roundToInt() % 16) + 16) % 16
+    /** The fractional frame (0 ≤ f < 16) for [heading] in radians, y down, 0 = moving right; clockwise from nose-up. */
+    fun frameAt(heading: Float): Float {
+        val f = (Math.toDegrees((heading + PI / 2).toDouble()) / STEP).toFloat()
+        return ((f % 16f) + 16f) % 16f
     }
 
-    private fun frameAngle(k: Int) = (k * 22.5f) * PI.toFloat() / 180f
+    /** The nearest whole frame. */
+    fun frameOf(heading: Float): Int = frameAt(heading).roundToInt() % 16
 
-    /** A point given in nose-up frame units (x right, y toward the tail), placed for frame [k], squashed by [sx] across the wings. */
-    private fun place(k: Int, x: Float, y: Float, size: Float, sx: Float): Offset {
-        val a = frameAngle(k)
+    /** The two frames a heading sits between and the weight of the second (0 = all [first]). */
+    fun blend(heading: Float): Triple<Int, Int, Float> {
+        val f = frameAt(heading)
+        val k0 = floor(f).toInt() % 16
+        return Triple(k0, (k0 + 1) % 16, f - floor(f))
+    }
+
+    private fun angleOf(f: Float) = (f * STEP) * PI.toFloat() / 180f
+
+    /** A point given in nose-up frame units (x right, y toward the tail), placed at frame angle [a], squashed by [sx]. */
+    private fun place(a: Float, x: Float, y: Float, size: Float, sx: Float): Offset {
         val px = x * sx * size; val py = y * size
         return Offset(px * cos(a) - py * sin(a), (px * sin(a) + py * cos(a)) * TILT)
     }
 
     /**
-     * One frame of the jet centred on [c] (px), its frame [size] px square. [bank] -1 … 1, [roll] 0 … 1 the celebratory
-     * roll's progress (0 = none); [t] drives the flame flicker.
+     * The jet centred on [c] (px), its frame [size] px square. [bank] -1 … 1, [roll] 0 … 1 the celebratory roll's
+     * progress (0 = none); [t] drives the flame flicker; [flames] 0 … 1 how much the afterburners burn.
      */
-    fun DrawScope.jet(frames: List<ImageBitmap>, c: Offset, size: Float, heading: Float, bank: Float, roll: Float, t: Float, motion: Boolean) {
-        val k = frameOf(heading)
-        val a = frameAngle(k)
+    fun DrawScope.jet(frames: List<ImageBitmap>, c: Offset, size: Float, heading: Float, bank: Float, roll: Float, t: Float, motion: Boolean, flames: Float = 1f) {
+        val f = frameAt(heading)
+        val a = angleOf(f)
         val sx = (1f - 0.12f * abs(bank).coerceAtMost(1f)) * (if (roll > 0f) cos(2f * PI.toFloat() * roll) else 1f)
-        // Two afterburners at the nozzles, pointing back along the frame's heading, under the jet.
-        for ((i, side) in listOf(-1f, 1f).withIndex()) {
-            // The lesson's flame is 0.11 × 0.26 of the jet's length: here ~8 × 20 dp, starting at the nozzle's lip.
-            val n = c + place(k, side * NOZZLE_X, TAIL_Y - 0.02f, size, sx)
+        if (flames > 0.01f) for ((i, side) in listOf(-1f, 1f).withIndex()) {
+            // The lesson's flame is 0.11 × 0.26 of the jet's length, starting at the nozzle's lip, under the jet.
+            val n = c + place(a, side * NOZZLE_X, TAIL_Y - 0.02f, size, sx)
             val flick = if (motion) 0.88f + 0.12f * sin(t * 37f + i * 2.1f) + 0.06f * sin(t * 61f + i) else 1f
             val r = size * 0.075f
-            withTransform({ translate(n.x, n.y); scale(1f, TILT, Offset.Zero); rotate(k * 22.5f, Offset.Zero); scale(0.62f, 1.6f * flick, Offset.Zero) }) {
+            withTransform({ translate(n.x, n.y); scale(1f, TILT, Offset.Zero); rotate(f * STEP, Offset.Zero); scale(0.62f, (0.35f + 1.25f * flames) * flick, Offset.Zero) }) {
                 drawCircle(Brush.radialGradient(*FlameStops, center = Offset(0f, r * 0.3f), radius = r * 1.05f), r, Offset(0f, r * 0.72f))
             }
         }
-        sprite(frames[k], c, size, a, sx, alpha = 1f, filter = null)
+        // A true crossfade: both frames into one layer, the second added (Plus), so where they overlap the jet stays opaque.
+        val (k0, k1, w) = blend(heading)
+        if (w < 0.02f || w > 0.98f) {
+            sprite(frames[if (w > 0.98f) k1 else k0], c, size, a, sx, 1f, null)
+            return
+        }
+        drawIntoCanvas { canvas ->
+            canvas.saveLayer(Rect(c.x - size, c.y - size, c.x + size, c.y + size), Paint())
+            sprite(frames[k0], c, size, a, sx, 1f - w, null)
+            sprite(frames[k1], c, size, a, sx, w, null, BlendMode.Plus)
+            canvas.restore()
+        }
     }
 
-    /** The same frame flat on the ground in 18 % teal: lower-right of the jet, further and smaller the higher it flies. */
+    /**
+     * The jet's shadow flat on the ground in deep teal, lower-right of the jet: soft (nine copies a few dp apart in one
+     * layer) and faint ([SHADOW_ALPHA]), so it reads as a shadow and never as a second jet.
+     */
     fun DrawScope.jetShadow(frames: List<ImageBitmap>, c: Offset, size: Float, heading: Float, bank: Float, roll: Float, altitude: Float, dp: Float) {
-        val k = frameOf(heading)
+        val f = frameAt(heading)
+        val k = f.roundToInt() % 16
         val sx = (1f - 0.12f * abs(bank).coerceAtMost(1f)) * (if (roll > 0f) abs(cos(2f * PI.toFloat() * roll)) else 1f)
-        val at = c + Offset((16f + 20f * altitude) * dp, (26f + 32f * altitude) * dp)
-        sprite(frames[k], at, size * (0.9f - 0.08f * altitude), frameAngle(k), sx, alpha = 0.18f, filter = ShadowTint)
+        val at = c + Offset((10f + 12f * altitude) * dp, (16f + 18f * altitude) * dp)
+        val s = size * (0.9f - 0.08f * altitude)
+        val soft = (3f + 3f * altitude) * dp
+        drawIntoCanvas { canvas ->
+            canvas.saveLayer(Rect(at.x - s, at.y - s, at.x + s, at.y + s), Paint().apply { alpha = SHADOW_ALPHA })
+            for (i in 0 until 9) {
+                val o = if (i == 8) Offset.Zero else Offset(soft * cos(i * PI.toFloat() / 4f), soft * sin(i * PI.toFloat() / 4f))
+                sprite(frames[k], at + o, s, angleOf(f), sx, 0.25f, ShadowTint)
+            }
+            canvas.restore()
+        }
     }
 
     /** The bitmap as rendered, centred; [sx] squashes it across the wings (the frame's own axis), never turns it. */
-    private fun DrawScope.sprite(image: ImageBitmap, c: Offset, size: Float, angle: Float, sx: Float, alpha: Float, filter: ColorFilter?) {
+    private fun DrawScope.sprite(image: ImageBitmap, c: Offset, size: Float, angle: Float, sx: Float, alpha: Float, filter: ColorFilter?, mode: BlendMode = BlendMode.SrcOver) {
         val deg = angle * 180f / PI.toFloat()
         withTransform({
             translate(c.x, c.y)
@@ -106,19 +146,48 @@ internal object Jet {
                 dstSize = IntSize(s, s),
                 alpha = alpha,
                 colorFilter = filter,
+                blendMode = mode,
                 filterQuality = FilterQuality.Medium,
             )
         }
     }
 
     /** Where the tail is for [heading], from the jet's centre (px): the smoke trail starts there. */
-    fun tail(heading: Float, size: Float): Offset = place(frameOf(heading), 0f, TAIL_Y + 0.08f, size, 1f)
+    fun tail(heading: Float, size: Float): Offset = place(angleOf(frameAt(heading)), 0f, TAIL_Y + 0.08f, size, 1f)
 
     /** A soft smoke trail: [past] tail points, newest first; each puff older, bigger and fainter. */
     fun DrawScope.smoke(past: List<Offset>, dp: Float) {
         past.forEachIndexed { i, p ->
             val age = (i + 1f) / (past.size + 1f)
             translate(p.x, p.y) { drawCircle(Smoke, (2.5f + 7f * age) * dp, Offset.Zero, alpha = 0.26f * (1f - age)) }
+        }
+    }
+}
+
+/**
+ * The jet's heading as a spring (Boss on alpha05: "turning sharp, not smooth"): each frame it moves a share of the way
+ * to the wanted heading, never more than [maxDegPerFrame], always the short way round. Plain state, read in draw.
+ */
+class HeadingSpring(private val maxDegPerFrame: Float = 6f, private val share: Float = 0.22f) {
+    var value = Float.NaN
+        private set
+
+    /** Steps toward [target] (radians) over [frames] 60 Hz frames and returns the new heading. */
+    fun step(target: Float, frames: Float = 1f): Float {
+        if (value.isNaN()) { value = target; return value }
+        val d = wrap(target - value)
+        val max = Math.toRadians(maxDegPerFrame.toDouble()).toFloat() * frames
+        val k = 1f - Math.pow((1f - share).toDouble(), frames.toDouble()).toFloat()
+        value = wrap(value + (d * k).coerceIn(-max, max))
+        return value
+    }
+
+    fun snapTo(heading: Float) { value = heading }
+
+    companion object {
+        fun wrap(a: Float): Float {
+            val tau = 2f * PI.toFloat()
+            return ((a + PI.toFloat()) % tau + tau) % tau - PI.toFloat()
         }
     }
 }

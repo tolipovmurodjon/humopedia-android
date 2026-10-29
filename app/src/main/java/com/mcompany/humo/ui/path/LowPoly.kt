@@ -90,13 +90,6 @@ internal object LowPoly {
         drawPath(tick, Glass.Primary, style = Stroke(r * 0.26f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 
-    /** The "start here" mark on the current island: a mint disc with a white play triangle (no word needed). */
-    fun DrawScope.playBadge(c: Offset, r: Float) {
-        drawCircle(ShadowTeal.copy(alpha = 0.22f), r, c + Offset(0f, r * 0.2f))
-        drawCircle(Glass.Primary, r, c)
-        drawPath(Path().apply { moveTo(c.x - r * 0.28f, c.y - r * 0.42f); lineTo(c.x + r * 0.48f, c.y); lineTo(c.x - r * 0.28f, c.y + r * 0.42f); close() }, Color.White)
-    }
-
     /** A four-point sparkle, [s] its half size, [a] its opacity: the "you did this" twinkle on a done tick. */
     fun DrawScope.sparkle(c: Offset, s: Float, a: Float) {
         val w = s * 0.26f

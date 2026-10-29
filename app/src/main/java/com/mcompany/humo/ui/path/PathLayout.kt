@@ -35,6 +35,13 @@ data class BankRow(val y: Float, val width: Float, val spacing: Float, val speed
 /** Where the SR-71 is at a moment of its loop: position, heading (radians, y down) and bank (-1 left … 1 right). */
 data class PlaneFix(val at: Pt, val heading: Float, val bank: Float, val altitude: Float)
 
+/** The jet's lap: an ellipse round ([cx], [cy]), flown clockwise on screen from its top. */
+data class Lane(val cx: Float, val cy: Float, val rx: Float, val ry: Float) {
+    fun at(a: Float) = Pt(cx + rx * sin(a), cy - ry * cos(a))
+    /** The direction of travel at [a] (radians, y down, 0 = right). */
+    fun heading(a: Float): Float = if (rx == 0f && ry == 0f) -PI.toFloat() / 2f else atan2(ry * sin(a), rx * cos(a))
+}
+
 /**
  * The map of one course, in dp, inside a content box [height] tall and [width] wide (PHASE-PATH-V2): level 1 at the
  * bottom, a walkable trail of flagstones climbing through every level's island, a river that meets the trail only at
@@ -219,43 +226,55 @@ class PathLayout(val count: Int, val width: Float) {
         }
     }
 
+    /** An island's no-fly radius (dp): its art's half width plus 24 dp, around EVERY island (Boss on alpha05). */
+    fun noFly(i: Int, current: Int): Float = (if (i == current - 1) CURRENT_R else ISLAND_R) + NO_FLY_MARGIN
+
     /**
-     * The SR-71's lazy figure-eight over the clouds, above the current stone (never over the stone the child is about
-     * to tap). One loop every [LOOP_S] seconds; heading and bank come from the curve itself.
+     * The jet's own lane (Boss on alpha05: "the SR-71 should keep its place, it should never go over that lesson"): an
+     * ellipse in free air, fixed in the world, chosen once per level and screen. It lies inside what shows when Home
+     * opens (the current island at thumb height in a [viewport] dp tall view above the tab bar, under the top bar), at
+     * least [JET_EDGE] dp inside the screen's sides, and every point of it is outside every island's no-fly circle.
+     * Among the lanes that fit, the widest one nearest the middle of the open sky above the current island wins.
      */
-    fun plane(current: Int, seconds: Float, scrollDp: Float? = null, viewport: Float? = null): PlaneFix {
+    fun lane(current: Int, viewport: Float = 740f): Lane {
         val c = (current - 1).coerceIn(0, count - 1)
-        val home = if (c >= count - 2) y(c) + gap * 1.55f else y(c) - gap * 1.6f
-        // Kept on screen (checker fix 5): between the top bar and 170 dp above thumb height, where the current stone opens.
-        val sd = scrollDp ?: 0f
-        val lo = sd + 124f
-        val hi = if (viewport == null) lo else sd + viewport * THUMB - 170f
-        // A short screen (landscape) has no room above the stone: the loop flies beside it instead, on the far side,
-        // never under the tab bar.
-        val beside = scrollDp != null && viewport != null && hi < lo
-        val stone = stone(c)
-        val cy = when {
-            scrollDp == null || viewport == null -> home
-            beside -> stone.y.coerceIn(sd + 110f, (sd + (viewport ?: 0f) - 70f).coerceAtLeast(sd + 110f))
-            else -> {
-                val kept = home.coerceIn(lo, hi)
-                // Never over the stone the child is about to tap, wherever they have scrolled it.
-                if (abs(kept - y(c)) >= 170f) kept else if (y(c) - 170f >= sd + 60f) y(c) - 170f else y(c) + 170f
+        val top = y(c) - viewport * THUMB + TOP_CLEAR
+        val bottom = y(c) + viewport * (1f - THUMB) - BOTTOM_CLEAR
+        val near = (0 until count).filter { y(it) in top - 260f..bottom + 260f }
+        val want = Pt(width / 2f, (top + y(c)) / 2f)
+        var best: Lane? = null
+        var bestScore = Float.NEGATIVE_INFINITY
+        val rxs = listOf(0.34f, 0.28f, 0.22f, 0.17f, 0.12f, 0.08f).map { (width * it).coerceAtMost(150f) }
+        val rys = listOf(60f, 46f, 34f, 24f)
+        var cy = top
+        while (cy <= bottom) {
+            var cx = JET_EDGE
+            while (cx <= width - JET_EDGE) {
+                if (near.all { Pt(cx, cy).dist(stone(it)) > noFly(it, current) }) for (rx in rxs) for (ry in rys) {
+                    if (cx - rx < JET_EDGE || cx + rx > width - JET_EDGE || cy - ry < top || cy + ry > bottom) continue
+                    val l = Lane(cx, cy, rx, ry)
+                    val score = rx + ry * 0.6f - Pt(cx, cy).dist(want) * 0.25f
+                    if (score <= bestScore) continue
+                    // 48 samples plus 3 dp to spare, so the curve between two samples stays out too.
+                    if ((0 until LANE_SAMPLES).all { k -> val p = l.at(k * 2f * PI.toFloat() / LANE_SAMPLES); near.all { p.dist(stone(it)) > noFly(it, current) + 3f } }) {
+                        best = l; bestScore = score
+                    }
+                }
+                cx += 10f
             }
+            cy += 10f
         }
-        val cx = if (!beside) width / 2f else if (stone.x < width / 2f) width * 0.85f else width * 0.15f
-        // Beside: the loop's near end stays 110 dp from the stone and its far end 40 dp inside the screen edge.
-        val rx = if (!beside) width * 0.3f else (abs(cx - stone.x) - 110f).coerceAtMost(minOf(cx, width - cx) - 40f).coerceAtLeast(24f)
-        val ry = if (beside) 40f else 54f
+        // Nowhere free (never seen on a phone): hold still in the widest gap beside the current island.
+        return best ?: Lane(if (x(c) < width / 2f) width - JET_EDGE else JET_EDGE, y(c), 0f, 0f)
+    }
+
+    /** Where the SR-71 is [seconds] into its lap of [lane]: one lap every [LOOP_S] s, heading and bank from the curve. */
+    fun plane(lane: Lane, seconds: Float): PlaneFix {
         val a = (seconds / LOOP_S) * 2f * PI.toFloat()
-        fun at(a: Float) = Pt(cx + rx * sin(a), cy + ry * sin(2f * a))
-        val p = at(a)
-        val q = at(a + 0.01f)
-        val heading = atan2(q.y - p.y, q.x - p.x)
-        val r = at(a + 0.02f)
-        val turn = atan2(r.y - q.y, r.x - q.x) - heading
-        val wrapped = ((turn + PI.toFloat()) % (2f * PI.toFloat()) + 2f * PI.toFloat()) % (2f * PI.toFloat()) - PI.toFloat()
-        val bank = (wrapped * 40f).coerceIn(-1f, 1f)
+        val p = lane.at(a)
+        val heading = lane.heading(a)
+        val turn = HeadingSpring.wrap(lane.heading(a + 0.05f) - heading)
+        val bank = (turn * 12f).coerceIn(-1f, 1f)
         return PlaneFix(p, heading, bank, altitude = 0.5f + 0.5f * abs(cos(a)))
     }
 
@@ -267,6 +286,16 @@ class PathLayout(val count: Int, val width: Float) {
         const val RIVER_OFFSET = 88f
         const val RIVER_HALF = 20f
         const val LOOP_S = 22f
+        /** Island art half widths (PathScreen: 88 dp, the current one 100 dp) and the no-fly margin around each. */
+        const val ISLAND_R = 44f
+        const val CURRENT_R = 50f
+        const val NO_FLY_MARGIN = 24f
+        /** The jet's centre stays this far inside the screen's sides (half its frame and a little). */
+        const val JET_EDGE = 44f
+        /** The top bar and status bar, and the space above the tab bar, that the lane keeps clear of at open. */
+        const val TOP_CLEAR = 120f
+        const val BOTTOM_CLEAR = 40f
+        const val LANE_SAMPLES = 48
         /** Locked islands left in the open above the current one: the story the child can see coming. */
         const val STORY = 6
         /** How much of the cloud bank shows at the very top of the scroll (dp). */

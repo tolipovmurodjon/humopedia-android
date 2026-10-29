@@ -46,6 +46,7 @@ import com.mcompany.humo.ui.glass.GlassStage
 import com.mcompany.humo.ui.glass.LiquidBottomTab
 import com.mcompany.humo.ui.glass.LiquidBottomTabs
 import com.mcompany.humo.ui.glass.edgeFade
+import com.mcompany.humo.ui.lesson.LessonEntry
 import com.mcompany.humo.ui.path.PathRoute as PathScreenRoute
 
 private val BarTall = 64.dp
@@ -62,6 +63,8 @@ fun AppShell(
     startTab: Int = 0,
     /** Home's path; tests pass a fixed state instead of the Hilt ViewModel. */
     path: @Composable (PaddingValues, (Level) -> Unit) -> Unit = { padding, open -> PathScreenRoute(padding, onOpenLevel = open) },
+    /** A level's lesson; tests pass the player without the Hilt ViewModel. */
+    lesson: @Composable (Int, PaddingValues, () -> Unit) -> Unit = { level, padding, close -> LessonEntry(level, padding, close) },
 ) {
     val backdrop = rememberLayerBackdrop()
     var selected by rememberSaveable { mutableStateOf(startTab) }
@@ -87,7 +90,8 @@ fun AppShell(
             Box(
                 Modifier.fillMaxSize()
                     // No full-screen offscreen layer in a cold start's first frame (GlassStage).
-                    .then(if (!GlassStage.on) Modifier else Modifier.edgeFade(top + 14.dp, if (onTop) nav + barSpace + 8.dp else null)),
+                    // The lesson is Brilliant's white page edge to edge: no fade over its top bar.
+                    .then(if (!GlassStage.on || !onTop) Modifier else Modifier.edgeFade(top + 14.dp, nav + barSpace + 8.dp)),
             ) {
                 key(selected) {
                     NavDisplay(
@@ -96,7 +100,7 @@ fun AppShell(
                         entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator<NavKey>(), rememberViewModelStoreNavEntryDecorator<NavKey>()),
                         entryProvider = entryProvider<NavKey> {
                             entry<PathRoute> { path(padding) { stack.add(LessonRoute(it.n)) } }
-                            entry<LessonRoute> { r -> LessonScreen(r.level, padding, onBack = { stack.removeLastOrNull() }) }
+                            entry<LessonRoute> { r -> lesson(r.level, padding) { stack.removeLastOrNull() } }
                             entry<WorldsRoute> { ComingScreen(Tab.Worlds, padding) }
                             entry<BattleRoute> { ComingScreen(Tab.Battle, padding) }
                             entry<LeaderboardRoute> { ComingScreen(Tab.Leaderboard, padding) }

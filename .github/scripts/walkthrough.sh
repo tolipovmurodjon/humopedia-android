@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Emulator smoke + critic walkthrough for the native app (NATIVE-BRIEF N0; PAGEL's emulator-smoke.sh + walkthrough.sh,
 # cut to what Humopedia has). Uses the app like a child: launch, every tab, scroll the path up to the cloud bank, one
-# tap on the current island starts the lesson, a done island's sheet, the course chip, back, rotate, big font. Each step leaves a screenshot + UI tree in smoke-out/walk; a broken step fails the run.
+# tap on the current island starts L1.1 and the walk plays it to the end, a done island's sheet, the course chip, back, rotate, big font. Each step leaves a screenshot + UI tree in smoke-out/walk; a broken step fails the run.
 set -u
 T="timeout 60"
 PKG=com.mcompany.humo
@@ -100,12 +100,48 @@ log "-- leave Home and come back: the path opens at the current stone again"
 tap Jang; sleep 1; tap "Bosh sahifa"; shot path-at-current
 has "Level 3, Rotations, current"
 
-log "-- one tap on the current island starts its lesson (no sheet); back opens Home at the current island again"
+log "-- one tap on the current island starts L1.1 (no sheet); Back asks before leaving"
 tap "Level 3, Rotations, current"; shot lesson
-has "Lesson 3.1 · Rotation Around the Origin"
-$T adb shell input keyevent 4; shot back-from-lesson 0.8
+has "Move the point 3 steps to the right and 1 up."
+$T adb shell input keyevent 4; shot leave-asks 0.8
+has "Leave the lesson?"
+tap "Keep going"; sleep 1
+
+log "-- play L1.1 to the end like a child: one wrong try on every graded page"
+# The board's corners from the UI tree; Brilliant's graph geometry (docs/qa/l11-spec.md §3): origin (48, 308), cell
+# 42.67 in a 350 px wide box.
+board() { set -- $(dump | tr '>' '\n' | grep 'resource-id="board"' | head -1 | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | grep -oE '[0-9]+' | tr '\n' ' '); BX1=${1:-0}; BY1=${2:-0}; BX2=${3:-0}; [ "$BX2" -gt 0 ] || fail "no board on screen"; }
+npx() { awk -v l="$BX1" -v t="$BY1" -v r="$BX2" -v x="$1" -v y="$2" 'BEGIN{s=(r-l)/350; printf "%d %d", l+(48+x*42.67)*s, t+(308-y*42.67)*s}'; }
+drag() { board; local a b; a=$(npx "$1" "$2"); b=$(npx "$3" "$4"); $T adb shell input swipe $a $b 700; sleep 0.8; }
+press() { tap "$1"; sleep "${2:-0.8}"; }
+
+drag 2 1 3 4; press Check; shot P1-wrong
+has "Hmm, think about that again."
+press "Try again"; drag 3 4 5 2; press Check; shot P1-correct
+has "Good!"
+press "Why?"; shot P1-why; has "Why is this the answer?"; press "Yes, that makes sense"
+press Continue
+drag 1 3 2 6; press Check; press "Try again"; drag 2 6 4 4; press Check; shot P2-correct
+has "Continue"; press Continue
+shot P3; has "Two points, each moved a steps right and b steps up."; press Continue
+for P in "P4 1 2 2 2" "P5 1 3 3 1" "P6 3 2 2 3"; do
+  set -- $P
+  press "Tile $2" 0.4; press "Tile $3"; press Check; shot "$1-wrong"
+  has "Try again"; press "Try again"; press "Start over"
+  press "Tile $4" 0.4; press "Tile $5"; press Check; shot "$1-correct"
+  has "Continue"; press Continue
+done
+shot P7; press Play 1.5; press Continue
+shot skill-splash 0.3; has "Skill check"; sleep 2.5
+press "Tile 3" 0.4; press "Tile 2"; press Check 1.2
+press "I don(&apos;|.)t know" 1.2
+press "Tile 1" 0.4; press "Tile 4"; press Check 1.5
+shot skill-score; has "That was tricky!"
+press "Skip review"; shot skill-retry; has "Retry skill check"
+press "Skip retry"; shot lesson-end; has "Lesson complete"; has "75 sparks earned."
+press Continue 2; shot back-from-lesson
 has "Level 3, Rotations, current"
-has "Bosh sahifa"
+has "Olmos: 75"
 shot jet-roll-done 1.5
 
 log "-- a done island opens its sheet to replay; Back closes it"

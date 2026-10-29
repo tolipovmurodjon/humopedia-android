@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,10 +95,11 @@ import com.mcompany.humo.ui.path.Jet.jet
 import com.mcompany.humo.ui.path.Jet.jetShadow
 import com.mcompany.humo.ui.path.Jet.smoke
 import com.mcompany.humo.ui.path.LowPoly.pine
-import com.mcompany.humo.ui.path.LowPoly.playBadge
 import com.mcompany.humo.ui.path.LowPoly.sparkle
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.sin
@@ -301,7 +303,7 @@ private fun Ground(layout: PathLayout, current: Int, cut: Float) {
 
 /**
  * One level's island. No words on the map: the state is in the picture (done = moss + a tick that sparkles as it comes
- * into view, current = sunny gold + a waving flag + a play mark + a breathing ring, locked = slate + padlock). TalkBack
+ * into view, current = sunny gold + a waving flag + a breathing ring, locked = slate + padlock). TalkBack
  * reads "Level 3, Rotations, current".
  */
 @Composable
@@ -360,8 +362,8 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
                     island(c, rx, look)
                     when (stone) {
                         StoneState.Done -> doneBadge(Offset(c.x + rx * 0.62f, c.y - rx * 0.42f), 11.dp.toPx())
-                        StoneState.Current -> playBadge(Offset(c.x - rx * 0.6f, c.y - rx * 0.34f), 12.dp.toPx())
                         StoneState.Locked -> lock(Offset(c.x, c.y - rx * 0.02f), rx * 0.42f)
+                        StoneState.Current -> Unit
                     }
                 }
             },
@@ -411,6 +413,14 @@ private fun Sky(
 ) {
     val rows = remember(layout, current) { layout.bank(current) }
     val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
+    // The jet's own lane, fixed in the world for this level and screen (it keeps its place when the child scrolls).
+    // The search tries a few thousand ellipses (~10-50 ms), so on a phone it runs off the main thread once per open.
+    val still = remember(layout, current, visible, motion) { if (motion) null else layout.lane(current, visible) }
+    val lane by produceState(still, layout, current, visible) {
+        if (value == null) value = withContext(Dispatchers.Default) { layout.lane(current, visible) }
+    }
+    val headingSpring = remember { HeadingSpring() }
+    val lastT = remember { floatArrayOf(Float.NaN) }
     Box(
         Modifier.fillMaxSize().graphicsLayer().clearAndSetSemantics {}.drawWithCache {
             val k = density
@@ -433,11 +443,20 @@ private fun Sky(
             onDrawBehind {
                 val t = if (motion) seconds.value else 0f
                 val scrollDp = scroll.value / k + cut
-                val fix = layout.plane(current, t, scrollDp, visible)
-                val jetOn = fix.at.y - scrollDp in -60f..viewport + 60f
+                val lap = lane
+                val raw = if (lap != null) layout.plane(lap, t) else null
+                // The heading springs toward the curve's own (≤ 6° a frame), so no turn ever snaps.
+                val frames60 = if (lastT[0].isNaN() || !motion) 1f else ((t - lastT[0]) * 60f).coerceIn(0f, 4f)
+                lastT[0] = t
+                val fix = when {
+                    raw == null -> null
+                    motion -> raw.copy(heading = headingSpring.step(raw.heading, frames60))
+                    else -> raw.also { headingSpring.snapTo(it.heading) }
+                }
+                val jetOn = fix != null && lap != null && fix.at.y - scrollDp in -60f..viewport + 60f
                 val roll = ((t - rollAt.value) / 1.1f).let { if (it in 0f..1f) it else 0f }
                 translate(0f, -scrollDp * k) {
-                    if (jetOn) jetShadow(frames, Offset(fix.at.x * k, fix.at.y * k), JET_FRAME * k, fix.heading, fix.bank, roll, fix.altitude, k)
+                    if (jetOn && fix != null) jetShadow(frames, Offset(fix.at.x * k, fix.at.y * k), JET_FRAME * k, fix.heading, fix.bank, roll, fix.altitude, k)
                     if (edge + 30f > scrollDp) {
                         drawPath(shadow, cloudShadow)
                         // Behind the rows, so no gap between two puffs ever shows the world above.
@@ -454,10 +473,10 @@ private fun Sky(
                             }
                         }
                     }
-                    if (jetOn) {
+                    if (jetOn && fix != null && lap != null) {
                         // A soft trail of puffs behind the tail, where the jet was a moment ago.
                         val past = (1..9).map { i ->
-                            val f = layout.plane(current, t - i * 0.16f, scrollDp, visible)
+                            val f = layout.plane(lap, t - i * 0.16f)
                             Offset(f.at.x * k, f.at.y * k) + Jet.tail(f.heading, JET_FRAME * k)
                         }
                         smoke(past, k)

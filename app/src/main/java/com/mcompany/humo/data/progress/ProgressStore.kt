@@ -31,10 +31,28 @@ class ProgressStore @Inject constructor(@ApplicationContext private val context:
         context.progress.edit { it[CURRENT_LEVEL] = level }
     }
 
+    /** Lessons finished in [level] (shown on its island sheet later). */
+    fun lessonsDone(level: Int): Flow<Int> = context.progress.data.map { it[doneKey(level)] ?: 0 }
+
+    /**
+     * A finished lesson: one more lesson done in [level] (at most [lessons]), its sparks added to the gems, and when the
+     * current level's last lesson is done the next level becomes current.
+     */
+    suspend fun lessonDone(level: Int, lessons: Int, sparks: Int) {
+        context.progress.edit {
+            val done = ((it[doneKey(level)] ?: 0) + 1).coerceAtMost(lessons)
+            it[doneKey(level)] = done
+            it[GEMS] = (it[GEMS] ?: 0) + sparks
+            val current = it[CURRENT_LEVEL] ?: DEMO_START_LEVEL
+            if (done >= lessons && level == current) it[CURRENT_LEVEL] = current + 1
+        }
+    }
+
     companion object {
         const val DEMO_START_LEVEL = 3
         private val CURRENT_LEVEL = intPreferencesKey("trans.current_level")
         private val GEMS = intPreferencesKey("gems")
         private val STREAK_DAYS = intPreferencesKey("streak_days")
+        private fun doneKey(level: Int) = intPreferencesKey("trans.done.$level")
     }
 }

@@ -30,6 +30,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.mcompany.humo.data.course.CoordinateTransformations
 import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.GlassTheme
+import com.mcompany.humo.ui.lesson.LessonPlayer
 import com.mcompany.humo.ui.path.Jet
 import com.mcompany.humo.ui.path.PathScreen
 import com.mcompany.humo.ui.path.PathUiState
@@ -68,7 +69,13 @@ class ShellScreenshotTest {
                 val d = LocalDensity.current
                 key(tab, scale) {
                     CompositionLocalProvider(LocalDensity provides Density(d.density, scale)) {
-                        GlassTheme { AppShell(startTab = tab, path = { padding, open -> PathScreen(demo, padding, open, motion = false) }) }
+                        GlassTheme {
+                            AppShell(
+                                startTab = tab,
+                                path = { padding, open -> PathScreen(demo, padding, open, motion = false) },
+                                lesson = { _, padding, close -> LessonPlayer(padding, onExit = close, onFinish = { close() }, motion = false) },
+                            )
+                        }
                     }
                 }
             }
@@ -97,9 +104,11 @@ class ShellScreenshotTest {
         shell()
         compose.onNodeWithContentDescription("Level 3, Rotations, current").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Lesson 3.1 · Rotation Around the Origin").assertIsDisplayed()
+        compose.onNodeWithText("Move the point 3 steps to the right and 1 up.").assertIsDisplayed()
         shot("03b-lesson")
-        compose.onNodeWithContentDescription("Orqaga").performClick()
+        compose.onNodeWithContentDescription("Exit lesson").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Leave").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Level 3, Rotations, current").assertIsDisplayed()
         shot("03c-back-from-lesson")
@@ -190,6 +199,29 @@ class ShellScreenshotTest {
         }
         compose.waitForIdle()
         shot("12-jet-headings")
+    }
+
+    /**
+     * A turn, three frames apart, as the path draws it (Boss on alpha05: "turning sharp, tick tick"): nose-up, halfway
+     * between frame 0 and frame 1 (a crossfade of both), then frame 1; each with its soft 12 % shadow.
+     */
+    @Test fun jetTurnStrip() {
+        compose.setContent {
+            val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
+            Box(Modifier.fillMaxSize().background(Glass.Page).drawBehind {
+                val cell = size.width / 3f
+                for (i in 0 until 3) {
+                    val c = Offset(cell * (i + 0.5f), cell * 0.8f)
+                    val heading = (-90f + i * 11.25f) * Math.PI.toFloat() / 180f
+                    with(Jet) {
+                        jetShadow(frames, c, cell * 0.8f, heading, 0f, 0f, 0.6f, density)
+                        jet(frames, c, cell * 0.8f, heading, 0f, 0f, 0f, motion = false)
+                    }
+                }
+            })
+        }
+        compose.waitForIdle()
+        shot("13-jet-turn-strip")
     }
 
     @Config(qualifiers = "w844dp-h390dp-xxhdpi")
