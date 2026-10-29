@@ -2,6 +2,7 @@ package com.mcompany.humo.ui
 
 import com.mcompany.humo.data.course.CoordinateTransformations
 import com.mcompany.humo.data.course.firstLessonLabel
+import com.mcompany.humo.ui.path.Jet
 import com.mcompany.humo.ui.path.PathLayout
 import com.mcompany.humo.ui.path.Pt
 import com.mcompany.humo.ui.path.StoneState
@@ -142,6 +143,29 @@ class PathLayoutTest {
                 }
                 scroll += 120f
             }
+        }
+    }
+
+    @Test fun `the jet picks the sprite frame facing its heading, clockwise from nose-up`() {
+        val pi = Math.PI.toFloat()
+        assertEquals(0, Jet.frameOf(-pi / 2f))
+        assertEquals(2, Jet.frameOf(-pi / 4f))
+        assertEquals(4, Jet.frameOf(0f))
+        assertEquals(8, Jet.frameOf(pi / 2f))
+        assertEquals(12, Jet.frameOf(pi))
+        assertEquals(12, Jet.frameOf(-pi))
+        assertEquals(15, Jet.frameOf(-pi / 2f - 0.39f))
+        assertEquals(16, Jet.Frames.size)
+    }
+
+    @Test fun `on a short screen the jet loops beside the current stone, never under the tab bar`() {
+        val wide = PathLayout(14, 844f)
+        val visible = 300f
+        val scroll = wide.scrollFor(2, visible)
+        for (s in 0 until 44) {
+            val fix = wide.plane(3, s / 2f, scroll, visible)
+            assertTrue(fix.at.dist(wide.stone(2)) > 100f)
+            assertTrue("jet at ${fix.at.y - scroll} of $visible", fix.at.y - scroll in 60f..visible - 20f)
         }
     }
 

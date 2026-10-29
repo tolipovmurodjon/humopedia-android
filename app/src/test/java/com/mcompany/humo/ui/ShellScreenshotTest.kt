@@ -6,7 +6,15 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -20,7 +28,9 @@ import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.mcompany.humo.data.course.CoordinateTransformations
+import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.GlassTheme
+import com.mcompany.humo.ui.path.Jet
 import com.mcompany.humo.ui.path.PathScreen
 import com.mcompany.humo.ui.path.PathUiState
 import com.mcompany.humo.ui.shell.AppShell
@@ -160,6 +170,26 @@ class ShellScreenshotTest {
     @Test fun smallPhone() {
         shell()
         shot("11-home-path-360x800")
+    }
+
+    /** The SR-71 sprite in all 16 headings (a full circle, clockwise from nose-up), flames on, banked on the odd ones. */
+    @Test fun jetInEveryHeading() {
+        compose.setContent {
+            val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
+            Box(Modifier.fillMaxSize().background(Glass.Page).drawBehind {
+                val cell = size.width / 4f
+                for (i in 0 until 16) {
+                    val c = Offset(cell * (i % 4 + 0.5f), cell * (i / 4 + 0.5f) + 40f)
+                    val heading = (i * 22.5f - 90f) * Math.PI.toFloat() / 180f
+                    with(Jet) {
+                        jetShadow(frames, c, cell * 0.8f, heading, if (i % 2 == 1) 0.8f else 0f, 0f, 0.6f, density)
+                        jet(frames, c, cell * 0.8f, heading, if (i % 2 == 1) 0.8f else 0f, 0f, 0f, motion = false)
+                    }
+                }
+            })
+        }
+        compose.waitForIdle()
+        shot("12-jet-headings")
     }
 
     @Config(qualifiers = "w844dp-h390dp-xxhdpi")

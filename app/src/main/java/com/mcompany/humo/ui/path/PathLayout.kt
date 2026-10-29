@@ -227,16 +227,26 @@ class PathLayout(val count: Int, val width: Float) {
         val c = (current - 1).coerceIn(0, count - 1)
         val home = if (c >= count - 2) y(c) + gap * 1.55f else y(c) - gap * 1.6f
         // Kept on screen (checker fix 5): between the top bar and 170 dp above thumb height, where the current stone opens.
-        val cy = if (scrollDp == null || viewport == null) home else {
-            val lo = scrollDp + 124f
-            val hi = scrollDp + viewport * THUMB - 170f
-            val kept = if (hi >= lo) home.coerceIn(lo, hi) else lo
-            // Never over the stone the child is about to tap, wherever they have scrolled it.
-            if (abs(kept - y(c)) >= 170f) kept else if (y(c) - 170f >= scrollDp + 60f) y(c) - 170f else y(c) + 170f
+        val sd = scrollDp ?: 0f
+        val lo = sd + 124f
+        val hi = if (viewport == null) lo else sd + viewport * THUMB - 170f
+        // A short screen (landscape) has no room above the stone: the loop flies beside it instead, on the far side,
+        // never under the tab bar.
+        val beside = scrollDp != null && viewport != null && hi < lo
+        val stone = stone(c)
+        val cy = when {
+            scrollDp == null || viewport == null -> home
+            beside -> stone.y.coerceIn(sd + 110f, (sd + (viewport ?: 0f) - 70f).coerceAtLeast(sd + 110f))
+            else -> {
+                val kept = home.coerceIn(lo, hi)
+                // Never over the stone the child is about to tap, wherever they have scrolled it.
+                if (abs(kept - y(c)) >= 170f) kept else if (y(c) - 170f >= sd + 60f) y(c) - 170f else y(c) + 170f
+            }
         }
-        val cx = width / 2f
-        val rx = width * 0.3f
-        val ry = 54f
+        val cx = if (!beside) width / 2f else if (stone.x < width / 2f) width * 0.85f else width * 0.15f
+        // Beside: the loop's near end stays 110 dp from the stone and its far end 40 dp inside the screen edge.
+        val rx = if (!beside) width * 0.3f else (abs(cx - stone.x) - 110f).coerceAtMost(minOf(cx, width - cx) - 40f).coerceAtLeast(24f)
+        val ry = if (beside) 40f else 54f
         val a = (seconds / LOOP_S) * 2f * PI.toFloat()
         fun at(a: Float) = Pt(cx + rx * sin(a), cy + ry * sin(2f * a))
         val p = at(a)

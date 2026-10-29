@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -65,6 +66,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -98,7 +100,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
@@ -114,8 +115,8 @@ private val TopBarH = 48.dp
 /** An island's box is 0.9 of its width tall; the top face's centre sits 44 % down it. */
 private const val ISLAND_H = 0.9f
 private const val ISLAND_CY = 0.44f
-/** The SR-71, nose to tail (dp). */
-private const val JET_LEN = 70f
+/** The SR-71 sprite's square frame (dp): the jet is ~72 dp nose to tail side-on, less when it flies up or down the screen. */
+private const val JET_FRAME = 84f
 
 /**
  * The Home tab (PHASE-PATH-V2, Boss 2026-10-29): a low-poly world map with no words on it. A walkable flagstone trail
@@ -409,6 +410,7 @@ private fun Sky(
     seconds: State<Float>, motion: Boolean, rollAt: State<Float>,
 ) {
     val rows = remember(layout, current) { layout.bank(current) }
+    val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
     Box(
         Modifier.fillMaxSize().graphicsLayer().clearAndSetSemantics {}.drawWithCache {
             val k = density
@@ -435,7 +437,7 @@ private fun Sky(
                 val jetOn = fix.at.y - scrollDp in -60f..viewport + 60f
                 val roll = ((t - rollAt.value) / 1.1f).let { if (it in 0f..1f) it else 0f }
                 translate(0f, -scrollDp * k) {
-                    if (jetOn) jetShadow(Offset(fix.at.x * k, fix.at.y * k), JET_LEN * k, fix.heading, fix.bank, roll, fix.altitude, k)
+                    if (jetOn) jetShadow(frames, Offset(fix.at.x * k, fix.at.y * k), JET_FRAME * k, fix.heading, fix.bank, roll, fix.altitude, k)
                     if (edge + 30f > scrollDp) {
                         drawPath(shadow, cloudShadow)
                         // Behind the rows, so no gap between two puffs ever shows the world above.
@@ -456,10 +458,10 @@ private fun Sky(
                         // A soft trail of puffs behind the tail, where the jet was a moment ago.
                         val past = (1..9).map { i ->
                             val f = layout.plane(current, t - i * 0.16f, scrollDp, visible)
-                            Offset((f.at.x - cos(f.heading) * JET_LEN * 0.62f) * k, (f.at.y - sin(f.heading) * JET_LEN * 0.62f) * k)
+                            Offset(f.at.x * k, f.at.y * k) + Jet.tail(f.heading, JET_FRAME * k)
                         }
                         smoke(past, k)
-                        jet(Offset(fix.at.x * k, fix.at.y * k), JET_LEN * k, fix.heading, fix.bank, roll, t, motion)
+                        jet(frames, Offset(fix.at.x * k, fix.at.y * k), JET_FRAME * k, fix.heading, fix.bank, roll, t, motion)
                     }
                 }
             }
