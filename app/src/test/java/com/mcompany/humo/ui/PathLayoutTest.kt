@@ -97,6 +97,20 @@ class PathLayoutTest {
         }
     }
 
+    @Test fun `the jet stays on screen and off the current stone wherever the child scrolls`() {
+        for (viewport in listOf(740f, 300f)) for (current in listOf(1, 3, 9, 14)) {
+            var scroll = 0f
+            while (scroll < layout.height) {
+                for (s in 0 until 44) {
+                    val fix = layout.plane(current, s / 2f, scroll, viewport)
+                    assertTrue("level $current scroll $scroll", fix.at.dist(layout.stone(current - 1)) > 100f)
+                    assertTrue("far off screen at scroll $scroll", fix.at.y - scroll in 0f..viewport + 160f)
+                }
+                scroll += 120f
+            }
+        }
+    }
+
     @Test fun `the map fits a 360 dp phone too`() {
         val small = PathLayout(14, 360f)
         for (i in 0 until 14) assertTrue(small.x(i) - 50f >= 0f && small.x(i) + 50f <= 360f)

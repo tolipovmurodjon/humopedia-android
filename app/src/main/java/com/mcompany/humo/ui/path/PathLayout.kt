@@ -61,7 +61,7 @@ class PathLayout(val count: Int, val width: Float) {
     fun stone(i: Int) = Pt(x(i), y(i))
 
     /**
-     * The scroll offset that puts stone [i] at thumb height: 62 % down a [viewport]-tall screen, the easy reach of a
+     * The scroll offset that puts stone [i] at thumb height: 55 % down the [viewport] above the tab bar, the easy reach of a
      * one-handed grip.
      */
     fun scrollFor(i: Int, viewport: Float): Float = (y(i) - viewport * THUMB).coerceIn(0f, (height - viewport).coerceAtLeast(0f))
@@ -101,11 +101,11 @@ class PathLayout(val count: Int, val width: Float) {
                     val dx = p.x - prev.x; val dy = p.y - prev.y
                     val len = hypot(dx, dy).coerceAtLeast(0.001f)
                     val nx = -dy / len; val ny = dx / len
-                    val side = if (seed % 2 == 0) 5.5f else -5.5f
+                    val side = if (seed % 2 == 0) 7f else -7f
                     val at = Pt(p.x + nx * side, p.y + ny * side)
                     val clearOfIsland = (0 until count).none { at.dist(stone(it)) < ISLAND_CLEAR }
                     val clearOfBridge = bridges.none { at.dist(it.at) < BRIDGE_CLEAR }
-                    if (clearOfIsland && clearOfBridge) add(Flagstone(at, 6.5f + (seed * 7 % 5) * 0.5f, seed))
+                    if (clearOfIsland && clearOfBridge) add(Flagstone(at, 8.5f + (seed * 7 % 5) * 0.5f, seed))
                     seed++
                 }
                 prev = p
@@ -199,9 +199,17 @@ class PathLayout(val count: Int, val width: Float) {
      * The SR-71's lazy figure-eight over the clouds, above the current stone (never over the stone the child is about
      * to tap). One loop every [LOOP_S] seconds; heading and bank come from the curve itself.
      */
-    fun plane(current: Int, seconds: Float): PlaneFix {
+    fun plane(current: Int, seconds: Float, scrollDp: Float? = null, viewport: Float? = null): PlaneFix {
         val c = (current - 1).coerceIn(0, count - 1)
-        val cy = if (c >= count - 2) y(c) + gap * 1.55f else y(c) - gap * 1.6f
+        val home = if (c >= count - 2) y(c) + gap * 1.55f else y(c) - gap * 1.6f
+        // Kept on screen (checker fix 5): between the top bar and 170 dp above thumb height, where the current stone opens.
+        val cy = if (scrollDp == null || viewport == null) home else {
+            val lo = scrollDp + 110f
+            val hi = scrollDp + viewport * THUMB - 170f
+            val kept = if (hi >= lo) home.coerceIn(lo, hi) else lo
+            // Never over the stone the child is about to tap, wherever they have scrolled it.
+            if (abs(kept - y(c)) >= 170f) kept else if (y(c) - 170f >= scrollDp + 60f) y(c) - 170f else y(c) + 170f
+        }
         val cx = width / 2f
         val rx = width * 0.3f
         val ry = 54f
@@ -218,7 +226,7 @@ class PathLayout(val count: Int, val width: Float) {
     }
 
     companion object {
-        const val THUMB = 0.62f
+        const val THUMB = 0.55f
         const val STONE_STEP = 15f
         const val ISLAND_CLEAR = 46f
         const val BRIDGE_CLEAR = 26f

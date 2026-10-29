@@ -113,12 +113,12 @@ internal object LowPoly {
             Offset(c.x + rr * cos(a), c.y + rr * sin(a) * 0.72f)
         }
         val rim = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y + r * 0.28f) else lineTo(p.x, p.y + r * 0.28f) }; close() }
-        drawPath(rim, Color(0xFFBCA57E).copy(alpha = dim))
+        drawPath(rim, Color(0xFFA88C5E).copy(alpha = dim))
         val face = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }; close() }
-        drawPath(face, Color(0xFFDCCBA4).copy(alpha = dim))
+        drawPath(face, Color(0xFFCDB68A).copy(alpha = dim))
         // The half facing the light, from the top-left.
         val lit = Path().apply { moveTo(pts[2].x, pts[2].y); lineTo(pts[3].x, pts[3].y); lineTo(pts[4].x, pts[4].y); lineTo(pts[5].x, pts[5].y); close() }
-        drawPath(lit, Color(0xFFF6EDD8).copy(alpha = dim))
+        drawPath(lit, Color(0xFFE9DAB6).copy(alpha = dim))
     }
 
     /** A wooden footbridge across the river, along the trail's [angle]: deck planks, two rails. */
@@ -165,31 +165,38 @@ internal object LowPoly {
     }
 
     /**
-     * A low-poly cloud around (0, 0) (CI 40834278210: the first one read as stacked shelves): four rounded puffs, each
-     * one flat polygon with one lit facet on its upper-left, over a short chamfered underside in a cool blue-grey,
-     * narrower than the puffs so no ledge shows. [w] is its width in px; [seed] varies the puffs. Built once; the
-     * screen only moves it.
+     * A low-poly cloud around (0, 0) (checker 2026-10-29: "stickers", not sky): one of three silhouettes (3, 4 or 5
+     * puffs) picked by [seed], each puff a five-sided dome with two lit facets on its upper-left, over a chamfered
+     * blue-grey underside narrower than the puffs. The screen adds its ground shadow. [w] is its width in px.
      */
     fun cloudShape(w: Float, seed: Int): List<Pair<Path, Color>> = buildList {
         val lit = Color(0xFFFFFFFF)
-        val body = Color(0xFFEFF6F9)
-        val shade = Color(0xFFD3E3EC)
+        val soft = Color(0xFFF6FAFC)
+        val body = Color(0xFFE6EFF4)
+        val shade = Color(0xFFB8CCDA)
         add(Path().apply {
             moveTo(-w * 0.44f, -w * 0.02f); lineTo(w * 0.44f, -w * 0.02f); lineTo(w * 0.4f, w * 0.05f)
             lineTo(w * 0.3f, w * 0.085f); lineTo(-w * 0.3f, w * 0.085f); lineTo(-w * 0.4f, w * 0.05f); close()
         } to shade)
-        val puffs = listOf(-0.27f to 0.2f, -0.04f to 0.29f, 0.2f to 0.24f, 0.36f to 0.15f)
+        val puffs = when (seed % 3) {
+            0 -> listOf(-0.24f to 0.24f, 0.06f to 0.32f, 0.32f to 0.2f)
+            1 -> listOf(-0.27f to 0.2f, -0.04f to 0.29f, 0.2f to 0.24f, 0.36f to 0.15f)
+            else -> listOf(-0.36f to 0.14f, -0.18f to 0.22f, 0.04f to 0.3f, 0.24f to 0.22f, 0.4f to 0.13f)
+        }
         puffs.forEachIndexed { k, (dx, r0) ->
             val r = w * r0 * (0.92f + ((seed + k * 5) % 4) * 0.05f)
             val pc = Offset(w * dx, 0f)
-            val n = 7
+            val n = 5
+            // Uneven angles so every dome has its own faceted silhouette.
             val v = (0..n).map { i ->
-                val a = PI.toFloat() + i * PI.toFloat() / n
-                Offset(pc.x + r * cos(a), pc.y + r * 0.9f * sin(a))
+                val a = PI.toFloat() + i * PI.toFloat() / n + if (i in 1 until n) ((seed + k + i) % 3 - 1) * 0.08f else 0f
+                Offset(pc.x + r * cos(a), pc.y + r * 0.95f * sin(a))
             }
             add(Path().apply { moveTo(v[0].x, v[0].y); for (i in 1..n) lineTo(v[i].x, v[i].y); close() } to body)
-            // The facet that faces the light: the upper-left third of the puff.
-            add(Path().apply { moveTo(pc.x - r * 0.12f, pc.y - r * 0.1f); lineTo(v[1].x, v[1].y); lineTo(v[2].x, v[2].y); lineTo(v[3].x, v[3].y); lineTo(v[4].x, v[4].y); close() } to lit)
+            val ridge = Offset(pc.x - r * 0.08f, pc.y - r * 0.18f)
+            // Two facets that face the light (top-left), the brighter one on the left shoulder.
+            add(Path().apply { moveTo(ridge.x, ridge.y); lineTo(v[0].x, v[0].y); lineTo(v[1].x, v[1].y); lineTo(v[2].x, v[2].y); close() } to lit)
+            add(Path().apply { moveTo(ridge.x, ridge.y); lineTo(v[2].x, v[2].y); lineTo(v[3].x, v[3].y); close() } to soft)
         }
     }
 }

@@ -145,7 +145,7 @@ fun PathScreen(
             val s = state ?: return@LaunchedEffect
             if (placed) return@LaunchedEffect
             snapshotFlow { scroll.maxValue }.first { it > 0 && it != Int.MAX_VALUE }
-            scroll.scrollTo(with(density) { layout.scrollFor(s.current - 1, viewport).dp.roundToPx() })
+            scroll.scrollTo(with(density) { layout.scrollFor(s.current - 1, viewport - padding.calculateBottomPadding().value).dp.roundToPx() })
             placed = true
         }
         Box(Modifier.fillMaxSize().verticalScroll(scroll).semantics { contentDescription = "Path" }) {
@@ -159,16 +159,19 @@ fun PathScreen(
                         }
                     }
                 }
-                Sky(layout, current, scroll, viewport, seconds, motion)
             }
         }
+        // A screen-sized layer (checker fix 1): redrawn every frame, so it must not be the 2,700 dp content box.
+        Sky(layout, current, scroll, viewport, viewport - padding.calculateBottomPadding().value, seconds, motion)
 
         TopBar(state, padding, onCourse = { coursesOpen = !coursesOpen })
 
         val anySheet = sheetLevel != null || coursesOpen
+        // A light deep-teal veil only under the level sheet (8 %, never the grey fog); the course list is a dropdown,
+        // so the world stays clear and only a clear tap-to-close layer sits over it.
         AnimatedVisibility(anySheet, enter = fadeIn(), exit = fadeOut()) {
             Box(
-                Modifier.fillMaxSize().background(Glass.Ink.copy(alpha = 0.16f))
+                Modifier.fillMaxSize().background(if (sheetLevel != null) Color(0xFF0B3D36).copy(alpha = 0.08f) else Color.Transparent)
                     .clickable(remember { MutableInteractionSource() }, null, onClickLabel = "Yopish") { sheetLevel = null; coursesOpen = false },
             )
         }
@@ -280,6 +283,11 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
         Modifier
             .offset { with(density) { IntOffset((at.x.dp - w / 2).roundToPx(), (at.y.dp - h * 0.52f).roundToPx()) } }
             .size(w, h)
+            .then(
+                if (stone == StoneState.Current && motion) {
+                    Modifier.graphicsLayer { translationY = sin(seconds.value * 2f * PI.toFloat() / 2.4f) * 3.dp.toPx() }
+                } else Modifier,
+            )
             .pressScale(interaction)
             .clickable(interaction, null, role = Role.Button, onClick = onTap)
             .clearAndSetSemantics { contentDescription = "Level ${level.n}, ${level.title}, $status"; role = Role.Button },
@@ -292,10 +300,10 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
                     val p = if (motion) (seconds.value % 1.6f) / 1.6f else 0.35f
                     val rx = size.width * 0.46f * (1f + 0.32f * p)
                     drawOval(
-                        Color.White.copy(alpha = 0.75f * (1f - p)),
+                        Glass.Primary.copy(alpha = 0.55f * (1f - p)),
                         topLeft = Offset(c.x - rx, c.y - rx * 0.55f + size.width * 0.06f),
                         size = androidx.compose.ui.geometry.Size(rx * 2f, rx * 1.1f),
-                        style = Stroke(3.dp.toPx()),
+                        style = Stroke(4.dp.toPx()),
                     )
                 },
             )
@@ -328,7 +336,7 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
  * screen; one canvas, redrawn per frame, its cloud shapes built once.
  */
 @Composable
-private fun Sky(layout: PathLayout, current: Int, scroll: ScrollState, viewport: Float, seconds: State<Float>, motion: Boolean) {
+private fun Sky(layout: PathLayout, current: Int, scroll: ScrollState, viewport: Float, visible: Float, seconds: State<Float>, motion: Boolean) {
     val plane = ImageBitmap.imageResource(R.drawable.plane_sr71)
     val clouds = remember(layout, current) { layout.clouds(current) }
     Box(
@@ -336,25 +344,32 @@ private fun Sky(layout: PathLayout, current: Int, scroll: ScrollState, viewport:
             val k = density
             val shapes = clouds.map { LowPoly.cloudShape(it.width * k, it.seed) }
             val shadowTint = ColorFilter.tint(Color(0xFF1F5E57), BlendMode.SrcIn)
+            val cloudShadow = Color(0xFF1F5E57).copy(alpha = 0.10f)
             onDrawBehind {
                 val t = if (motion) seconds.value else 0f
                 val scrollDp = scroll.value / k
-                val fix = layout.plane(current, t)
-                drawPlane(plane, fix, k, shadow = true, tint = shadowTint)
-                clouds.forEachIndexed { i, c ->
-                    // Parallax: a cloud moves a little slower than the ground, by at most 24 dp, so the first row never slides onto the current island.
-                    val lag = ((viewport * 0.5f - (c.at.y - scrollDp)) * (0.06f + 0.04f * c.depth)).coerceIn(-24f, 24f)
-                    val screenY = c.at.y + lag - scrollDp
-                    if (screenY < -120f || screenY > viewport + 120f) return@forEachIndexed
-                    // Parting: a cloud slides away from the middle as it reaches the upper-middle of the screen.
-                    val part = ((viewport * 0.6f - screenY) / (viewport * 0.6f)).coerceIn(0f, 1f)
-                    val away = if (c.at.x < layout.width / 2f) -1f else 1f
-                    val drift = if (motion) sin(t * 2f * PI.toFloat() / (26f + c.seed % 9) + c.seed) * 10f else 0f
-                    val x = (c.at.x + drift + away * 26f * part * part) * k
-                    val y = (c.at.y + lag) * k
-                    translate(x, y) { shapes[i].forEach { (p, col) -> drawPath(p, col) } }
+                val fix = layout.plane(current, t, scrollDp, visible)
+                translate(0f, -scroll.value.toFloat()) {
+                    val planeOnScreen = fix.at.y - scrollDp in 0f..viewport
+                    if (planeOnScreen) drawPlane(plane, fix, k, shadow = true, tint = shadowTint)
+                    clouds.forEachIndexed { i, c ->
+                        // Parallax: a cloud moves a little slower than the ground, by at most 24 dp, so the first row never slides onto the current island.
+                        val lag = ((viewport * 0.5f - (c.at.y - scrollDp)) * (0.06f + 0.04f * c.depth)).coerceIn(-24f, 24f)
+                        val screenY = c.at.y + lag - scrollDp
+                        if (screenY < -160f || screenY > viewport + 120f) return@forEachIndexed
+                        // Parting: a cloud slides away from the middle as it reaches the upper-middle of the screen.
+                        val part = ((viewport * 0.6f - screenY) / (viewport * 0.6f)).coerceIn(0f, 1f)
+                        val away = if (c.at.x < layout.width / 2f) -1f else 1f
+                        val drift = if (motion) sin(t * 2f * PI.toFloat() / (26f + c.seed % 9) + c.seed) * 10f else 0f
+                        val x = (c.at.x + drift + away * 26f * part * part) * k
+                        val y = (c.at.y + lag) * k
+                        // Its shadow on the ground, lower-right (light from the top-left): this is what lifts it off the grass.
+                        val sw = c.width * 0.8f * k
+                        drawOval(cloudShadow, topLeft = Offset(x - sw / 2f + 16f * k, y + 44f * k - sw * 0.09f), size = androidx.compose.ui.geometry.Size(sw, sw * 0.18f))
+                        translate(x, y) { shapes[i].forEach { (p, col) -> drawPath(p, col) } }
+                    }
+                    if (planeOnScreen) drawPlane(plane, fix, k, shadow = false, tint = null)
                 }
-                drawPlane(plane, fix, k, shadow = false, tint = null)
             }
         },
     )
@@ -402,7 +417,7 @@ private fun TopBar(state: PathUiState?, padding: PaddingValues, onCourse: () -> 
             Row(Modifier.padding(start = 14.dp, end = 10.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
                 Icon(TabIcons.CourseFilled, null, tint = Glass.Primary, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("${course?.number ?: ""}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Glass.Ink, maxLines = 1)
+                Text(course?.let { "${it.number}-kurs" } ?: "", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Glass.Ink, maxLines = 1)
                 Spacer(Modifier.width(4.dp))
                 Icon(TabIcons.ChevronDown, null, tint = Glass.Ink.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
             }
@@ -412,7 +427,7 @@ private fun TopBar(state: PathUiState?, padding: PaddingValues, onCourse: () -> 
             Row(Modifier.padding(horizontal = 14.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
                 Count(TabIcons.GemFilled, Color(0xFF1E8FCB), state?.gems ?: 0, "Olmos")
                 Spacer(Modifier.width(16.dp))
-                Count(TabIcons.StreakFilled, Color(0xFFE8711F), state?.streakDays ?: 0, "Ketma-ket kunlar")
+                Count(TabIcons.StreakFilled, Color(0xFFD0600E), state?.streakDays ?: 0, "Ketma-ket kunlar")
             }
         }
     }

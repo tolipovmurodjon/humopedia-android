@@ -28,9 +28,11 @@ const PAGE_R = 'M20.5 5.2c0-.7-.5-1.2-1.2-1.2H15c-1.7 0-3 1.3-3 3v13.2c0-1.2 1-2
 const ICONS = {
   Home: { line: [HOUSE, 'M9.75 21v-4.75a2.25 2.25 0 0 1 4.5 0V21'], fill: [HOUSE], holes: ['M9.75 21v-4.75a2.25 2.25 0 0 1 4.5 0V21Z'] },
   Worlds: { line: [c(12, 12, 6), RING], fill: [c(12, 12, 6)], activeLine: [RING] },
+  // Two crossed swords with guards and grips (checker 2026-10-29: the old bare X read as "close"); active = solid blades.
   Battle: {
-    line: ['M4 4h3.6l9.1 9.1', 'M20 4h-3.6l-9.1 9.1', 'M13.2 17.6l4.4-4.4', 'M10.8 17.6 6.4 13.2', 'M15.4 15.4 19.6 19.6', 'M8.6 15.4 4.4 19.6'],
-    boldLine: true,
+    line: ['M8.3 15.7 20.5 3.5', 'M15.7 15.7 3.5 3.5', 'M5.5 14.3l4.2 4.2', 'M18.5 14.3l-4.2 4.2', 'M6.6 17.4l-3 3', 'M17.4 17.4l3 3'],
+    fill: ['M7.24 14.64 17.64 4.24 20.6 3.4 19.76 6.36 9.36 16.76Z', 'M14.64 16.76 4.24 6.36 3.4 3.4 6.36 4.24 16.76 14.64Z'],
+    activeLine: ['M5.5 14.3l4.2 4.2', 'M18.5 14.3l-4.2 4.2', 'M6.6 17.4l-3 3', 'M17.4 17.4l3 3'],
   },
   Leaderboard: {
     line: [PODIUM, 'M8.5 13.5v7', 'M15.5 15.5v5'], fill: [PODIUM],
@@ -57,7 +59,8 @@ function svgFor(icon, set, active) {
   const ink = active ? MINT : INK;
   const p = (d, extra) => `<path d="${d}" ${extra}/>`;
   const st = (w, join = 'round', cap = 'round') => `fill="none" stroke="${ink}" stroke-width="${w}" stroke-linejoin="${join}" stroke-linecap="${cap}"`;
-  const filled = () => p([...icon.fill, ...(icon.holes ?? [])].join(' '), `fill="${ink}" fill-rule="evenodd"`);
+  const rule = icon.holes ? 'evenodd' : 'nonzero';
+  const filled = () => p([...icon.fill, ...(icon.holes ?? [])].join(' '), `fill="${ink}" fill-rule="${rule}"`);
   const always = (icon.always ?? []).map((d) => p(d, `fill="${ink}"`)).join('');
   const dots = (icon.idleDots ?? []).map((d) => p(d, `fill="${ink}"`)).join('');
   const lines = (w, j, cap) => icon.line.map((d) => p(d, st(w, j, cap))).join('');
@@ -77,7 +80,7 @@ function svgFor(icon, set, active) {
       defs = `<linearGradient id="${id}" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="0.55" stop-color="${base}"/><stop offset="1" stop-color="${deep}"/></linearGradient>`
         + `<filter id="${id}s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0.6" dy="1.2" stdDeviation="0.8" flood-color="${deep}" flood-opacity="0.35"/></filter>`;
       const shape = icon.fill
-        ? p([...icon.fill, ...(icon.holes ?? [])].join(' '), `fill="url(#${id})" fill-rule="evenodd"`) + (icon.activeLine ?? []).map((d) => p(d, `fill="none" stroke="url(#${id})" stroke-width="2.6" stroke-linecap="round"`)).join('')
+        ? p([...icon.fill, ...(icon.holes ?? [])].join(' '), `fill="url(#${id})" fill-rule="${icon.holes ? 'evenodd' : 'nonzero'}"`) + (icon.activeLine ?? []).map((d) => p(d, `fill="none" stroke="url(#${id})" stroke-width="2.6" stroke-linecap="round"`)).join('')
         : icon.line.map((d) => p(d, `fill="none" stroke="url(#${id})" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"`)).join('');
       const al = (icon.always ?? []).map((d) => p(d, `fill="url(#${id})"`)).join('');
       body = `<g filter="url(#${id}s)">${shape}${al}</g><ellipse cx="8.5" cy="8" rx="3" ry="1.4" fill="#fff" fill-opacity="0.5" transform="rotate(-30 8.5 8)"/>`; break;
@@ -127,7 +130,7 @@ for (const n of names) {
   const idle = [...parts(i.line, 'Stroke'), ...parts(i.always, 'Filled'), ...parts(i.idleDots, 'Filled')];
   const active = i.boldLine || !i.fill
     ? i.line.map((d) => `Stroke(${kq(d)}, width = 2.8f)`)
-    : [`Filled(${kq([...i.fill, ...(i.holes ?? [])].join(' '))}, evenOdd = true)`, ...parts(i.activeLine, 'Stroke')];
+    : [`Filled(${kq([...i.fill, ...(i.holes ?? [])].join(' '))}, evenOdd = ${i.holes ? 'true' : 'false'})`, ...parts(i.activeLine, 'Stroke')];
   out.push(`    val ${n} = icon(${kq(n.toLowerCase())}, ${idle.join(', ')})`);
   out.push(`    val ${n}Filled = icon(${kq(n.toLowerCase() + '-filled')}, ${[...active, ...parts(i.always, 'Filled')].join(', ')})`);
 }

@@ -12,9 +12,11 @@ const sharp = require('sharp');
 
 const SVG = 'D:/30_library/assets/humo-brand/code-soft25d/rig/humo-rig.svg';
 const RES = path.resolve('app/src/main/res');
-// Humo's box inside the 108 dp canvas: 50 dp keeps the bell (its round bottom corners) inside the 72 dp visible
-// circle that launchers mask to; the 66 dp safe zone holds the face.
-const HUMO_DP = 50;
+// Humo's box inside the 108 dp canvas: 56 dp (checker 2026-10-29: 50 looked small); the bell's measured outline stays
+// inside the 66 dp safe circle (checked on an overlay), so no launcher mask cuts it.
+const HUMO_DP = 56;
+// The bell's bottom corners are its farthest points from the centre: lift Humo 2 dp so they sit inside the safe circle.
+const LIFT_DP = 2;
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
 const svg = fs.readFileSync(SVG, 'utf8').replace(/<ellipse id="shadow"[^>]*\/>/, '').replace(/<rect id="page"[^>]*\/>/, '');
@@ -35,7 +37,7 @@ for (const [name, k] of Object.entries(DENSITIES)) {
   const scale = box / Math.max(tw, th);
   const w = Math.round(tw * scale), h = Math.round(th * scale);
   const humo = await sharp(trimmed.data).resize(w, h).png().toBuffer();
-  const left = Math.round((canvas - w) / 2), top = Math.round((canvas - h) / 2);
+  const left = Math.round((canvas - w) / 2), top = Math.round((canvas - h) / 2 - LIFT_DP * k);
   const dir = path.join(RES, `drawable-${name}`);
   fs.mkdirSync(dir, { recursive: true });
   const fg = await sharp({ create: { width: canvas, height: canvas, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
