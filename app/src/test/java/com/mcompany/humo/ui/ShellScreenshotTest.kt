@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -24,6 +25,7 @@ import com.mcompany.humo.ui.path.PathScreen
 import com.mcompany.humo.ui.path.PathUiState
 import com.mcompany.humo.ui.shell.AppShell
 import com.mcompany.humo.ui.shell.Tab
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,7 +42,7 @@ import org.robolectric.annotation.GraphicsMode
 class ShellScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val demo = PathUiState(CoordinateTransformations, current = 3)
+    private val demo = PathUiState(CoordinateTransformations, current = 3, gems = 120, streakDays = 3)
 
     private var tab by mutableIntStateOf(0)
     private var scale by mutableFloatStateOf(1f)
@@ -56,7 +58,7 @@ class ShellScreenshotTest {
                 val d = LocalDensity.current
                 key(tab, scale) {
                     CompositionLocalProvider(LocalDensity provides Density(d.density, scale)) {
-                        GlassTheme { AppShell(startTab = tab, path = { padding, open -> PathScreen(demo, padding, open) }) }
+                        GlassTheme { AppShell(startTab = tab, path = { padding, open -> PathScreen(demo, padding, open, motion = false) }) }
                     }
                 }
             }
@@ -81,15 +83,42 @@ class ShellScreenshotTest {
         }
     }
 
-    @Test fun oneTapOnTheCurrentStoneOpensItsLessonAndBackReturns() {
+    @Test fun oneTapOnTheCurrentIslandOpensItsSheetThenTheLesson() {
         shell()
         compose.onNodeWithContentDescription("Level 3, Rotations, current").performClick()
         compose.waitForIdle()
+        compose.onNodeWithText("Davom etish").assertIsDisplayed()
+        compose.onNodeWithText("4 ta dars").assertIsDisplayed()
+        shot("03-level-sheet")
+        compose.onNodeWithText("Davom etish").performClick()
+        compose.waitForIdle()
         compose.onNodeWithText("Lesson 3.1 · Rotation Around the Origin").assertIsDisplayed()
-        shot("03-lesson")
+        shot("03b-lesson")
         compose.onNodeWithContentDescription("Orqaga").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Level 3, Rotations, current").assertIsDisplayed()
+    }
+
+    @Test fun aLockedIslandSaysWhyAndHasNoGoButton() {
+        shell()
+        compose.onNodeWithContentDescription("Level 4, Rotations in Coordinates, locked").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Avval 3-darajani tugating.").assertIsDisplayed()
+        compose.onNodeWithText("Davom etish").assertDoesNotExist()
+        shot("09-locked-sheet")
+    }
+
+    @Test fun theCourseChipOpensTheCourseListAndTheBarDoesNotMove() {
+        shell()
+        val chip = compose.onNodeWithContentDescription("Kurs: Coordinate Transformations")
+        compose.onNodeWithContentDescription("Olmos: 120").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Ketma-ket kunlar: 3").assertIsDisplayed()
+        val before = chip.getUnclippedBoundsInRoot()
+        chip.performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Boshqa kurslar tez orada.").assertIsDisplayed()
+        shot("10-course-list")
+        assertEquals(before, chip.getUnclippedBoundsInRoot())
     }
 
     @Test fun barTabsAreNamedForTalkBack() {
@@ -118,6 +147,12 @@ class ShellScreenshotTest {
     @Test fun darkModePhone() {
         shell()
         shot("07-home-path-dark-phone")
+    }
+
+    @Config(qualifiers = "w360dp-h800dp-xxhdpi")
+    @Test fun smallPhone() {
+        shell()
+        shot("11-home-path-360x800")
     }
 
     @Config(qualifiers = "w844dp-h390dp-xxhdpi")

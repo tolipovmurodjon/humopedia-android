@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Emulator smoke + critic walkthrough for the native app (NATIVE-BRIEF N0; PAGEL's emulator-smoke.sh + walkthrough.sh,
 # cut to what Humopedia has). Uses the app like a child: launch, every tab, scroll the path, one tap on the current
-# stone, back, rotate, big font. Each step leaves a screenshot + UI tree in smoke-out/walk; a broken step fails the run.
+# island, its sheet, the course chip, back, rotate, big font. Each step leaves a screenshot + UI tree in smoke-out/walk; a broken step fails the run.
 set -u
 T="timeout 60"
 PKG=com.mcompany.humo
@@ -80,20 +80,29 @@ tap "Bosh sahifa"; shot back-home
 has "Level 3, Rotations, current"
 
 SIZE=$(screen_size); W=${SIZE%x*}; H=${SIZE#*x}
-log "-- scroll the path up into the clouds, to the course title"
+log "-- scroll the path up into the clouds, to the top"
 $T adb shell input swipe $((W / 2)) $((H * 30 / 100)) $((W / 2)) $((H * 75 / 100)) 400
 shot path-up
 for i in 1 2 3 4 5 6; do $T adb shell input swipe $((W / 2)) $((H * 25 / 100)) $((W / 2)) $((H * 80 / 100)) 250; sleep 0.5; done
-shot path-top
-has "Coordinate Transformations"
+shot path-top-clouds
+has "Kurs: Coordinate Transformations"
 has "Level 14, Stretching, locked"
+
+log "-- the course chip opens the course list; Back closes it"
+tap "Kurs: Coordinate Transformations"; shot course-list
+has "Boshqa kurslar tez orada."
+$T adb shell input keyevent 4; shot course-list-closed
+has "Bosh sahifa"
 
 log "-- leave Home and come back: the path opens at the current stone again"
 tap Jang; sleep 1; tap "Bosh sahifa"; shot path-at-current
 has "Level 3, Rotations, current"
 
-log "-- one tap on the current stone opens its lesson"
-tap "Level 3, Rotations, current"; shot lesson
+log "-- one tap on the current island opens its sheet; Davom etish opens the lesson"
+tap "Level 3, Rotations, current"; shot level-sheet
+has "Davom etish"
+has "4 ta dars"
+tap "Davom etish"; shot lesson
 has "Lesson 3.1 · Rotation Around the Origin"
 $T adb shell input keyevent 4; shot back-from-lesson
 has "Level 3, Rotations, current"

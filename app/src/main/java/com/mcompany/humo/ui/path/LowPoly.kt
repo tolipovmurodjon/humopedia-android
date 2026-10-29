@@ -1,0 +1,197 @@
+package com.mcompany.humo.ui.path
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotateRad
+import androidx.compose.ui.graphics.drawscope.withTransform
+import com.mcompany.humo.ui.glass.Glass
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+/**
+ * The map's low-poly art, drawn in code (PHASE-PATH-V2: "flat facets, 2-3 tones per part, soft contact shadow", one
+ * light from the top-left, colour theory #6). Every function takes dp and a centre in px; nothing allocates a bitmap.
+ */
+internal object LowPoly {
+    /** Three tones per surface, light → shade (colour theory #7: shade by hue, never by black). */
+    class Tones(val light: Color, val mid: Color, val shade: Color)
+
+    class IslandLook(val top: Tones, val side: Tones)
+
+    val DoneLook = IslandLook(Tones(Color(0xFFA6E6B0), Color(0xFF7FCE91), Color(0xFF5DB275)), Tones(Color(0xFFC09166), Color(0xFF9C7149), Color(0xFF7E5938)))
+    val CurrentLook = IslandLook(Tones(Color(0xFFFFE597), Color(0xFFFFCD52), Color(0xFFF0AE2E)), Tones(Color(0xFFE39A3B), Color(0xFFC27626), Color(0xFF9E5B1A)))
+    val LockedLook = IslandLook(Tones(Color(0xFFDDE3EB), Color(0xFFC6CFDA), Color(0xFFAEB8C6)), Tones(Color(0xFF9AA5B6), Color(0xFF828EA2), Color(0xFF6C788D)))
+
+    /** The contact shadow's hue: deep teal (colour theory #14: shadows take a hue). */
+    private val ShadowTeal = Color(0xFF1F5E57)
+
+    /** Light direction (y down): from the top-left. A facet facing it is lit. */
+    private const val LIGHT = (225.0 * PI / 180.0).toFloat()
+
+    private fun pick(t: Tones, facing: Float): Color {
+        val lit = (cos(facing - LIGHT) + 1f) / 2f
+        return when {
+            lit > 0.66f -> t.light
+            lit > 0.33f -> t.mid
+            else -> t.shade
+        }
+    }
+
+    /**
+     * An octagonal island seen from above at a tilt: a faceted top, a side band in front, a soft hue shadow under it.
+     * [rx] is the half width in px; the top's half height is 0.55 [rx], the side is 0.34 [rx] deep.
+     */
+    fun DrawScope.island(c: Offset, rx: Float, look: IslandLook) {
+        val ry = rx * 0.55f
+        val depth = rx * 0.34f
+        drawOval(ShadowTeal.copy(alpha = 0.20f), topLeft = Offset(c.x - rx * 1.08f, c.y + depth - ry * 0.55f), size = Size(rx * 2.16f, ry * 1.5f))
+        val v = (0 until 8).map { k ->
+            val a = (k * 45f + 22.5f) * PI.toFloat() / 180f
+            Offset(c.x + rx * cos(a), c.y + ry * sin(a))
+        }
+        // The side band: the front half of the rim pushed down.
+        for (k in 0 until 8) {
+            val a = v[k]; val b = v[(k + 1) % 8]
+            if (a.y + b.y <= 2 * c.y) continue
+            val mid = (a.x + b.x) / 2f - c.x
+            val tone = if (mid < -rx * 0.35f) look.side.light else if (mid > rx * 0.35f) look.side.shade else look.side.mid
+            drawPath(Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y); lineTo(b.x, b.y + depth); lineTo(a.x, a.y + depth); close() }, tone)
+        }
+        // The top: eight facets meeting a ridge point nudged toward the light.
+        val ridge = Offset(c.x - rx * 0.10f, c.y - ry * 0.12f)
+        for (k in 0 until 8) {
+            val a = v[k]; val b = v[(k + 1) % 8]
+            val facing = kotlin.math.atan2((a.y + b.y) / 2f - c.y, (a.x + b.x) / 2f - c.x)
+            drawPath(Path().apply { moveTo(ridge.x, ridge.y); lineTo(a.x, a.y); lineTo(b.x, b.y); close() }, pick(look.top, facing))
+        }
+    }
+
+    /** The "done" mark: a white disc with a mint tick, on the island's back-right rim. */
+    fun DrawScope.doneBadge(c: Offset, r: Float) {
+        drawCircle(ShadowTeal.copy(alpha = 0.18f), r, c + Offset(0f, r * 0.18f))
+        drawCircle(Color.White, r, c)
+        val tick = Path().apply {
+            moveTo(c.x - r * 0.45f, c.y + r * 0.02f); lineTo(c.x - r * 0.1f, c.y + r * 0.36f); lineTo(c.x + r * 0.48f, c.y - r * 0.3f)
+        }
+        drawPath(tick, Glass.Primary, style = Stroke(r * 0.26f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+
+    /** The current level's flag: a pole and a faceted mint pennant (two tones), planted on the island's ridge. */
+    fun DrawScope.flag(base: Offset, h: Float, wave: Float) {
+        val top = Offset(base.x, base.y - h)
+        drawLine(Color(0xFF6B4A2E), base, top, strokeWidth = h * 0.07f, cap = StrokeCap.Round)
+        val tip = Offset(top.x + h * 0.62f, top.y + h * 0.2f + wave * h * 0.05f)
+        val low = Offset(top.x, top.y + h * 0.42f)
+        val fold = Offset(top.x + h * 0.3f, top.y + h * 0.2f + wave * h * 0.03f)
+        drawPath(Path().apply { moveTo(top.x, top.y); lineTo(tip.x, tip.y); lineTo(fold.x, fold.y); close() }, Color(0xFF66DDA8))
+        drawPath(Path().apply { moveTo(fold.x, fold.y); lineTo(tip.x, tip.y); lineTo(low.x, low.y); close() }, Color(0xFF3DC98C))
+        drawPath(Path().apply { moveTo(top.x, top.y); lineTo(fold.x, fold.y); lineTo(low.x, low.y); close() }, Color(0xFF23A06C))
+    }
+
+    /** A small padlock in slate for a locked island (a picture, not a word). */
+    fun DrawScope.lock(c: Offset, s: Float) {
+        val ink = Color(0xFF5D6880)
+        drawArc(ink, 180f, 180f, false, topLeft = Offset(c.x - s * 0.3f, c.y - s * 0.62f), size = Size(s * 0.6f, s * 0.62f), style = Stroke(s * 0.13f, cap = StrokeCap.Round))
+        drawLine(ink, Offset(c.x - s * 0.3f, c.y - s * 0.31f), Offset(c.x - s * 0.3f, c.y - s * 0.05f), s * 0.13f, StrokeCap.Round)
+        drawLine(ink, Offset(c.x + s * 0.3f, c.y - s * 0.31f), Offset(c.x + s * 0.3f, c.y - s * 0.05f), s * 0.13f, StrokeCap.Round)
+        drawRoundRect(ink, topLeft = Offset(c.x - s * 0.45f, c.y - s * 0.08f), size = Size(s * 0.9f, s * 0.62f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(s * 0.14f))
+        drawCircle(Color(0xFFDDE3EB), s * 0.09f, Offset(c.x, c.y + s * 0.2f))
+    }
+
+    /** One flagstone: an irregular hexagon, lit half and shaded half, on a thin darker rim (its thickness). */
+    fun DrawScope.flagstone(c: Offset, r: Float, seed: Int, dim: Float) {
+        val pts = (0 until 6).map { k ->
+            val a = (k * 60f + seed * 23 % 60) * PI.toFloat() / 180f
+            val rr = r * (0.82f + ((seed * 7 + k * 13) % 5) * 0.06f)
+            Offset(c.x + rr * cos(a), c.y + rr * sin(a) * 0.72f)
+        }
+        val rim = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y + r * 0.28f) else lineTo(p.x, p.y + r * 0.28f) }; close() }
+        drawPath(rim, Color(0xFFBCA57E).copy(alpha = dim))
+        val face = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }; close() }
+        drawPath(face, Color(0xFFDCCBA4).copy(alpha = dim))
+        // The half facing the light, from the top-left.
+        val lit = Path().apply { moveTo(pts[2].x, pts[2].y); lineTo(pts[3].x, pts[3].y); lineTo(pts[4].x, pts[4].y); lineTo(pts[5].x, pts[5].y); close() }
+        drawPath(lit, Color(0xFFF6EDD8).copy(alpha = dim))
+    }
+
+    /** A wooden footbridge across the river, along the trail's [angle]: deck planks, two rails. */
+    fun DrawScope.bridge(c: Offset, angle: Float, len: Float, wide: Float) {
+        withTransform({ translate(c.x, c.y); rotateRad(angle, Offset.Zero) }) {
+            drawRoundRect(ShadowTeal.copy(alpha = 0.22f), Offset(-len / 2f + wide * 0.1f, -wide / 2f + wide * 0.32f), Size(len, wide), androidx.compose.ui.geometry.CornerRadius(wide * 0.2f))
+            drawRect(Color(0xFF9C6E45), Offset(-len / 2f, -wide / 2f + wide * 0.16f), Size(len, wide))
+            drawRect(Color(0xFFD7A36C), Offset(-len / 2f, -wide / 2f), Size(len, wide))
+            val planks = 7
+            for (p in 1 until planks) {
+                val x = -len / 2f + len * p / planks
+                drawLine(Color(0xFFB0804F), Offset(x, -wide / 2f), Offset(x, wide / 2f), strokeWidth = wide * 0.07f)
+            }
+            drawLine(Color(0xFF7E5938), Offset(-len / 2f, -wide / 2f), Offset(len / 2f, -wide / 2f), strokeWidth = wide * 0.16f, cap = StrokeCap.Round)
+            drawLine(Color(0xFF8F6640), Offset(-len / 2f, wide / 2f), Offset(len / 2f, wide / 2f), strokeWidth = wide * 0.16f, cap = StrokeCap.Round)
+        }
+    }
+
+    /** A low-poly pine: three stacked cones, each split into a lit and a shaded half, on a small trunk. */
+    fun DrawScope.pine(base: Offset, h: Float) {
+        drawOval(ShadowTeal.copy(alpha = 0.18f), Offset(base.x - h * 0.34f, base.y - h * 0.06f), Size(h * 0.7f, h * 0.16f))
+        drawRect(Color(0xFF8F6A48), Offset(base.x - h * 0.05f, base.y - h * 0.18f), Size(h * 0.1f, h * 0.18f))
+        for (k in 0 until 3) {
+            val w = h * (0.36f - k * 0.08f)
+            val bottom = base.y - h * (0.14f + k * 0.24f)
+            val apex = Offset(base.x, bottom - h * 0.42f)
+            drawPath(Path().apply { moveTo(apex.x, apex.y); lineTo(base.x - w, bottom); lineTo(base.x, bottom + h * 0.04f); close() }, Color(0xFF79D195))
+            drawPath(Path().apply { moveTo(apex.x, apex.y); lineTo(base.x, bottom + h * 0.04f); lineTo(base.x + w, bottom); close() }, Color(0xFF3F9E6B))
+        }
+    }
+
+    /** A low-poly bush: a faceted dome in three greens. */
+    fun DrawScope.bush(base: Offset, s: Float) {
+        drawOval(ShadowTeal.copy(alpha = 0.18f), Offset(base.x - s * 0.55f, base.y - s * 0.08f), Size(s * 1.1f, s * 0.2f))
+        val top = Offset(base.x - s * 0.08f, base.y - s * 0.62f)
+        val l = Offset(base.x - s * 0.5f, base.y); val r = Offset(base.x + s * 0.5f, base.y)
+        val ml = Offset(base.x - s * 0.42f, base.y - s * 0.36f); val mr = Offset(base.x + s * 0.4f, base.y - s * 0.4f)
+        val mid = Offset(base.x + s * 0.05f, base.y - s * 0.12f)
+        drawPath(Path().apply { moveTo(l.x, l.y); lineTo(ml.x, ml.y); lineTo(mid.x, mid.y); close() }, Color(0xFF6CC488))
+        drawPath(Path().apply { moveTo(ml.x, ml.y); lineTo(top.x, top.y); lineTo(mid.x, mid.y); close() }, Color(0xFF8FDDA4))
+        drawPath(Path().apply { moveTo(top.x, top.y); lineTo(mr.x, mr.y); lineTo(mid.x, mid.y); close() }, Color(0xFF5DB878))
+        drawPath(Path().apply { moveTo(mr.x, mr.y); lineTo(r.x, r.y); lineTo(mid.x, mid.y); close() }, Color(0xFF3F9E6B))
+        drawPath(Path().apply { moveTo(l.x, l.y); lineTo(mid.x, mid.y); lineTo(r.x, r.y); close() }, Color(0xFF4FA972))
+    }
+
+    /**
+     * A low-poly cloud around (0, 0): four faceted puffs on a flat base, white on top, a cool blue-grey underside
+     * (lit from the top-left). [w] is its width in px; [seed] varies the puffs so no two clouds match. Built once;
+     * the screen only moves it.
+     */
+    fun cloudShape(w: Float, seed: Int): List<Pair<Path, Color>> = buildList {
+        val top = Color(0xFFFFFFFF)
+        val mid = Color(0xFFEAF3F7)
+        val shade = Color(0xFFC9DCE6)
+        add(Path().apply { moveTo(-w * 0.5f, 0f); lineTo(w * 0.5f, 0f); lineTo(w * 0.42f, w * 0.1f); lineTo(-w * 0.44f, w * 0.1f); close() } to shade)
+        val puffs = listOf(-0.32f to 0.24f, -0.08f to 0.34f, 0.2f to 0.28f, 0.4f to 0.18f)
+        puffs.forEachIndexed { k, (dx, r0) ->
+            val r = w * r0 * (0.9f + ((seed + k * 5) % 4) * 0.06f)
+            val pc = Offset(w * dx, -r * 0.15f)
+            val n = 6
+            val v = (0..n).map { i ->
+                val a = PI.toFloat() + i * PI.toFloat() / n
+                Offset(pc.x + r * cos(a), pc.y + r * 0.85f * sin(a))
+            }
+            for (i in 0 until n) {
+                val tone = when {
+                    i < 2 -> top
+                    i < 4 -> if (k % 2 == 0) top else mid
+                    else -> mid
+                }
+                add(Path().apply { moveTo(pc.x, pc.y + r * 0.1f); lineTo(v[i].x, v[i].y); lineTo(v[i + 1].x, v[i + 1].y); close() } to tone)
+            }
+        }
+        add(Path().apply { moveTo(-w * 0.5f, 0f); lineTo(w * 0.5f, 0f); lineTo(w * 0.46f, w * 0.05f); lineTo(-w * 0.47f, w * 0.05f); close() } to mid)
+    }
+}

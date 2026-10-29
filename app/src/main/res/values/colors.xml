@@ -3,5 +3,4 @@
     <!-- The aurora page's ground (Glass.Page): the window behind the first frame matches the app's first frame. -->
     <color name="ground">#F3FBF7</color>
     <color name="humo_mint">#3DC98C</color>
-    <color name="icon_teal">#0A2D2A</color>
 </resources>

@@ -3,6 +3,7 @@ package com.mcompany.humo.ui
 import com.mcompany.humo.data.course.CoordinateTransformations
 import com.mcompany.humo.data.course.firstLessonLabel
 import com.mcompany.humo.ui.path.PathLayout
+import com.mcompany.humo.ui.path.Pt
 import com.mcompany.humo.ui.path.StoneState
 import com.mcompany.humo.ui.path.stoneState
 import org.junit.Assert.assertEquals
@@ -29,7 +30,7 @@ class PathLayoutTest {
     }
 
     @Test fun `every stone stays on screen sideways`() {
-        for (i in 0 until 14) assertTrue(layout.x(i) - 56f >= 0f && layout.x(i) + 56f <= 390f)
+        for (i in 0 until 14) assertTrue(layout.x(i) - 50f >= 0f && layout.x(i) + 50f <= 390f)
     }
 
     @Test fun `the current stone opens at thumb height`() {
@@ -48,5 +49,58 @@ class PathLayoutTest {
         assertEquals(StoneState.Done, stoneState(2, 3))
         assertEquals(StoneState.Current, stoneState(3, 3))
         assertEquals(StoneState.Locked, stoneState(4, 3))
+    }
+
+    @Test fun `the river meets the trail only at the three footbridges`() {
+        assertEquals(3, layout.bridges.size)
+        val trail = (-1 until 14).flatMap { i -> (0..40).map { layout.trail(i, it / 40f) } }
+        for (r in layout.river) {
+            if (trail.any { it.dist(r) < 24f }) assertTrue("river touches the trail at $r", layout.bridges.any { it.at.dist(r) < 70f })
+        }
+    }
+
+    @Test fun `the river never runs through an island`() {
+        for (i in 0 until 14) for (r in layout.river) assertTrue(r.dist(layout.stone(i)) > 50f)
+    }
+
+    @Test fun `no flagstone sits on an island or a bridge, and the trail is a real trail`() {
+        assertTrue(layout.flagstones.size > 60)
+        for (f in layout.flagstones) {
+            for (i in 0 until 14) assertTrue(f.at.dist(layout.stone(i)) >= PathLayout.ISLAND_CLEAR)
+            for (b in layout.bridges) assertTrue(f.at.dist(b.at) >= PathLayout.BRIDGE_CLEAR)
+        }
+    }
+
+    @Test fun `trees stand on free ground`() {
+        assertTrue(layout.trees.size >= 8)
+        for (t in layout.trees) {
+            for (i in 0 until 14) assertTrue(t.at.dist(layout.stone(i)) >= 70f)
+            assertTrue(t.at.x in 0f..390f)
+        }
+    }
+
+    @Test fun `clouds cover only the levels not reached yet`() {
+        val clouds = layout.clouds(3)
+        assertTrue(clouds.isNotEmpty())
+        for (c in clouds) assertTrue("cloud at ${c.at} over the current stone", c.at.y < layout.y(2) - 60f)
+        assertTrue(clouds.any { it.at.y < 100f })
+    }
+
+    @Test fun `the plane never flies over the stone the child is about to tap`() {
+        for (current in 1..14) {
+            val stone = layout.stone(current - 1)
+            for (s in 0 until 220) {
+                val fix = layout.plane(current, s / 10f)
+                assertTrue("level $current at ${s / 10f}s", fix.at.dist(stone) > 100f)
+                assertTrue(fix.bank in -1f..1f)
+            }
+        }
+    }
+
+    @Test fun `the map fits a 360 dp phone too`() {
+        val small = PathLayout(14, 360f)
+        for (i in 0 until 14) assertTrue(small.x(i) - 50f >= 0f && small.x(i) + 50f <= 360f)
+        for (r in small.river) assertTrue(r.x in 0f..360f || r.y < 0f || r.y > small.height)
+        assertEquals(Pt(0f, 0f).dist(Pt(3f, 4f)), 5f, 0.001f)
     }
 }
