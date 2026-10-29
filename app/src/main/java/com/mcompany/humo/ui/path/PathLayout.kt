@@ -194,23 +194,28 @@ class PathLayout(val count: Int, val width: Float) {
         var y = edge
         var r = 0
         while (y > stop) {
-            val w = if (r == 0) 156f else 148f + (r % 2) * 14f
+            // Back rows are bigger and packed 40 dp apart, so each row's base hides behind the domes of the row in front
+            // (no grey shelves): only the front row shows its underside.
+            val w = if (r == 0) 156f else 170f + (r % 3) * 12f
             // A cloud's underside reaches 0.085 w below its centre; the front row's sits on the edge.
             val centre = y - w * 0.09f
             val dir = if (r % 2 == 0) 1f else -1f
-            add(BankRow(centre, w, spacing = 104f, speed = dir * (5f + 2.5f * r), seed = r * 11 + 3, depth = r))
-            y -= 58f
+            add(BankRow(centre, w, spacing = 104f, speed = dir * (5f + 2.5f * (r % 5)), seed = r * 11 + 3, depth = r))
+            y -= 40f
             r++
         }
     }
 
-    /** The cloud centres (dp) of [row] at time [seconds]: they slide at the row's speed and wrap off-screen, never popping. */
+    /**
+     * The cloud centres (dp) of [row] at time [seconds]: they slide at the row's speed and wrap off-screen, never popping.
+     * Each cloud sits up to 12 dp higher than its row (never lower), so the bank's lower edge is lumpy, not a ruler line.
+     */
     fun bankClouds(row: BankRow, seconds: Float): List<Pt> {
         val n = (width / row.spacing).toInt() + 3
         val period = n * row.spacing
         return (0 until n).map { j ->
             val raw = (j * row.spacing + row.speed * seconds + (row.seed % 7) * 13f) % period
-            Pt((if (raw < 0f) raw + period else raw) - row.spacing, row.y)
+            Pt((if (raw < 0f) raw + period else raw) - row.spacing, row.y - ((row.seed + j * 7) % 4) * 4f)
         }
     }
 
@@ -223,7 +228,7 @@ class PathLayout(val count: Int, val width: Float) {
         val home = if (c >= count - 2) y(c) + gap * 1.55f else y(c) - gap * 1.6f
         // Kept on screen (checker fix 5): between the top bar and 170 dp above thumb height, where the current stone opens.
         val cy = if (scrollDp == null || viewport == null) home else {
-            val lo = scrollDp + 110f
+            val lo = scrollDp + 124f
             val hi = scrollDp + viewport * THUMB - 170f
             val kept = if (hi >= lo) home.coerceIn(lo, hi) else lo
             // Never over the stone the child is about to tap, wherever they have scrolled it.

@@ -414,7 +414,7 @@ private fun Sky(
             val k = density
             val edge = layout.bankEdge(current)
             val shapes = rows.map { row ->
-                layout.bankClouds(row, 0f).indices.map { j -> LowPoly.cloudShape(row.width * k, row.seed + j * 5, far = row.depth > 0) }
+                layout.bankClouds(row, 0f).indices.map { j -> LowPoly.cloudShape(row.width * k, row.seed + j * 5, far = row.depth > 0, underside = row.depth == 0) }
             }
             val fillTop = rows.lastOrNull()?.y ?: edge
             // The bank's shadow on the ground: a faceted band just under its edge (light from the top-left).

@@ -192,15 +192,16 @@ internal object LowPoly {
     /**
      * A low-poly cloud around (0, 0) (checker 2026-10-29: "stickers", not sky): one of three silhouettes (3, 4 or 5
      * puffs) picked by [seed], each puff a five-sided dome with two lit facets on its upper-left, over a chamfered
-     * blue-grey underside narrower than the puffs. [far] rows are a touch bluer. [w] is its width in px.
+     * blue-grey underside narrower than the puffs ([underside] off for a bank row hidden behind the one in front).
+     * [far] rows are a touch bluer. [w] is its width in px.
      */
-    fun cloudShape(w: Float, seed: Int, far: Boolean = false): List<Pair<Path, Color>> = buildList {
+    fun cloudShape(w: Float, seed: Int, far: Boolean = false, underside: Boolean = true): List<Pair<Path, Color>> = buildList {
         // Rows further back are a touch bluer, so the bank has depth without any blur.
         val lit = if (far) Color(0xFFF7FBFD) else Color(0xFFFFFFFF)
         val soft = if (far) Color(0xFFEAF2F6) else Color(0xFFF6FAFC)
         val body = if (far) Color(0xFFDCE8EF) else Color(0xFFE6EFF4)
         val shade = if (far) Color(0xFFB0C5D4) else Color(0xFFB8CCDA)
-        add(Path().apply {
+        if (underside) add(Path().apply {
             moveTo(-w * 0.44f, -w * 0.02f); lineTo(w * 0.44f, -w * 0.02f); lineTo(w * 0.4f, w * 0.05f)
             lineTo(w * 0.3f, w * 0.085f); lineTo(-w * 0.3f, w * 0.085f); lineTo(-w * 0.4f, w * 0.05f); close()
         } to shade)
