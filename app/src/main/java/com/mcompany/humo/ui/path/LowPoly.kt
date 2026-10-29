@@ -165,33 +165,31 @@ internal object LowPoly {
     }
 
     /**
-     * A low-poly cloud around (0, 0): four faceted puffs on a flat base, white on top, a cool blue-grey underside
-     * (lit from the top-left). [w] is its width in px; [seed] varies the puffs so no two clouds match. Built once;
-     * the screen only moves it.
+     * A low-poly cloud around (0, 0) (CI 40834278210: the first one read as stacked shelves): four rounded puffs, each
+     * one flat polygon with one lit facet on its upper-left, over a short chamfered underside in a cool blue-grey,
+     * narrower than the puffs so no ledge shows. [w] is its width in px; [seed] varies the puffs. Built once; the
+     * screen only moves it.
      */
     fun cloudShape(w: Float, seed: Int): List<Pair<Path, Color>> = buildList {
-        val top = Color(0xFFFFFFFF)
-        val mid = Color(0xFFEAF3F7)
-        val shade = Color(0xFFC9DCE6)
-        add(Path().apply { moveTo(-w * 0.5f, 0f); lineTo(w * 0.5f, 0f); lineTo(w * 0.42f, w * 0.1f); lineTo(-w * 0.44f, w * 0.1f); close() } to shade)
-        val puffs = listOf(-0.32f to 0.24f, -0.08f to 0.34f, 0.2f to 0.28f, 0.4f to 0.18f)
+        val lit = Color(0xFFFFFFFF)
+        val body = Color(0xFFEFF6F9)
+        val shade = Color(0xFFD3E3EC)
+        add(Path().apply {
+            moveTo(-w * 0.44f, -w * 0.02f); lineTo(w * 0.44f, -w * 0.02f); lineTo(w * 0.4f, w * 0.05f)
+            lineTo(w * 0.3f, w * 0.085f); lineTo(-w * 0.3f, w * 0.085f); lineTo(-w * 0.4f, w * 0.05f); close()
+        } to shade)
+        val puffs = listOf(-0.27f to 0.2f, -0.04f to 0.29f, 0.2f to 0.24f, 0.36f to 0.15f)
         puffs.forEachIndexed { k, (dx, r0) ->
-            val r = w * r0 * (0.9f + ((seed + k * 5) % 4) * 0.06f)
-            val pc = Offset(w * dx, -r * 0.15f)
-            val n = 6
+            val r = w * r0 * (0.92f + ((seed + k * 5) % 4) * 0.05f)
+            val pc = Offset(w * dx, 0f)
+            val n = 7
             val v = (0..n).map { i ->
                 val a = PI.toFloat() + i * PI.toFloat() / n
-                Offset(pc.x + r * cos(a), pc.y + r * 0.85f * sin(a))
+                Offset(pc.x + r * cos(a), pc.y + r * 0.9f * sin(a))
             }
-            for (i in 0 until n) {
-                val tone = when {
-                    i < 2 -> top
-                    i < 4 -> if (k % 2 == 0) top else mid
-                    else -> mid
-                }
-                add(Path().apply { moveTo(pc.x, pc.y + r * 0.1f); lineTo(v[i].x, v[i].y); lineTo(v[i + 1].x, v[i + 1].y); close() } to tone)
-            }
+            add(Path().apply { moveTo(v[0].x, v[0].y); for (i in 1..n) lineTo(v[i].x, v[i].y); close() } to body)
+            // The facet that faces the light: the upper-left third of the puff.
+            add(Path().apply { moveTo(pc.x - r * 0.12f, pc.y - r * 0.1f); lineTo(v[1].x, v[1].y); lineTo(v[2].x, v[2].y); lineTo(v[3].x, v[3].y); lineTo(v[4].x, v[4].y); close() } to lit)
         }
-        add(Path().apply { moveTo(-w * 0.5f, 0f); lineTo(w * 0.5f, 0f); lineTo(w * 0.46f, w * 0.05f); lineTo(-w * 0.47f, w * 0.05f); close() } to mid)
     }
 }

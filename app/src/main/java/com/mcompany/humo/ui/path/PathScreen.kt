@@ -342,7 +342,8 @@ private fun Sky(layout: PathLayout, current: Int, scroll: ScrollState, viewport:
                 val fix = layout.plane(current, t)
                 drawPlane(plane, fix, k, shadow = true, tint = shadowTint)
                 clouds.forEachIndexed { i, c ->
-                    val lag = scrollDp * (0.10f + 0.08f * c.depth)
+                    // Parallax: a cloud moves a little slower than the ground, by at most 24 dp, so the first row never slides onto the current island.
+                    val lag = ((viewport * 0.5f - (c.at.y - scrollDp)) * (0.06f + 0.04f * c.depth)).coerceIn(-24f, 24f)
                     val screenY = c.at.y + lag - scrollDp
                     if (screenY < -120f || screenY > viewport + 120f) return@forEachIndexed
                     // Parting: a cloud slides away from the middle as it reaches the upper-middle of the screen.
@@ -351,8 +352,7 @@ private fun Sky(layout: PathLayout, current: Int, scroll: ScrollState, viewport:
                     val drift = if (motion) sin(t * 2f * PI.toFloat() / (26f + c.seed % 9) + c.seed) * 10f else 0f
                     val x = (c.at.x + drift + away * 26f * part * part) * k
                     val y = (c.at.y + lag) * k
-                    val alpha = 0.96f - 0.12f * c.depth
-                    translate(x, y) { shapes[i].forEach { (p, col) -> drawPath(p, col, alpha = alpha) } }
+                    translate(x, y) { shapes[i].forEach { (p, col) -> drawPath(p, col) } }
                 }
                 drawPlane(plane, fix, k, shadow = false, tint = null)
             }

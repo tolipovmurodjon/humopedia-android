@@ -171,25 +171,26 @@ class PathLayout(val count: Int, val width: Float) {
     }
 
     /**
-     * Clouds over the levels not reached yet: the first row half-covers the next stone, every row above is fuller,
-     * and a thick bank closes the top (the part of the world not built yet).
+     * Clouds over the levels not reached yet: two per row, rows 120 dp apart, so the locked islands peek between them;
+     * the first row sits well above the current island, and a fuller row of three closes the top (the part of the
+     * world not built yet).
      */
     fun clouds(current: Int): List<Cloud> = buildList {
-        val start = y((current - 1).coerceIn(0, count - 1)) - gap * 0.72f
-        var y = start
+        var y = y((current - 1).coerceIn(0, count - 1)) - gap * 0.85f
         var row = 0
-        while (y > -30f) {
-            val perRow = if (row == 0) 2 else 3
-            for (k in 0 until perRow) {
-                val seed = row * 7 + k * 3
-                val fx = when (perRow) {
-                    2 -> if (k == 0) 0.16f else 0.84f
-                    else -> listOf(0.12f, 0.5f, 0.88f)[k] + ((seed * 13) % 9 - 4) * 0.012f
-                }
-                val w = (if (row == 0) 120f else 140f) + (seed * 17 % 5) * 12f
-                add(Cloud(Pt(width * fx, y + ((seed * 11) % 7 - 3) * 6f), w, seed, depth = (seed % 3) / 2f))
+        while (y > -20f) {
+            val xs = when {
+                y < 150f -> listOf(0.15f, 0.5f, 0.85f)
+                row == 0 -> listOf(0.14f, 0.86f)
+                row % 2 == 1 -> listOf(0.3f, 0.9f)
+                else -> listOf(0.1f, 0.68f)
             }
-            y -= 78f
+            xs.forEachIndexed { k, fx ->
+                val seed = row * 7 + k * 3
+                val w = 130f + (seed * 17 % 5) * 10f
+                add(Cloud(Pt(width * fx, y + ((seed * 11) % 7 - 3) * 4f), w, seed, depth = (seed % 3) / 2f))
+            }
+            y -= 120f
             row++
         }
     }
