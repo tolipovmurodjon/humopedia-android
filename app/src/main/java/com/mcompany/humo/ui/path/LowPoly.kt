@@ -45,21 +45,22 @@ internal object LowPoly {
     }
 
     /**
-     * An octagonal island seen from above at a tilt: a faceted top, a side band in front, a soft hue shadow under it.
-     * [rx] is the half width in px; the top's half height is 0.55 [rx], the side is 0.34 [rx] deep.
+     * An octagonal island seen from above at a tilt (Boss 2026-10-29: "islands look squashed"): a faceted top whose
+     * half height is 0.62 [rx], a side band 0.42 [rx] deep (25 % of the island's height), a lit rim where top meets side
+     * so the facets read crisp, and a soft hue shadow under it. [rx] is the half width in px.
      */
     fun DrawScope.island(c: Offset, rx: Float, look: IslandLook) {
-        val ry = rx * 0.55f
-        val depth = rx * 0.34f
-        drawOval(ShadowTeal.copy(alpha = 0.20f), topLeft = Offset(c.x - rx * 1.08f, c.y + depth - ry * 0.55f), size = Size(rx * 2.16f, ry * 1.5f))
+        val ry = rx * TOP_RATIO
+        val depth = rx * SIDE_RATIO
+        drawOval(ShadowTeal.copy(alpha = 0.20f), topLeft = Offset(c.x - rx * 1.06f, c.y + depth - ry * 0.45f), size = Size(rx * 2.12f, ry * 1.3f))
         val v = (0 until 8).map { k ->
             val a = (k * 45f + 22.5f) * PI.toFloat() / 180f
             Offset(c.x + rx * cos(a), c.y + ry * sin(a))
         }
-        // The side band: the front half of the rim pushed down.
-        for (k in 0 until 8) {
+        // The side band: the front half of the rim pushed down, each face lit by how much it turns to the left.
+        val front = (0 until 8).filter { k -> v[k].y + v[(k + 1) % 8].y > 2 * c.y }
+        for (k in front) {
             val a = v[k]; val b = v[(k + 1) % 8]
-            if (a.y + b.y <= 2 * c.y) continue
             val mid = (a.x + b.x) / 2f - c.x
             val tone = if (mid < -rx * 0.35f) look.side.light else if (mid > rx * 0.35f) look.side.shade else look.side.mid
             drawPath(Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y); lineTo(b.x, b.y + depth); lineTo(a.x, a.y + depth); close() }, tone)
@@ -71,7 +72,13 @@ internal object LowPoly {
             val facing = kotlin.math.atan2((a.y + b.y) / 2f - c.y, (a.x + b.x) / 2f - c.x)
             drawPath(Path().apply { moveTo(ridge.x, ridge.y); lineTo(a.x, a.y); lineTo(b.x, b.y); close() }, pick(look.top, facing))
         }
+        // The lit rim along the front edge of the top: one crisp line where the light catches the corner.
+        for (k in front) drawLine(look.top.light, v[k], v[(k + 1) % 8], rx * 0.035f, StrokeCap.Round)
     }
+
+    /** The island's shape: top half height and side depth, as fractions of its half width. */
+    const val TOP_RATIO = 0.62f
+    const val SIDE_RATIO = 0.42f
 
     /** The "done" mark: a white disc with a mint tick, on the island's back-right rim. */
     fun DrawScope.doneBadge(c: Offset, r: Float) {
@@ -83,13 +90,31 @@ internal object LowPoly {
         drawPath(tick, Glass.Primary, style = Stroke(r * 0.26f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 
-    /** The current level's flag: a pole and a faceted mint pennant (two tones), planted on the island's ridge. */
+    /** The "start here" mark on the current island: a mint disc with a white play triangle (no word needed). */
+    fun DrawScope.playBadge(c: Offset, r: Float) {
+        drawCircle(ShadowTeal.copy(alpha = 0.22f), r, c + Offset(0f, r * 0.2f))
+        drawCircle(Glass.Primary, r, c)
+        drawPath(Path().apply { moveTo(c.x - r * 0.28f, c.y - r * 0.42f); lineTo(c.x + r * 0.48f, c.y); lineTo(c.x - r * 0.28f, c.y + r * 0.42f); close() }, Color.White)
+    }
+
+    /** A four-point sparkle, [s] its half size, [a] its opacity: the "you did this" twinkle on a done tick. */
+    fun DrawScope.sparkle(c: Offset, s: Float, a: Float) {
+        val w = s * 0.26f
+        drawPath(Path().apply {
+            moveTo(c.x, c.y - s); lineTo(c.x + w, c.y - w); lineTo(c.x + s, c.y); lineTo(c.x + w, c.y + w)
+            lineTo(c.x, c.y + s); lineTo(c.x - w, c.y + w); lineTo(c.x - s, c.y); lineTo(c.x - w, c.y - w); close()
+        }, Color(0xFFFFD45C), alpha = a)
+        drawCircle(Color.White, s * 0.16f, c, alpha = a)
+    }
+
+    /** The current level's flag: a pole and a faceted mint pennant (three tones) that waves, planted on the island's ridge. */
     fun DrawScope.flag(base: Offset, h: Float, wave: Float) {
         val top = Offset(base.x, base.y - h)
         drawLine(Color(0xFF6B4A2E), base, top, strokeWidth = h * 0.07f, cap = StrokeCap.Round)
-        val tip = Offset(top.x + h * 0.62f, top.y + h * 0.2f + wave * h * 0.05f)
+        // [wave] -1 … 1: the tip swings one way while the fold dips the other, a ripple running down the pennant.
+        val tip = Offset(top.x + h * (0.6f + 0.03f * wave), top.y + h * 0.2f + wave * h * 0.08f)
         val low = Offset(top.x, top.y + h * 0.42f)
-        val fold = Offset(top.x + h * 0.3f, top.y + h * 0.2f + wave * h * 0.03f)
+        val fold = Offset(top.x + h * 0.3f, top.y + h * 0.2f - wave * h * 0.05f)
         drawPath(Path().apply { moveTo(top.x, top.y); lineTo(tip.x, tip.y); lineTo(fold.x, fold.y); close() }, Color(0xFF66DDA8))
         drawPath(Path().apply { moveTo(fold.x, fold.y); lineTo(tip.x, tip.y); lineTo(low.x, low.y); close() }, Color(0xFF3DC98C))
         drawPath(Path().apply { moveTo(top.x, top.y); lineTo(fold.x, fold.y); lineTo(low.x, low.y); close() }, Color(0xFF23A06C))
@@ -167,13 +192,14 @@ internal object LowPoly {
     /**
      * A low-poly cloud around (0, 0) (checker 2026-10-29: "stickers", not sky): one of three silhouettes (3, 4 or 5
      * puffs) picked by [seed], each puff a five-sided dome with two lit facets on its upper-left, over a chamfered
-     * blue-grey underside narrower than the puffs. The screen adds its ground shadow. [w] is its width in px.
+     * blue-grey underside narrower than the puffs. [far] rows are a touch bluer. [w] is its width in px.
      */
-    fun cloudShape(w: Float, seed: Int): List<Pair<Path, Color>> = buildList {
-        val lit = Color(0xFFFFFFFF)
-        val soft = Color(0xFFF6FAFC)
-        val body = Color(0xFFE6EFF4)
-        val shade = Color(0xFFB8CCDA)
+    fun cloudShape(w: Float, seed: Int, far: Boolean = false): List<Pair<Path, Color>> = buildList {
+        // Rows further back are a touch bluer, so the bank has depth without any blur.
+        val lit = if (far) Color(0xFFF7FBFD) else Color(0xFFFFFFFF)
+        val soft = if (far) Color(0xFFEAF2F6) else Color(0xFFF6FAFC)
+        val body = if (far) Color(0xFFDCE8EF) else Color(0xFFE6EFF4)
+        val shade = if (far) Color(0xFFB0C5D4) else Color(0xFFB8CCDA)
         add(Path().apply {
             moveTo(-w * 0.44f, -w * 0.02f); lineTo(w * 0.44f, -w * 0.02f); lineTo(w * 0.4f, w * 0.05f)
             lineTo(w * 0.3f, w * 0.085f); lineTo(-w * 0.3f, w * 0.085f); lineTo(-w * 0.4f, w * 0.05f); close()

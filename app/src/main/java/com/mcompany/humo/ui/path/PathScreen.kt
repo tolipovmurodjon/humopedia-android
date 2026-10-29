@@ -51,17 +51,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotateRad
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -70,7 +65,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -79,11 +73,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mcompany.humo.R
 import com.mcompany.humo.data.course.Level
 import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.Pane
@@ -96,11 +88,17 @@ import com.mcompany.humo.ui.path.LowPoly.flag
 import com.mcompany.humo.ui.path.LowPoly.flagstone
 import com.mcompany.humo.ui.path.LowPoly.island
 import com.mcompany.humo.ui.path.LowPoly.lock
+import com.mcompany.humo.ui.path.Jet.jet
+import com.mcompany.humo.ui.path.Jet.jetShadow
+import com.mcompany.humo.ui.path.Jet.smoke
 import com.mcompany.humo.ui.path.LowPoly.pine
+import com.mcompany.humo.ui.path.LowPoly.playBadge
+import com.mcompany.humo.ui.path.LowPoly.sparkle
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.roundToInt
+import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
@@ -109,16 +107,23 @@ fun PathRoute(padding: PaddingValues, onOpenLevel: (Level) -> Unit, vm: PathView
     PathScreen(state, padding, onOpenLevel)
 }
 
-/** Island art widths (dp): the current one is the biggest thing on the map; every tap box is ≥ 72 dp tall. */
+/** Island art widths (dp): the current one is the biggest thing on the map; every tap box is ≥ 79 dp tall. */
 private val IslandW = 88.dp
 private val CurrentW = 100.dp
 private val TopBarH = 48.dp
+/** An island's box is 0.9 of its width tall; the top face's centre sits 44 % down it. */
+private const val ISLAND_H = 0.9f
+private const val ISLAND_CY = 0.44f
+/** The SR-71, nose to tail (dp). */
+private const val JET_LEN = 70f
 
 /**
  * The Home tab (PHASE-PATH-V2, Boss 2026-10-29): a low-poly world map with no words on it. A walkable flagstone trail
- * climbs from island to island, crossing the river on a footbridge after each unit; the SR-71 loops over the clouds
- * that hide the levels not reached yet. One tap on an island opens a glass sheet with its name and a big
- * "Davom etish". A glass bar on top holds the course, gems and the day count (numbers and icons only).
+ * climbs from island to island, crossing the river on a footbridge after each unit. The current island and the next
+ * six are in the open (the story); above them a low-poly cloud bank closes the world, and the scroll stops there. The
+ * SR-71 flies its loop over it all. Every time Home opens, the current island sits at thumb height, and one tap on it
+ * starts the lesson; a done or locked island opens a glass sheet instead. A glass bar on top holds the course, gems
+ * and the day count.
  */
 @Composable
 fun PathScreen(
@@ -134,35 +139,60 @@ fun PathScreen(
     var coursesOpen by rememberSaveable { mutableStateOf(false) }
     val seconds = rememberSceneSeconds(motion)
     val haptics = LocalHapticFeedback.current
+    // Set when a lesson opens; when the child comes back, the jet does one small roll for them.
+    var lessonOpen by rememberSaveable { mutableStateOf(false) }
+    val rollAt = remember { mutableFloatStateOf(-10f) }
+    LaunchedEffect(Unit) {
+        if (lessonOpen) {
+            lessonOpen = false
+            if (motion) rollAt.floatValue = 0.6f
+        }
+    }
+    val start: (Level) -> Unit = { level ->
+        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        sheetLevel = null
+        lessonOpen = true
+        onOpenLevel(level)
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val layout = remember(maxWidth) { PathLayout(count, maxWidth.value) }
+        val cut = layout.cut(current)
         val density = LocalDensity.current
         val viewport = with(density) { constraints.maxHeight.toDp().value }
-        // Opens at the current stone once, then the learner's own scroll is kept (rotation, back from a lesson).
-        var placed by rememberSaveable { mutableStateOf(false) }
-        LaunchedEffect(state?.current, placed) {
+        val visible = viewport - padding.calculateBottomPadding().value
+        // Every time Home opens (launch, back from a lesson, back from another tab, rotation): the current island at thumb
+        // height, clear of the clouds. The world's height changes with the bank, so wait until the scroll can reach it.
+        LaunchedEffect(state?.current, cut, visible) {
             val s = state ?: return@LaunchedEffect
-            if (placed) return@LaunchedEffect
-            snapshotFlow { scroll.maxValue }.first { it > 0 && it != Int.MAX_VALUE }
-            scroll.scrollTo(with(density) { layout.scrollFor(s.current - 1, viewport - padding.calculateBottomPadding().value).dp.roundToPx() })
-            placed = true
+            val target = with(density) { layout.scrollFor(s.current - 1, visible, cut).dp.roundToPx() }
+            withTimeoutOrNull(1_000) { snapshotFlow { scroll.maxValue }.first { it != Int.MAX_VALUE && it >= target - 2 } }
+            scroll.scrollTo(target)
         }
         Box(Modifier.fillMaxSize().verticalScroll(scroll).semantics { contentDescription = "Path" }) {
-            Box(Modifier.fillMaxWidth().height(layout.height.dp + padding.calculateBottomPadding())) {
-                Ground(layout, current)
+            Box(Modifier.fillMaxWidth().height((layout.height - cut).dp + padding.calculateBottomPadding())) {
+                Ground(layout, current, cut)
                 if (state != null) {
+                    val top = layout.storyTop(current)
                     state.course.levels.forEachIndexed { i, level ->
-                        Island(level, stoneState(level.n, current), layout.stone(i), seconds, motion) {
-                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
-                            sheetLevel = level.n
+                        // Islands under the bank are not drawn and cannot be tapped: the story ends at the clouds.
+                        if (i > top) return@forEachIndexed
+                        val at = layout.stone(i).let { Pt(it.x, it.y - cut) }
+                        val stone = stoneState(level.n, current)
+                        Island(level, stone, at, seconds, motion, inView = { (at.y - scroll.value / density.density) in 60f..(visible - 40f) }) {
+                            if (stone == StoneState.Current) {
+                                start(level)
+                            } else {
+                                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                sheetLevel = level.n
+                            }
                         }
                     }
                 }
             }
         }
         // A screen-sized layer (checker fix 1): redrawn every frame, so it must not be the 2,700 dp content box.
-        Sky(layout, current, scroll, viewport, viewport - padding.calculateBottomPadding().value, seconds, motion)
+        Sky(layout, current, cut, scroll, viewport, visible, seconds, motion, rollAt)
 
         TopBar(state, padding, onCourse = { coursesOpen = !coursesOpen })
 
@@ -193,13 +223,7 @@ fun PathScreen(
             enter = fadeIn() + slideInVertically(spring(dampingRatio = 0.86f, stiffness = 420f)) { it / 2 },
             exit = fadeOut() + slideOutVertically { it / 2 },
         ) {
-            shown?.let { level ->
-                LevelSheet(level, stoneState(level.n, current), current) {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    sheetLevel = null
-                    onOpenLevel(level)
-                }
-            }
+            shown?.let { level -> LevelSheet(level, stoneState(level.n, current), current) { start(level) } }
         }
     }
 }
@@ -224,9 +248,12 @@ private fun rememberSceneSeconds(motion: Boolean): State<Float> {
     return t
 }
 
-/** River, trail, footbridges and trees: built once per layout into paths, on their own layer (scrolling never redraws them). */
+/**
+ * River, trail, footbridges and trees: built once per layout into paths, on their own layer (scrolling never redraws
+ * them). The map's dp are the full world's; the scrollable box starts [cut] dp down it, at the cloud bank.
+ */
 @Composable
-private fun Ground(layout: PathLayout, current: Int) {
+private fun Ground(layout: PathLayout, current: Int, cut: Float) {
     Box(
         Modifier.fillMaxSize().graphicsLayer().clearAndSetSemantics {}.drawWithCache {
             val k = density
@@ -246,42 +273,52 @@ private fun Ground(layout: PathLayout, current: Int) {
             val ripple = Stroke(3f * k, cap = StrokeCap.Round, join = StrokeJoin.Round)
             val dirt = Stroke(30f * k, cap = StrokeCap.Round, join = StrokeJoin.Round)
             // Above the current level the world is not walked yet: the trail there is paler.
-            val walkedTop = layout.y(current - 1) * k
+            val walkedTop = layout.y(current - 1)
             val dirtBrush = Brush.verticalGradient(
                 0f to Color(0xFFE7DDC4).copy(alpha = 0.45f),
-                (walkedTop / size.height).coerceIn(0.01f, 0.99f) to Color(0xFFE6D3A6).copy(alpha = 0.85f),
+                (walkedTop / layout.height).coerceIn(0.01f, 0.99f) to Color(0xFFE6D3A6).copy(alpha = 0.85f),
                 1f to Color(0xFFE6D3A6).copy(alpha = 0.85f),
+                startY = 0f, endY = layout.height * k,
             )
             onDrawBehind {
-                drawPath(riverPath, Glass.Mint1.copy(alpha = 0.75f), style = bank)
-                drawPath(riverPath, Glass.Water, style = water)
-                drawPath(riverPath, Glass.WaterDeep.copy(alpha = 0.35f), style = Stroke(PathLayout.RIVER_HALF * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawPath(riverPath, Color.White.copy(alpha = 0.45f), style = ripple)
-                drawPath(trailPath, dirtBrush, style = dirt)
-                layout.flagstones.forEach { f ->
-                    flagstone(o(f.at), f.r * k, f.seed, if (f.at.y * k < walkedTop) 0.7f else 1f)
+                translate(0f, -cut * k) {
+                    drawPath(riverPath, Glass.Mint1.copy(alpha = 0.75f), style = bank)
+                    drawPath(riverPath, Glass.Water, style = water)
+                    drawPath(riverPath, Glass.WaterDeep.copy(alpha = 0.35f), style = Stroke(PathLayout.RIVER_HALF * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawPath(riverPath, Color.White.copy(alpha = 0.45f), style = ripple)
+                    drawPath(trailPath, dirtBrush, style = dirt)
+                    layout.flagstones.forEach { f ->
+                        flagstone(o(f.at), f.r * k, f.seed, if (f.at.y < walkedTop) 0.7f else 1f)
+                    }
+                    layout.bridges.forEach { b -> bridge(o(b.at), b.angle, 62f * k, 26f * k) }
+                    layout.trees.forEach { t -> if (t.pine) pine(o(t.at), t.size * k) else bush(o(t.at), t.size * 0.8f * k) }
                 }
-                layout.bridges.forEach { b -> bridge(o(b.at), b.angle, 62f * k, 26f * k) }
-                layout.trees.forEach { t -> if (t.pine) pine(o(t.at), t.size * k) else bush(o(t.at), t.size * 0.8f * k) }
             }
         },
     )
 }
 
 /**
- * One level's island. No words on the map: the state is in the picture (done = moss + tick, current = sunny gold +
- * flag + a slow pulse, locked = slate + padlock, under the clouds). TalkBack reads "Level 3, Rotations, current".
+ * One level's island. No words on the map: the state is in the picture (done = moss + a tick that sparkles as it comes
+ * into view, current = sunny gold + a waving flag + a play mark + a breathing ring, locked = slate + padlock). TalkBack
+ * reads "Level 3, Rotations, current".
  */
 @Composable
-private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float>, motion: Boolean, onTap: () -> Unit) {
+private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float>, motion: Boolean, inView: () -> Boolean, onTap: () -> Unit) {
     val w = if (stone == StoneState.Current) CurrentW else IslandW
-    val h = w * 0.86f
+    val h = w * ISLAND_H
     val density = LocalDensity.current
     val interaction = remember { MutableInteractionSource() }
     val status = when (stone) { StoneState.Done -> "done"; StoneState.Current -> "current"; StoneState.Locked -> "locked" }
+    val sparkAt = remember { mutableFloatStateOf(-10f) }
+    if (stone == StoneState.Done && motion) {
+        LaunchedEffect(Unit) {
+            snapshotFlow { inView() }.distinctUntilChanged().collect { if (it) sparkAt.floatValue = seconds.value }
+        }
+    }
     Box(
         Modifier
-            .offset { with(density) { IntOffset((at.x.dp - w / 2).roundToPx(), (at.y.dp - h * 0.52f).roundToPx()) } }
+            .offset { with(density) { IntOffset((at.x.dp - w / 2).roundToPx(), (at.y.dp - h * ISLAND_CY).roundToPx()) } }
             .size(w, h)
             .then(
                 if (stone == StoneState.Current && motion) {
@@ -293,16 +330,17 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
             .clearAndSetSemantics { contentDescription = "Level ${level.n}, ${level.title}, $status"; role = Role.Button },
     ) {
         if (stone == StoneState.Current) {
-            // The one obvious "tap me": a ring that breathes out from under the island every 1.6 s.
+            // The one obvious "tap me": a mint ring that breathes out from under the island every 1.6 s.
             Box(
                 Modifier.fillMaxSize().drawBehind {
-                    val c = Offset(size.width / 2f, size.height * 0.52f)
+                    val c = Offset(size.width / 2f, size.height * ISLAND_CY)
                     val p = if (motion) (seconds.value % 1.6f) / 1.6f else 0.35f
                     val rx = size.width * 0.46f * (1f + 0.32f * p)
+                    val ry = rx * LowPoly.TOP_RATIO
                     drawOval(
                         Glass.Primary.copy(alpha = 0.55f * (1f - p)),
-                        topLeft = Offset(c.x - rx, c.y - rx * 0.55f + size.width * 0.06f),
-                        size = androidx.compose.ui.geometry.Size(rx * 2f, rx * 1.1f),
+                        topLeft = Offset(c.x - rx, c.y - ry + size.width * 0.08f),
+                        size = androidx.compose.ui.geometry.Size(rx * 2f, ry * 2f),
                         style = Stroke(4.dp.toPx()),
                     )
                 },
@@ -310,7 +348,7 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
         }
         Box(
             Modifier.fillMaxSize().graphicsLayer().drawWithCache {
-                val c = Offset(size.width / 2f, size.height * 0.52f)
+                val c = Offset(size.width / 2f, size.height * ISLAND_CY)
                 val rx = size.width * 0.44f
                 val look = when (stone) {
                     StoneState.Done -> LowPoly.DoneLook
@@ -321,79 +359,112 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
                     island(c, rx, look)
                     when (stone) {
                         StoneState.Done -> doneBadge(Offset(c.x + rx * 0.62f, c.y - rx * 0.42f), 11.dp.toPx())
-                        StoneState.Current -> flag(Offset(c.x + rx * 0.08f, c.y - rx * 0.06f), rx * 0.95f, 0f)
+                        StoneState.Current -> playBadge(Offset(c.x - rx * 0.6f, c.y - rx * 0.34f), 12.dp.toPx())
                         StoneState.Locked -> lock(Offset(c.x, c.y - rx * 0.02f), rx * 0.42f)
                     }
                 }
             },
         )
+        // What moves each frame sits on its own small layer, so the island's facets stay cached.
+        if (stone == StoneState.Current) {
+            Box(
+                Modifier.fillMaxSize().drawBehind {
+                    val c = Offset(size.width / 2f, size.height * ISLAND_CY)
+                    val rx = size.width * 0.44f
+                    val wave = if (motion) sin(seconds.value * 2f * PI.toFloat() / 1.3f) else 0.4f
+                    flag(Offset(c.x + rx * 0.08f, c.y - rx * 0.06f), rx * 0.95f, wave)
+                },
+            )
+        } else if (stone == StoneState.Done && motion) {
+            Box(
+                Modifier.fillMaxSize().drawBehind {
+                    val dt = seconds.value - sparkAt.floatValue
+                    if (dt !in 0f..1.3f) return@drawBehind
+                    val c = Offset(size.width / 2f, size.height * ISLAND_CY)
+                    val rx = size.width * 0.44f
+                    val tick = Offset(c.x + rx * 0.62f, c.y - rx * 0.42f)
+                    for ((n, delay) in listOf(0f, 0.3f).withIndex()) {
+                        val p = ((dt - delay) / 0.9f).coerceIn(0f, 1f)
+                        if (p <= 0f || p >= 1f) continue
+                        val a = sin(p * PI.toFloat())
+                        val s = (if (n == 0) 8f else 5f).dp.toPx() * a
+                        val off = if (n == 0) Offset(9f, -10f) else Offset(-11f, -4f)
+                        sparkle(tick + Offset(off.x.dp.toPx(), off.y.dp.toPx()), s, a)
+                    }
+                },
+            )
+        }
     }
 }
 
 /**
- * Low-poly clouds over the levels not reached yet, and the SR-71 flying over them with its shadow on the ground. The
- * clouds drift slowly, lag the scroll a little (parallax) and part sideways as they come into the middle of the
- * screen; one canvas, redrawn per frame, its cloud shapes built once.
+ * The cloud bank over the world above the story, and the SR-71 flying over everything with its shadow on the ground.
+ * Rows of low-poly clouds (flat facets, no blur) start at the bank's edge and fill everything above; each row drifts
+ * sideways at its own speed and every cloud breathes a little. One screen-sized canvas, redrawn per frame; the cloud
+ * shapes are built once.
  */
 @Composable
-private fun Sky(layout: PathLayout, current: Int, scroll: ScrollState, viewport: Float, visible: Float, seconds: State<Float>, motion: Boolean) {
-    val plane = ImageBitmap.imageResource(R.drawable.plane_sr71)
-    val clouds = remember(layout, current) { layout.clouds(current) }
+private fun Sky(
+    layout: PathLayout, current: Int, cut: Float, scroll: ScrollState, viewport: Float, visible: Float,
+    seconds: State<Float>, motion: Boolean, rollAt: State<Float>,
+) {
+    val rows = remember(layout, current) { layout.bank(current) }
     Box(
         Modifier.fillMaxSize().graphicsLayer().clearAndSetSemantics {}.drawWithCache {
             val k = density
-            val shapes = clouds.map { LowPoly.cloudShape(it.width * k, it.seed) }
-            val shadowTint = ColorFilter.tint(Color(0xFF1F5E57), BlendMode.SrcIn)
+            val edge = layout.bankEdge(current)
+            val shapes = rows.map { row ->
+                layout.bankClouds(row, 0f).indices.map { j -> LowPoly.cloudShape(row.width * k, row.seed + j * 5, far = row.depth > 0) }
+            }
+            val fillTop = rows.lastOrNull()?.y ?: edge
+            // The bank's shadow on the ground: a faceted band just under its edge (light from the top-left).
+            val shadow = Path().apply {
+                moveTo(-20f * k, (edge - 6f) * k)
+                var x = -20f
+                var i = 0
+                while (x <= layout.width + 40f) { lineTo(x * k, (edge + if (i % 2 == 0) 14f else 24f) * k); x += 28f; i++ }
+                lineTo((layout.width + 40f) * k, (edge - 6f) * k)
+                close()
+            }
             val cloudShadow = Color(0xFF1F5E57).copy(alpha = 0.10f)
+            val fill = Color(0xFFDCE8EF)
             onDrawBehind {
                 val t = if (motion) seconds.value else 0f
-                val scrollDp = scroll.value / k
+                val scrollDp = scroll.value / k + cut
                 val fix = layout.plane(current, t, scrollDp, visible)
-                translate(0f, -scroll.value.toFloat()) {
-                    val planeOnScreen = fix.at.y - scrollDp in 0f..viewport
-                    if (planeOnScreen) drawPlane(plane, fix, k, shadow = true, tint = shadowTint)
-                    clouds.forEachIndexed { i, c ->
-                        // Parallax: a cloud moves a little slower than the ground, by at most 24 dp, so the first row never slides onto the current island.
-                        val lag = ((viewport * 0.5f - (c.at.y - scrollDp)) * (0.06f + 0.04f * c.depth)).coerceIn(-24f, 24f)
-                        val screenY = c.at.y + lag - scrollDp
-                        if (screenY < -160f || screenY > viewport + 120f) return@forEachIndexed
-                        // Parting: a cloud slides away from the middle as it reaches the upper-middle of the screen.
-                        val part = ((viewport * 0.6f - screenY) / (viewport * 0.6f)).coerceIn(0f, 1f)
-                        val away = if (c.at.x < layout.width / 2f) -1f else 1f
-                        val drift = if (motion) sin(t * 2f * PI.toFloat() / (26f + c.seed % 9) + c.seed) * 10f else 0f
-                        val x = (c.at.x + drift + away * 26f * part * part) * k
-                        val y = (c.at.y + lag) * k
-                        // Its shadow on the ground, lower-right (light from the top-left): this is what lifts it off the grass.
-                        val sw = c.width * 0.8f * k
-                        drawOval(cloudShadow, topLeft = Offset(x - sw / 2f + 16f * k, y + 44f * k - sw * 0.09f), size = androidx.compose.ui.geometry.Size(sw, sw * 0.18f))
-                        translate(x, y) { shapes[i].forEach { (p, col) -> drawPath(p, col) } }
+                val jetOn = fix.at.y - scrollDp in -60f..viewport + 60f
+                val roll = ((t - rollAt.value) / 1.1f).let { if (it in 0f..1f) it else 0f }
+                translate(0f, -scrollDp * k) {
+                    if (jetOn) jetShadow(Offset(fix.at.x * k, fix.at.y * k), JET_LEN * k, fix.heading, fix.bank, roll, fix.altitude, k)
+                    if (edge + 30f > scrollDp) {
+                        drawPath(shadow, cloudShadow)
+                        // Behind the rows, so no gap between two puffs ever shows the world above.
+                        drawRect(fill, Offset(0f, (fillTop - 300f) * k), androidx.compose.ui.geometry.Size(layout.width * k, (edge - fillTop + 300f - 16f) * k))
+                        for (r in rows.indices.reversed()) {
+                            val row = rows[r]
+                            val screenY = row.y - scrollDp
+                            if (screenY < -90f || screenY > viewport + 40f) continue
+                            layout.bankClouds(row, t).forEachIndexed { j, p ->
+                                val breathe = 1f + if (motion) 0.03f * sin(t * 2f * PI.toFloat() / (4.5f + (row.seed + j) % 3) + j) else 0f
+                                withTransform({ translate(p.x * k, p.y * k); scale(breathe, breathe, Offset.Zero) }) {
+                                    shapes[r][j].forEach { (path, col) -> drawPath(path, col) }
+                                }
+                            }
+                        }
                     }
-                    if (planeOnScreen) drawPlane(plane, fix, k, shadow = false, tint = null)
+                    if (jetOn) {
+                        // A soft trail of puffs behind the tail, where the jet was a moment ago.
+                        val past = (1..9).map { i ->
+                            val f = layout.plane(current, t - i * 0.16f, scrollDp, visible)
+                            Offset((f.at.x - cos(f.heading) * JET_LEN * 0.62f) * k, (f.at.y - sin(f.heading) * JET_LEN * 0.62f) * k)
+                        }
+                        smoke(past, k)
+                        jet(Offset(fix.at.x * k, fix.at.y * k), JET_LEN * k, fix.heading, fix.bank, roll, t, motion)
+                    }
                 }
             }
         },
     )
-}
-
-/** The SR-71 sprite points up; turned to its heading, its wings squeezed by the bank. The shadow sits lower-right, smaller and fainter the higher it flies. */
-private fun DrawScope.drawPlane(plane: ImageBitmap, fix: PlaneFix, k: Float, shadow: Boolean, tint: ColorFilter?) {
-    val sizePx = 76f * k
-    val off = if (shadow) Offset((18f + 22f * fix.altitude) * k, (30f + 36f * fix.altitude) * k) else Offset.Zero
-    val c = Offset(fix.at.x * k + off.x, fix.at.y * k + off.y)
-    val s = if (shadow) 0.86f - 0.1f * fix.altitude else 1f
-    withTransform({
-        translate(c.x, c.y)
-        rotateRad(fix.heading + PI.toFloat() / 2f, Offset.Zero)
-        scale(s * (1f - 0.22f * abs(fix.bank)), s, Offset.Zero)
-    }) {
-        drawImage(
-            plane,
-            dstOffset = IntOffset((-sizePx / 2f).roundToInt(), (-sizePx / 2f).roundToInt()),
-            dstSize = IntSize(sizePx.roundToInt(), sizePx.roundToInt()),
-            alpha = if (shadow) 0.16f + 0.08f * (1f - fix.altitude) else 1f,
-            colorFilter = tint,
-        )
-    }
 }
 
 /**

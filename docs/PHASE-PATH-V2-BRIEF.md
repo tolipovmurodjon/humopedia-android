@@ -45,3 +45,40 @@ current stone → sheet opens, tap a tab. ONE push per CI cycle; CI must be gree
 
 ## Return (≤ 200 lines)
 What changed (file:line), CI run id + result, the screenshot paths, the icon board path, what is not done, and the APK artifact name.
+
+---
+# ROUND 3 (Boss on the A05s, 2026-10-29 13:01 — he played alpha02; alpha03 = run 40838456917 already folds the checker's 10 fixes)
+Screenshots: `C:\Users\Murodjon\.claude\uploads\e34b4f9b-a00d-49ba-afdd-0cb93f36f328\` 36be09e1-image.jpg (path), 9ae1f644-image.jpg (current sheet),
+5f8e784c-image.jpg (done sheet), 47b19335-image.jpg (scrolled up: cloud wall), 3c02d20e-image.jpg (jet).
+Boss's words: "Perfect for v0.1. That SR-71 is flying upside down kind of, not clean: the user looks directly (top-down), it should fly
+directly like it is a 2.5D world, not 3D. When flying it starts tilting left or right like it is feeling the manoeuvre. Lovely; also that
+fire should be like in the lesson, better colour. The path is good but clouds are even blocking the current lesson: always auto-scroll to
+the current lesson. Top bar: the user should know the goal is to continue, no friction. Is that model a PNG, a 3D model or vector — it must
+work the same on other phone sizes. Islands look squashed, not clean. Clouds not moving, trash. Show 5-7 lessons above (the story), then a
+cloud bank you cannot scroll past — clouds fixed starting low, whole covered above. Audit, do creative small things a child loves, like
+that fire and flag in the lesson."
+
+## Do (in this order)
+1. **The jet = the lesson's SR-71, top-down vector, flat 2.5D.** Port the SR-71 art from
+   `D:\Humopedia\docs\courses\15-coordinate-transformations\lessons\fly-layer.js` (ART.sr71 svg paths, viewBox -30 -60 60 120, nose up,
+   real black colours) to a Compose vector/Canvas drawing; delete `plane_sr71.webp`. Heading = direction of travel (nose into the move);
+   bank = a small scaleX squash (≤ 18 %) plus a lit/shade swap toward the turn, never a 3D flip. Two afterburner flames like the lesson
+   (radial #FFFBE6 → #FFD45C → #FF8A2A, flicker) and a soft smoke trail of fading puffs. Shadow = same silhouette, offset, 18 % teal.
+2. **Open on the current lesson**: scroll so the current island sits at THUMB above the tab bar on every open and on returning from a
+   lesson; never covered by a cloud. **Current island = one tap starts the lesson** (no sheet; "click and start, no friction"); done
+   and locked keep the sheet.
+3. **Visible story, then a cloud bank**: the current island + the next 5-7 locked islands are clearly visible (no cloud over them);
+   above that a solid low-poly cloud bank that starts low and covers everything above; the scroll stops at the bank (it is the top).
+   Clouds drift slowly and visibly (each layer its own speed), puffs gently breathe; they never cover an island below the bank.
+4. **Islands not squashed**: taller side face and less flattened top (top ellipse ratio ~0.62, side ≥ 22 % of height), crisp facets.
+5. **Small loved things** (pick 2-3, cheap, reduce-motion honoured): the flag waves on the current island; a tiny sparkle on done
+   ticks when they come into view; the jet does a small celebratory roll after the child returns from a finished lesson.
+6. Answer for Boss in the report: is each map piece vector/code-drawn (scales on every phone) or a bitmap.
+Bump to 3.0.0-alpha04 / code 38. Same checks; screenshots must show: current island clear on open, the 5-7 visible locked islands,
+the cloud bank as the top, the jet top-down with flames.
+7. **Launcher icon = Humo's head only, not the whole body** (Boss, 13:05). Crop/redraw to the face + sprout, filling the adaptive
+   safe zone. The face-only source exists: `D:\30_library\assets\humo-brand\app-icon-faceonly\` and `make_icon_faceonly.py` (check it
+   uses the new sprout Humo, not the old hair; if old, build the face from `code-soft25d\rig\`). Audit at 48 dp on a dark and a light
+   wallpaper.
+Note: Boss's notes above came from alpha02. Check each one against alpha03's screenshots
+(`D:\Humopedia\android\build-ci\40838456917\`) and fix what is still true.

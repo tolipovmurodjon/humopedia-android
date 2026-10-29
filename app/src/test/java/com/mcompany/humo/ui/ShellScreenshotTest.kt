@@ -83,20 +83,25 @@ class ShellScreenshotTest {
         }
     }
 
-    @Test fun oneTapOnTheCurrentIslandOpensItsSheetThenTheLesson() {
+    @Test fun oneTapOnTheCurrentIslandStartsTheLesson() {
         shell()
         compose.onNodeWithContentDescription("Level 3, Rotations, current").performClick()
-        compose.waitForIdle()
-        compose.onNodeWithText("Davom etish").assertIsDisplayed()
-        compose.onNodeWithText("4 ta dars").assertIsDisplayed()
-        shot("03-level-sheet")
-        compose.onNodeWithText("Davom etish").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Lesson 3.1 · Rotation Around the Origin").assertIsDisplayed()
         shot("03b-lesson")
         compose.onNodeWithContentDescription("Orqaga").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Level 3, Rotations, current").assertIsDisplayed()
+        shot("03c-back-from-lesson")
+    }
+
+    @Test fun aDoneIslandOpensItsSheetToReplay() {
+        shell()
+        compose.onNodeWithContentDescription("Level 2, Translations in Coordinates, done").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Takrorlash").assertIsDisplayed()
+        compose.onNodeWithText("4 ta dars · tugatilgan").assertIsDisplayed()
+        shot("03-level-sheet")
     }
 
     @Test fun aLockedIslandSaysWhyAndHasNoGoButton() {
@@ -131,7 +136,9 @@ class ShellScreenshotTest {
 
     @Test fun pathScrolledToTheTop() {
         shell()
-        compose.onNodeWithContentDescription("Level 14, Stretching, locked").assertExists()
+        // The story ends six islands above the current one; the rest is under the cloud bank, not on the map.
+        compose.onNodeWithContentDescription("Level 9, Combining Reflections, locked").assertExists()
+        compose.onNodeWithContentDescription("Level 10, Congruence and Symmetry, locked").assertDoesNotExist()
         compose.onNodeWithContentDescription("Path").performScrollToTop()
         shot("04-home-path-top")
     }

@@ -1,6 +1,8 @@
 // Builds the launcher icon from the approved clean Humo (brain card rules/two-five-clean: Soft 2.5D body, two-leaf
-// sprout, clean eyes): renders D:/30_library/assets/humo-brand/code-soft25d/rig/humo-rig.svg with a transparent
-// background, then writes the adaptive foreground and the monochrome (themed) layer at every density.
+// sprout, clean eyes). Boss 2026-10-29 13:05: "Humo's head only, not the whole body": the rig SVG is framed by its
+// viewBox on the face and the sprout, so the eyes fill the safe zone and the launcher's mask cuts the bell's feet.
+// Rendered as vector at every density (no upscaled PNG), plus the monochrome (themed) layer and a 48 dp audit board
+// on a dark and a light wallpaper (docs/qa/launcher-48dp.png).
 // Run on the laptop (uses the web repo's Playwright + sharp):  node scripts/art/build_launcher_icon.mjs
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -12,36 +14,33 @@ const sharp = require('sharp');
 
 const SVG = 'D:/30_library/assets/humo-brand/code-soft25d/rig/humo-rig.svg';
 const RES = path.resolve('app/src/main/res');
-// Humo's box inside the 108 dp canvas: 56 dp (checker 2026-10-29: 50 looked small); the bell's measured outline stays
-// inside the 66 dp safe circle (checked on an overlay), so no launcher mask cuts it.
-const HUMO_DP = 56;
-// The bell's bottom corners are its farthest points from the centre: lift Humo 2 dp so they sit inside the safe circle.
-const LIFT_DP = 2;
+// On the 108 dp canvas (visible circle 72 dp, safe circle 66 dp): the face group (eyes, lids, smile) is 54 dp wide and
+// centred at (54, 64.5): the head fills the circle, the sprout sits just inside its top and the mask cuts the feet.
+const FACE_W_DP = 54;
+const FACE_AT = [54, 64.5];
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
-const svg = fs.readFileSync(SVG, 'utf8').replace(/<ellipse id="shadow"[^>]*\/>/, '').replace(/<rect id="page"[^>]*\/>/, '');
-// The web repo's Playwright wants a browser build this laptop may not have; any installed Chromium renders SVG the same.
+const src = fs.readFileSync(SVG, 'utf8').replace(/<ellipse id="shadow"[^>]*\/>/, '').replace(/<rect id="page"[^>]*\/>/, '');
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? 'C:/Users/Murodjon/AppData/Local/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-win64/chrome-headless-shell.exe' });
 const page = await browser.newPage({ viewport: { width: 1024, height: 1024 } });
-await page.setContent(`<html><body style="margin:0;background:transparent">${svg.replace('<svg ', '<svg width="1024" height="1024" ')}</body></html>`);
-const full = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: 1024, height: 1024 } });
-await browser.close();
+await page.setContent(`<html><body style="margin:0;background:transparent">${src.replace('<svg ', '<svg width="1024" height="1024" ')}</body></html>`);
+const box = (id) => page.evaluate((id) => { const b = document.getElementById(id).getBBox(); return { x: b.x, y: b.y, w: b.width, h: b.height }; }, id);
+const face = await box('face');
+const hair = await box('hair');
+const s = FACE_W_DP / face.w; // dp per source unit
+const vx = face.x + face.w / 2 - FACE_AT[0] / s, vy = face.y + face.h / 2 - FACE_AT[1] / s, vw = 108 / s;
+console.log('face', face, 'sprout top at', ((hair.y - vy) * s).toFixed(1), 'dp (visible circle top = 18 dp)');
+const framed = src.replace(/viewBox="[^"]*"/, `viewBox="${vx} ${vy} ${vw} ${vw}"`);
 
-const trimmed = await sharp(full).trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
-const { width: tw, height: th } = trimmed.info;
-console.log('humo box', tw, th);
-
+const fgAt = {};
 for (const [name, k] of Object.entries(DENSITIES)) {
   const canvas = Math.round(108 * k);
-  const box = Math.round(HUMO_DP * k);
-  const scale = box / Math.max(tw, th);
-  const w = Math.round(tw * scale), h = Math.round(th * scale);
-  const humo = await sharp(trimmed.data).resize(w, h).png().toBuffer();
-  const left = Math.round((canvas - w) / 2), top = Math.round((canvas - h) / 2 - LIFT_DP * k);
+  await page.setViewportSize({ width: canvas, height: canvas });
+  await page.setContent(`<html><body style="margin:0;background:transparent">${framed.replace('<svg ', `<svg width="${canvas}" height="${canvas}" `)}</body></html>`);
+  const fg = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: canvas, height: canvas } });
+  fgAt[name] = fg;
   const dir = path.join(RES, `drawable-${name}`);
   fs.mkdirSync(dir, { recursive: true });
-  const fg = await sharp({ create: { width: canvas, height: canvas, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite([{ input: humo, left, top }]).png().toBuffer();
   fs.writeFileSync(path.join(dir, 'ic_launcher_humo.png'), fg);
 
   // Monochrome: Humo's silhouette in white; pupils and mouth (the dark parts) are cut out so the face still reads.
@@ -57,3 +56,15 @@ for (const [name, k] of Object.entries(DENSITIES)) {
   await sharp(mono, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toFile(path.join(dir, 'ic_launcher_humo_mono.png'));
   console.log(name, canvas, 'px');
 }
+
+// Audit board: the icon as a launcher shows it (circle and squircle masks over the deep-teal tile) at 48 dp (xxhdpi,
+// 144 px) and at 4x, on a dark and a light wallpaper.
+const tile = (px) => `<div style="width:${px}px;height:${px}px;position:relative;overflow:hidden;border-radius:var(--r);background:linear-gradient(135deg,#17615A,#0E3F3B 50%,#0A2A33)">
+  <img src="data:image/png;base64,${fgAt.xxxhdpi.toString('base64')}" style="position:absolute;left:${-px / 4}px;top:${-px / 4}px;width:${px * 1.5}px;height:${px * 1.5}px"></div>`;
+const row = (bg, ink) => `<div style="display:flex;gap:40px;align-items:center;padding:36px;background:${bg};color:${ink};font:600 22px sans-serif">
+  <div style="--r:50%">${tile(144)}</div><div style="--r:30%">${tile(144)}</div><div style="--r:50%">${tile(576)}</div><div>48 dp · circle · squircle · 4x</div></div>`;
+await page.setViewportSize({ width: 1400, height: 1300 });
+await page.setContent(`<html><body style="margin:0">${row('#1D2430', '#fff')}${row('#EEF1F4', '#111')}</body></html>`);
+await page.screenshot({ path: path.resolve('docs/qa/launcher-48dp.png'), fullPage: true });
+await browser.close();
+console.log('board docs/qa/launcher-48dp.png');

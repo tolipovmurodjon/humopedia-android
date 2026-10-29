@@ -37,6 +37,8 @@ class PathLayoutTest {
         val viewport = 844f
         val scroll = layout.scrollFor(2, viewport)
         assertEquals(viewport * PathLayout.THUMB, layout.y(2) - scroll, 0.5f)
+        val cut = layout.cut(3)
+        assertEquals(viewport * PathLayout.THUMB, layout.y(2) - cut - layout.scrollFor(2, viewport, cut), 0.5f)
     }
 
     @Test fun `scroll never goes past either end`() {
@@ -79,11 +81,43 @@ class PathLayoutTest {
         }
     }
 
-    @Test fun `clouds cover only the levels not reached yet`() {
-        val clouds = layout.clouds(3)
-        assertTrue(clouds.isNotEmpty())
-        for (c in clouds) assertTrue("cloud at ${c.at} over the current stone", c.at.y < layout.y(2) - 60f)
-        assertTrue(clouds.any { it.at.y < 100f })
+    @Test fun `the current island and the next 5 to 7 are the visible story`() {
+        for (current in 1..14) {
+            val ahead = layout.storyTop(current) - (current - 1)
+            assertTrue("level $current shows $ahead ahead", ahead in 5..7 || layout.storyTop(current) == 13)
+        }
+    }
+
+    @Test fun `the cloud bank never comes down onto a visible island`() {
+        for (current in 1..14) {
+            val islandTop = layout.y(layout.storyTop(current)) - 45f
+            val rows = layout.bank(current)
+            assertTrue(rows.size >= 4)
+            for (r in rows) assertTrue("level $current row at ${r.y}", r.y + r.width * 0.085f <= islandTop)
+            // The rows cover everything up to past the top of the scroll.
+            assertTrue(rows.last().y < layout.cut(current) - 60f)
+        }
+    }
+
+    @Test fun `the top of the scroll is the bank`() {
+        assertEquals(PathLayout.BANK_SHOWN, layout.bankEdge(3) - layout.cut(3), 0.01f)
+        assertEquals(0f, layout.cut(14), 0f)
+        // The current island always opens below the bank.
+        for (current in 1..14) assertTrue(layout.y(current - 1) > layout.bankEdge(current) + 80f)
+    }
+
+    @Test fun `bank clouds drift smoothly and wrap off screen`() {
+        for (row in layout.bank(3)) {
+            val a = layout.bankClouds(row, 10f)
+            val b = layout.bankClouds(row, 10.1f)
+            for (j in a.indices) {
+                assertTrue(a[j].x >= -row.spacing - 0.01f && a[j].x <= 390f + 2 * row.spacing)
+                val d = kotlin.math.abs(b[j].x - a[j].x)
+                // Either a small slide or a wrap that happens off screen on both sides.
+                assertTrue(d < 3f || (minOf(a[j].x, b[j].x) < -row.width * 0.44f && maxOf(a[j].x, b[j].x) > 390f + row.width * 0.44f))
+            }
+            assertTrue("row ${row.depth} moves", kotlin.math.abs(a[0].x - layout.bankClouds(row, 12f)[0].x) > 5f)
+        }
     }
 
     @Test fun `the plane never flies over the stone the child is about to tap`() {

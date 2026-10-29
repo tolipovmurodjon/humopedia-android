@@ -29,8 +29,8 @@ data class Bridge(val at: Pt, val angle: Float)
 /** A low-poly tree or bush beside the trail. */
 data class Tree(val at: Pt, val size: Float, val pine: Boolean)
 
-/** A low-poly cloud over the locked part; [depth] 0 = near (moves more), 1 = far. */
-data class Cloud(val at: Pt, val width: Float, val seed: Int, val depth: Float)
+/** One row of the cloud bank: its cloud centre line [y], cloud width, spacing, sideways speed (dp/s), seed and row index. */
+data class BankRow(val y: Float, val width: Float, val spacing: Float, val speed: Float, val seed: Int, val depth: Int)
 
 /** Where the SR-71 is at a moment of its loop: position, heading (radians, y down) and bank (-1 left … 1 right). */
 data class PlaneFix(val at: Pt, val heading: Float, val bank: Float, val altitude: Float)
@@ -38,7 +38,7 @@ data class PlaneFix(val at: Pt, val heading: Float, val bank: Float, val altitud
 /**
  * The map of one course, in dp, inside a content box [height] tall and [width] wide (PHASE-PATH-V2): level 1 at the
  * bottom, a walkable trail of flagstones climbing through every level's island, a river that meets the trail only at
- * the footbridges after each unit, trees on the free ground, low-poly clouds over the locked levels and the SR-71's
+ * the footbridges after each unit, trees on the free ground, a low-poly cloud bank above the story and the SR-71's
  * loop. Pure numbers: tested on the JVM, the screen only draws them.
  */
 class PathLayout(val count: Int, val width: Float) {
@@ -64,7 +64,8 @@ class PathLayout(val count: Int, val width: Float) {
      * The scroll offset that puts stone [i] at thumb height: 55 % down the [viewport] above the tab bar, the easy reach of a
      * one-handed grip.
      */
-    fun scrollFor(i: Int, viewport: Float): Float = (y(i) - viewport * THUMB).coerceIn(0f, (height - viewport).coerceAtLeast(0f))
+    fun scrollFor(i: Int, viewport: Float, cut: Float = 0f): Float =
+        (y(i) - cut - viewport * THUMB).coerceIn(0f, (height - cut - viewport).coerceAtLeast(0f))
 
     // ---- The trail: one cubic per hop, vertical tangents at each island, so it walks out of each stone upward. ----
 
@@ -170,28 +171,46 @@ class PathLayout(val count: Int, val width: Float) {
         }
     }
 
+    /** The highest island still in the open: the current one and the next [STORY] locked ones are the visible story. */
+    fun storyTop(current: Int): Int = ((current - 1).coerceIn(0, count - 1) + STORY).coerceAtMost(count - 1)
+
+    /** The cloud bank's lower edge (dp): halfway between the last visible island and the one above it, or the end of the world. */
+    fun bankEdge(current: Int): Float = y(storyTop(current)) - gap * 0.55f
+
     /**
-     * Clouds over the levels not reached yet: two per row, rows 120 dp apart, so the locked islands peek between them;
-     * the first row sits well above the current island, and a fuller row of three closes the top (the part of the
-     * world not built yet).
+     * Where the scrollable world starts (dp from the top of the full map): [BANK_SHOWN] above the bank's edge, so the top
+     * of the scroll is the bank itself and nothing above it can be scrolled to.
      */
-    fun clouds(current: Int): List<Cloud> = buildList {
-        var y = y((current - 1).coerceIn(0, count - 1)) - gap * 0.85f
-        var row = 0
-        while (y > -20f) {
-            val xs = when {
-                y < 150f -> listOf(0.15f, 0.5f, 0.85f)
-                row == 0 -> listOf(0.14f, 0.86f)
-                row % 2 == 1 -> listOf(0.3f, 0.9f)
-                else -> listOf(0.1f, 0.68f)
-            }
-            xs.forEachIndexed { k, fx ->
-                val seed = row * 7 + k * 3
-                val w = 130f + (seed * 17 % 5) * 10f
-                add(Cloud(Pt(width * fx, y + ((seed * 11) % 7 - 3) * 4f), w, seed, depth = (seed % 3) / 2f))
-            }
-            y -= 120f
-            row++
+    fun cut(current: Int): Float = (bankEdge(current) - BANK_SHOWN).coerceAtLeast(0f)
+
+    /**
+     * The low-poly cloud bank over everything above the story (Boss 2026-10-29: "clouds fixed starting low, whole covered
+     * above"): rows of clouds from the bank's edge up past the top of the scroll, the front row lowest; every row drifts
+     * sideways at its own speed and wraps around, so the bank moves but never comes down onto an island.
+     */
+    fun bank(current: Int): List<BankRow> = buildList {
+        val edge = bankEdge(current)
+        val stop = cut(current) - 140f
+        var y = edge
+        var r = 0
+        while (y > stop) {
+            val w = if (r == 0) 156f else 148f + (r % 2) * 14f
+            // A cloud's underside reaches 0.085 w below its centre; the front row's sits on the edge.
+            val centre = y - w * 0.09f
+            val dir = if (r % 2 == 0) 1f else -1f
+            add(BankRow(centre, w, spacing = 104f, speed = dir * (5f + 2.5f * r), seed = r * 11 + 3, depth = r))
+            y -= 58f
+            r++
+        }
+    }
+
+    /** The cloud centres (dp) of [row] at time [seconds]: they slide at the row's speed and wrap off-screen, never popping. */
+    fun bankClouds(row: BankRow, seconds: Float): List<Pt> {
+        val n = (width / row.spacing).toInt() + 3
+        val period = n * row.spacing
+        return (0 until n).map { j ->
+            val raw = (j * row.spacing + row.speed * seconds + (row.seed % 7) * 13f) % period
+            Pt((if (raw < 0f) raw + period else raw) - row.spacing, row.y)
         }
     }
 
@@ -233,6 +252,10 @@ class PathLayout(val count: Int, val width: Float) {
         const val RIVER_OFFSET = 88f
         const val RIVER_HALF = 20f
         const val LOOP_S = 22f
+        /** Locked islands left in the open above the current one: the story the child can see coming. */
+        const val STORY = 6
+        /** How much of the cloud bank shows at the very top of the scroll (dp). */
+        const val BANK_SHOWN = 250f
         /** Levels that close a unit; the trail crosses the river on a footbridge after each. */
         val BRIDGE_AFTER = listOf(3, 7, 11)
     }
