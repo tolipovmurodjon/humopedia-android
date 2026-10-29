@@ -71,10 +71,11 @@ internal object Jet {
         val sx = (1f - 0.12f * abs(bank).coerceAtMost(1f)) * (if (roll > 0f) cos(2f * PI.toFloat() * roll) else 1f)
         // Two afterburners at the nozzles, pointing back along the frame's heading, under the jet.
         for ((i, side) in listOf(-1f, 1f).withIndex()) {
-            val n = c + place(k, side * NOZZLE_X, TAIL_Y - 0.06f, size, sx)
+            // The lesson's flame is 0.11 × 0.26 of the jet's length: here ~8 × 20 dp, starting at the nozzle's lip.
+            val n = c + place(k, side * NOZZLE_X, TAIL_Y - 0.02f, size, sx)
             val flick = if (motion) 0.88f + 0.12f * sin(t * 37f + i * 2.1f) + 0.06f * sin(t * 61f + i) else 1f
-            val r = size * 0.05f
-            withTransform({ translate(n.x, n.y); scale(1f, TILT, Offset.Zero); rotate(k * 22.5f, Offset.Zero); scale(0.55f, 1.3f * flick, Offset.Zero) }) {
+            val r = size * 0.075f
+            withTransform({ translate(n.x, n.y); scale(1f, TILT, Offset.Zero); rotate(k * 22.5f, Offset.Zero); scale(0.62f, 1.6f * flick, Offset.Zero) }) {
                 drawCircle(Brush.radialGradient(*FlameStops, center = Offset(0f, r * 0.3f), radius = r * 1.05f), r, Offset(0f, r * 0.72f))
             }
         }
