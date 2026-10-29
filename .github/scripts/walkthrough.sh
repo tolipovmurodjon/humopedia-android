@@ -104,7 +104,7 @@ log "-- one tap on the current island starts L1.1 (no sheet); Back asks before l
 tap "Level 3, Rotations, current"; shot lesson
 has "Move the point 3 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
-has "Leave the lesson?"
+has "Leave the lesson\?"
 tap "Keep going"; sleep 1
 
 log "-- play L1.1 to the end like a child: one wrong try on every graded page"
@@ -119,7 +119,7 @@ drag 2 1 3 4; press Check; shot P1-wrong
 has "Hmm, think about that again."
 press "Try again"; drag 3 4 5 2; press Check; shot P1-correct
 has "Good!"
-press "Why?"; shot P1-why; has "Why is this the answer?"; press "Yes, that makes sense"
+press "Why\?"; shot P1-why; has "Why is this the answer\?"; press "Yes, that makes sense"
 press Continue
 drag 1 3 2 6; press Check; press "Try again"; drag 2 6 4 4; press Check; shot P2-correct
 has "Continue"; press Continue

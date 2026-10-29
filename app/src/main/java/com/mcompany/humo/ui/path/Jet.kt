@@ -26,9 +26,9 @@ import kotlin.math.sin
 /**
  * The SR-71 as 16 pre-rendered 3D frames (Boss 2026-10-29 "go sprite", the Clash of Clans method):
  * docs/design/2026-10-28-app-redesign/round-07-models/sr71-sprites, rendered from sr71.blend. Frame k faces k × 22.5°
- * clockwise from nose-up; the bitmap is never rotated (a rotated render looked upside down). Between two frames the
- * jet is a crossfade of both by the fractional heading (Boss on alpha05: "turning sharp, tick tick"), so a turn is
- * smooth. Banking is a small squash across the wings. The render's camera looks down at a tilt, so up-down distances
+ * clockwise from nose-up; a frame is turned at most half a step (11.25°) to the exact heading, never more (a fully
+ * rotated render looked upside down). Between two frames the jet crossfades them by the fractional heading (Boss on
+ * alpha05: "turning sharp, tick tick"), so a turn is smooth. Banking is a small squash across the wings. The render's camera looks down at a tilt, so up-down distances
  * in a frame are 0.82 of left-right ones: the nozzles are placed through the same squash.
  */
 internal object Jet {
@@ -95,16 +95,20 @@ internal object Jet {
                 drawCircle(Brush.radialGradient(*FlameStops, center = Offset(0f, r * 0.3f), radius = r * 1.05f), r, Offset(0f, r * 0.72f))
             }
         }
-        // A true crossfade: both frames into one layer, the second added (Plus), so where they overlap the jet stays opaque.
+        // Each frame is turned by what is left of the heading (at most 11.25°), so both point exactly where the jet flies;
+        // the swap from one to the next is a crossfade over the middle 30 % of the step, in one layer (the second frame
+        // added with Plus, so the overlap stays opaque). A 50/50 blend of two unturned frames read as two jets.
         val (k0, k1, w) = blend(heading)
-        if (w < 0.02f || w > 0.98f) {
-            sprite(frames[if (w > 0.98f) k1 else k0], c, size, a, sx, 1f, null)
+        val b = ((w - 0.35f) / 0.3f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
+        if (b < 0.02f || b > 0.98f) {
+            val near = b > 0.98f
+            sprite(frames[if (near) k1 else k0], c, size, a, sx, 1f, null, turn = if (near) (w - 1f) * STEP else w * STEP)
             return
         }
         drawIntoCanvas { canvas ->
             canvas.saveLayer(Rect(c.x - size, c.y - size, c.x + size, c.y + size), Paint())
-            sprite(frames[k0], c, size, a, sx, 1f - w, null)
-            sprite(frames[k1], c, size, a, sx, w, null, BlendMode.Plus)
+            sprite(frames[k0], c, size, a, sx, 1f - b, null, turn = w * STEP)
+            sprite(frames[k1], c, size, a, sx, b, null, BlendMode.Plus, turn = (w - 1f) * STEP)
             canvas.restore()
         }
     }
@@ -116,6 +120,7 @@ internal object Jet {
     fun DrawScope.jetShadow(frames: List<ImageBitmap>, c: Offset, size: Float, heading: Float, bank: Float, roll: Float, altitude: Float, dp: Float) {
         val f = frameAt(heading)
         val k = f.roundToInt() % 16
+        val rest = (f - f.roundToInt()) * STEP
         val sx = (1f - 0.12f * abs(bank).coerceAtMost(1f)) * (if (roll > 0f) abs(cos(2f * PI.toFloat() * roll)) else 1f)
         val at = c + Offset((10f + 12f * altitude) * dp, (16f + 18f * altitude) * dp)
         val s = size * (0.9f - 0.08f * altitude)
@@ -124,17 +129,21 @@ internal object Jet {
             canvas.saveLayer(Rect(at.x - s, at.y - s, at.x + s, at.y + s), Paint().apply { alpha = SHADOW_ALPHA })
             for (i in 0 until 9) {
                 val o = if (i == 8) Offset.Zero else Offset(soft * cos(i * PI.toFloat() / 4f), soft * sin(i * PI.toFloat() / 4f))
-                sprite(frames[k], at + o, s, angleOf(f), sx, 0.25f, ShadowTint)
+                sprite(frames[k], at + o, s, angleOf(f), sx, 0.25f, ShadowTint, turn = rest)
             }
             canvas.restore()
         }
     }
 
-    /** The bitmap as rendered, centred; [sx] squashes it across the wings (the frame's own axis), never turns it. */
-    private fun DrawScope.sprite(image: ImageBitmap, c: Offset, size: Float, angle: Float, sx: Float, alpha: Float, filter: ColorFilter?, mode: BlendMode = BlendMode.SrcOver) {
+    /**
+     * The bitmap as rendered, centred; [sx] squashes it across the wings (the frame's own axis); [turn] (degrees, never
+     * more than half a frame step) aligns the frame with the exact heading.
+     */
+    private fun DrawScope.sprite(image: ImageBitmap, c: Offset, size: Float, angle: Float, sx: Float, alpha: Float, filter: ColorFilter?, mode: BlendMode = BlendMode.SrcOver, turn: Float = 0f) {
         val deg = angle * 180f / PI.toFloat()
         withTransform({
             translate(c.x, c.y)
+            rotate(turn, Offset.Zero)
             rotate(deg, Offset.Zero)
             scale(sx, 1f, Offset.Zero)
             rotate(-deg, Offset.Zero)

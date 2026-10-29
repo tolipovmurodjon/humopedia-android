@@ -384,7 +384,9 @@ private fun Bubble(text: String?, good: Boolean, modifier: Modifier) {
 @Composable
 private fun SparkChip(burst: Int) {
     var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(burst) { if (burst > 0) { shown = true; delay(1400); shown = false } }
+    // Only a new burst shows it: a page opened after one (the chip is rebuilt per page) starts with it already seen.
+    val seen = remember { intArrayOf(burst) }
+    LaunchedEffect(burst) { if (burst > seen[0]) { seen[0] = burst; shown = true; delay(1400); shown = false } }
     AnimatedVisibility(shown, enter = fadeIn(tween(160)) + scaleIn(tween(220, easing = EaseOutStrong), initialScale = 0.7f), exit = fadeOut(tween(300))) {
         Row(Modifier.padding(end = 6.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDDF6E4)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("+${L11.SPARKS_PER_PAGE}", fontFamily = Glass.Heading, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF15803D))
