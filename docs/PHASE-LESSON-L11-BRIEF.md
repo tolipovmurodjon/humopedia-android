@@ -47,3 +47,18 @@ yourself. Version 3.0.0-alpha06 / code 40.
 ## Return (≤ 150 lines)
 Run id + result, APK path (`build-ci\<run>\apk\app-debug.apk`), the spec + compare board paths, each page matched or not (a table),
 what differs from Brilliant and why, what is not done.
+
+## ROUND 2 (lead, 2026-10-30 evening): finish L1.1 + L1.2 native, matching the web layer Boss loved
+Boss: "perfect flying, I love it going up like circling… redo those lessons 1:1 the same as brilliant.org in our own engine, clean code, on the native APK; I need to feel, play and love it."
+Start: the 4 uncommitted files in this repo (your previous run) and CI failures 40871338829 / 40871953851 / newest: read each failing log fully, fix every error in one push (one push per CI cycle).
+The web reference for the machine layer is `D:\Humopedia\docs\courses\15-coordinate-transformations\lessons\fly-layer.js` (read it whole). Port these behaviours, all of them Boss-approved today:
+1. Drag pages: the jet is glued 1:1 to the point (no lag); only the nose eases toward the last ~5 px of motion; no fire/smoke while dragging (focus). Tap jet → tap spot: the nose turns first (≤700 ms), then a calm eased flight (~40+ frames), every other touch ignored during it. After Check it STAYS where it was put (never returns to the start); a rebuild never resets the heading (that was the nose-up bug).
+2. Tile pages: the jets WAIT while numbers are tried; Check → they take off, climb (scale 1→1.45 and the shadow drops away), fly a gentle curve, land, THEN the answer is graded (Brilliant's own tick/cross). Skill check Submit: same flight first, then the next item.
+3. The dot under a landed jet is hidden; the tick/cross badge stays. No extra rings, pads or yellow marks ("AI slop").
+4. Two afterburner flames and two low-poly smoke trails (one per engine), only during flights.
+5. SR-71 art = the NEW 64-heading atlas: `D:\Humopedia\docs\courses\15-coordinate-transformations\lessons\assets\sprites\sr71\sr71_atlas64.webp` (8x8, 160 px frames, our own Blender render, OK for the public repo). Frame = round(heading/5.625) mod 64, rotate only the remainder. Replace the old 16 webp frames.
+6. Words name the machine: "Move the SR-71 3 steps to the right…", "The SR-71 flies by (2, 3)…" (never "the point"/"a shape").
+7. Sound: our own synthesised twin of Brilliant's per-step tick (one soft short tick on every grid node the point snaps to; brain rule `D:\Brain\rules\soft-tick-on-every-move.md`), plus our correct/incorrect; a soft airy whoosh on take-off. Never buzzy.
+8. Lesson complete: a 3 s "Mach 3 pass": the jet crosses the screen bottom-left → top-right, a white ring at mid-way, twin smoke, a tap boosts it; never blocks the buttons.
+Then L1.2 (negative translations, the B-2 is the machine there; if no B-2 atlas exists yet, use the SR-71 atlas and say so).
+Version 3.0.0-alpha07 / versionCode 41. Done when: CI green, walkthrough plays L1.1 to the end with one wrong try per graded page, screenshots of every page start/after-Check, APK path. Return ≤150 lines: Blocked on me / Changed / Found / Not confirmed, run id, APK path.
