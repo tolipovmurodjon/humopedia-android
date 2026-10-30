@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.mcompany.humo.R
@@ -160,7 +161,7 @@ internal object Jet {
 
 /** The one sprite atlas, decoded once per composition. */
 @androidx.compose.runtime.Composable
-internal fun rememberJetAtlas(): ImageBitmap = androidx.compose.ui.res.imageResource(R.drawable.sr71_atlas64)
+internal fun rememberJetAtlas(): ImageBitmap = ImageBitmap.imageResource(R.drawable.sr71_atlas64)
 
 /**
  * The jet's heading as a spring (Boss on alpha05: "turning sharp, not smooth"): each frame it moves a share of the way
