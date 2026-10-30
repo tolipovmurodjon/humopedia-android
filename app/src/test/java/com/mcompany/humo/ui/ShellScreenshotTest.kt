@@ -105,7 +105,7 @@ class ShellScreenshotTest {
         shell()
         compose.onNodeWithContentDescription("Lesson 1.2, Negative Translations, current").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Complete the translation to send the points to the targets.").assertIsDisplayed()
+        compose.onNodeWithText("Complete the translation to send the SR-71s to the targets.").assertIsDisplayed()
         shot("03b-lesson")
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
