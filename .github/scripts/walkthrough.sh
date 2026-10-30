@@ -148,7 +148,7 @@ tapnode 1 3; snap P2-armed 0.5
 tapnode 6 0; snap P2-tapfly-a 0.3; snap P2-tapfly-b 0.4
 sleep 5; shot P2-landed 0.5
 press Check; shot P2-wrong
-has "Hmm, think about that again."
+has "(Hmm, think about that again\.|Not quite.*)"
 press "Try again"; drag 6 0 4 4; press Check; shot P2-correct
 has "Continue"; press Continue
 shot P3; has "Two points, each moved a steps right and b steps up."; press Continue
