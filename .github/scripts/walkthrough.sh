@@ -94,6 +94,8 @@ $T adb install -r -g "$APK" || fail "install"
 
 log "== launch, alive after 20 s"
 $T adb logcat -c
+# A live copy of the log on the host: if the emulator itself dies (CI 41084169711, 41086361405), its last lines survive.
+timeout 1700 adb logcat -v time > "$OUT/logcat-live.txt" 2>&1 &
 $T adb shell am start -W -n "$PKG/.MainActivity" | tee "$OUT/am-start.txt"
 wait_glass
 sleep 10
