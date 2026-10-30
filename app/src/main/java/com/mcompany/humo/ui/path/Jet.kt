@@ -1,16 +1,13 @@
 package com.mcompany.humo.ui.path
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.res.imageResource
@@ -96,8 +93,7 @@ internal object Jet {
     }
 
     /**
-     * The jet's shadow flat on the ground in deep teal, lower-right of the jet: soft (nine copies a few dp apart in one
-     * layer) and faint ([SHADOW_ALPHA]), so it reads as a shadow and never as a second jet. [altitude] 0 ... 1 drops it
+     * The jet's shadow flat on the ground in deep teal, lower-right of the jet: soft (five copies a few dp apart) and faint ([SHADOW_ALPHA]), so it reads as a shadow and never as a second jet. [altitude] 0 ... 1 drops it
      * further away from the jet.
      */
     fun DrawScope.jetShadow(atlas: ImageBitmap, c: Offset, size: Float, heading: Float, bank: Float, roll: Float, altitude: Float, dp: Float) {
@@ -106,13 +102,12 @@ internal object Jet {
         val at = c + Offset((10f + 12f * altitude) * dp, (16f + 18f * altitude) * dp)
         val s = size * (0.9f - 0.08f * altitude)
         val soft = (3f + 3f * altitude) * dp
-        drawIntoCanvas { canvas ->
-            canvas.saveLayer(Rect(at.x - s, at.y - s, at.x + s, at.y + s), Paint().apply { alpha = SHADOW_ALPHA })
-            for (i in 0 until 9) {
-                val o = if (i == 8) Offset.Zero else Offset(soft * cos(i * PI.toFloat() / 4f), soft * sin(i * PI.toFloat() / 4f))
-                sprite(atlas, at + o, s, angleOf(f), sx, 0.25f, ShadowTint, turn = rest(heading))
-            }
-            canvas.restore()
+        // Five faint copies a few dp apart, no offscreen layer (a layer per jet per frame starved a software GPU): each copy
+        // carries a fifth of the shadow so the core adds up to [SHADOW_ALPHA] and the rim fades out.
+        val each = 1f - Math.pow(1.0 - SHADOW_ALPHA, 0.2).toFloat()
+        for (i in 0 until 5) {
+            val o = if (i == 4) Offset.Zero else Offset(soft * cos(i * PI.toFloat() / 2f), soft * sin(i * PI.toFloat() / 2f))
+            sprite(atlas, at + o, s, angleOf(f), sx, each, ShadowTint, turn = rest(heading))
         }
     }
 

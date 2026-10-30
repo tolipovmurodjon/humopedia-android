@@ -1,7 +1,6 @@
 package com.mcompany.humo.ui.lesson
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -153,21 +152,30 @@ internal object Flying {
 private val PuffLight = Color(0xFFF4F6F8)
 private val PuffShade = Color(0xFFC9CED6)
 
-/** A hexagon of radius 1, the low-poly puff. */
+/** A hexagon of radius 1, the low-poly puff, and its shaded lower-right half (one light, top-left). */
 private val Hexagon = Path().apply {
     moveTo(0f, -1f); lineTo(0.86f, -0.5f); lineTo(0.86f, 0.5f); lineTo(0f, 1f); lineTo(-0.86f, 0.5f); lineTo(-0.86f, -0.5f); close()
 }
+private val HexagonShade = Path().apply {
+    moveTo(0.86f, -0.5f); lineTo(0.86f, 0.5f); lineTo(0f, 1f); lineTo(-0.86f, 0.5f); close()
+}
 
-/** The smoke: each puff grows from 0.55 to 1.7 of [r], turns a little, drifts and fades over [Flying.PUFF_MS]. */
+/**
+ * The smoke: each puff grows from 0.55 to 1.7 of [r], turns a little, drifts and fades over [Flying.PUFF_MS]. Two flat
+ * fills, no gradient shader: a shader per puff per frame is slow on a cheap GPU.
+ */
 internal fun DrawScope.drawPuffs(list: List<Puff>, now: Long, r: Float) {
     for (p in list) {
         val u = ((now - p.born).toFloat() / Flying.PUFF_MS).coerceIn(0f, 1f)
         val e = 1f - (1f - u) * (1f - u)
         val k = r * (0.55f + 1.15f * e)
-        val brush = Brush.linearGradient(0.48f to PuffLight, 0.52f to PuffShade, start = Offset(-1f, -1f), end = Offset(1f, 1f))
+        val alpha = 0.85f * (1f - u)
         translate(p.x + p.jx * e, p.y + p.jy * e) {
             rotate(p.spin * e, Offset.Zero) {
-                scale(k, k, Offset.Zero) { drawPath(Hexagon, brush, alpha = 0.85f * (1f - u)) }
+                scale(k, k, Offset.Zero) {
+                    drawPath(Hexagon, PuffLight, alpha = alpha)
+                    drawPath(HexagonShade, PuffShade, alpha = alpha)
+                }
             }
         }
     }
