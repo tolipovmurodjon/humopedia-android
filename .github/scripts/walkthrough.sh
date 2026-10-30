@@ -139,10 +139,10 @@ tap Jang; sleep 1; tap "Bosh sahifa"; shot path-at-current
 has "Lesson 1.1, Translating Points, current"
 
 log "-- one tap on the current island starts L1.1 (no sheet); Back asks before leaving"
-# CI turns animations off for the emulator, and the app then (rightly) holds its motion back. The lesson is played with
-# animations ON, as on a child's phone, so the flights, the smoke and the Mach 3 pass really run.
+# CI turns animations off for the emulator, and the app then (rightly) holds its motion back, so this main walk is
+# instant. The flights, smoke and Mach 3 pass are proved frame by frame in the Roborazzi tests (LessonScreenshotTest) and
+# once more, best effort, at the end of this script with animations ON.
 ANIM() { $T adb shell settings put global animator_duration_scale "$1"; }
-ANIM 1.0
 tap "Lesson 1.1, Translating Points, current"; shot lesson
 has "Move the SR-71 3 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
@@ -196,7 +196,6 @@ waitfor "That was tricky!" 20; shot skill-score; has "That was tricky!"
 press "Skip review"; shot skill-retry; has "Retry skill check"
 tapsnap "Skip retry" mach3-a 1.3 mach3-b 1.2
 sleep 3; shot lesson-end; has "Lesson complete"; has "75 sparks earned."
-ANIM 0
 press Continue 2; shot back-from-lesson
 has "Lesson 1.1, Translating Points, done"
 has "Lesson 1.2, Negative Translations, current"
@@ -204,7 +203,6 @@ has "Olmos: 75"
 shot jet-roll-done 1.5
 
 log "-- L1.2 Negative Translations, the next island: one wrong try on every graded page, then a perfect skill check"
-ANIM 1.0
 tap "Lesson 1.2, Negative Translations, current"; shot l12-lesson
 has "Complete the translation to send the SR-71s to the targets."
 for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
@@ -223,7 +221,6 @@ scrolldown; press "Tile 3"; press Check 0.1; sleep 6
 scrolldown; press "Tile -2" 0.4; press "Tile 0"; press Check 0.1
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
 tapsnap Continue l12-mach3 1.6; sleep 2; shot l12-end; has "Lesson complete"; has "75 sparks earned."
-ANIM 0
 press Continue 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
@@ -277,5 +274,19 @@ FIRST=$(echo "$FILES" | tr ' ' '\n' | grep '^crash-.*\.json$' | head -1)
 timeout 20 adb exec-out run-as "$PKG" cat "files/crashes/$FIRST" > "$OUT/crash-file.json" < /dev/null
 grep -q "Humo test crash" "$OUT/crash-file.json" || fail "crash file does not hold the test crash"
 log "ok: CrashRecorder wrote the forced crash"
+
+log "-- best effort, never fails the run: L1.2 replayed with animations ON, as on a child's phone"
+(
+  fail() { log "motion phase stopped: $*"; exit 1; }
+  ANIM 1.0
+  $T adb shell am force-stop "$PKG"; $T adb shell am start -n "$PKG/.MainActivity" > /dev/null; sleep 15
+  tap "Lesson 1.2, Negative Translations, done"; sleep 2
+  tap "Takrorlash"; sleep 4
+  press "Tile -5" 0.4
+  tapsnap Check motion-L12-P1-takeoff 0.6 motion-L12-P1-cruise 1.0
+  waitfor "Try again" 25
+  shot motion-L12-P1-landed
+) || log "motion phase did not finish (the run goes on)"
+ANIM 0
 
 log "== walkthrough passed ($N steps)"

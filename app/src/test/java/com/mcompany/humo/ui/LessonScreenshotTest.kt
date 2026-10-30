@@ -61,11 +61,11 @@ class LessonScreenshotTest {
 
     private fun shot(name: String) = compose.onRoot().captureRoboImage("build/outputs/roborazzi/lesson/$name.png")
 
-    private fun player(theme: LessonTheme, flow: LessonFlow = LessonFlow(), fontScale: Float = 1f, finished: (Int) -> Unit = {}): LessonFlow {
+    private fun player(theme: LessonTheme, flow: LessonFlow = LessonFlow(), fontScale: Float = 1f, finished: (Int) -> Unit = {}, motion: Boolean = false): LessonFlow {
         compose.setContent {
             val d = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = false) }
+                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = motion) }
             }
         }
         compose.waitForIdle()
@@ -242,6 +242,58 @@ class LessonScreenshotTest {
         }
         compose.waitForIdle()
         shot("fly-climb-and-smoke")
+    }
+
+    // The flights with motion ON, frame by frame on the test clock (the CI emulator runs with animations off).
+
+    /** Check on a tile page: the machines wait, take off and climb, cruise, land; only then comes the verdict. */
+    @Test fun tileFlightInTheAir() {
+        val flow = player(LessonTheme.Fly, motion = true)
+        act { flow.goTo(Screen.Page(3)) }
+        act { flow.tapTile(2); flow.tapTile(2) }
+        shot("motion-P4-waiting")
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("Check").performClick()
+        compose.mainClock.advanceTimeBy(700)
+        shot("motion-P4-takeoff")
+        compose.mainClock.advanceTimeBy(900)
+        shot("motion-P4-cruise")
+        compose.mainClock.advanceTimeBy(4500)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Continue").assertIsDisplayed()
+        shot("motion-P4-landed")
+    }
+
+    /** Tap the jet (armed), tap a spot: the nose turns first, then a calm flight; nothing else is heard meanwhile. */
+    @Test fun tapFlyTurnsThenFlies() {
+        val flow = player(LessonTheme.Fly, motion = true)
+        compose.mainClock.autoAdvance = false
+        fun at(x: Int, y: Int, k: Float) = Offset((48f + x * 42.67f) * k, (308f - y * 42.67f) * k)
+        compose.onNodeWithTag("board").performTouchInput { click(at(2, 1, width / 350f)) }
+        compose.mainClock.advanceTimeBy(100)
+        shot("motion-P1-armed")
+        compose.onNodeWithTag("board").performTouchInput { click(at(5, 2, width / 350f)) }
+        compose.mainClock.advanceTimeBy(300)
+        shot("motion-P1-turning")
+        compose.mainClock.advanceTimeBy(900)
+        shot("motion-P1-flying")
+        compose.mainClock.advanceTimeBy(4000)
+        assertEquals(Node(5, 2), flow.dragAt)
+        shot("motion-P1-landed")
+    }
+
+    /** The 3-second Mach 3 pass over the end card: the jet, then the white ring, then it is gone. */
+    @Test fun machPassAtTheEnd() {
+        val flow = player(LessonTheme.Fly, motion = true)
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { flow.goTo(Screen.End) }
+        compose.mainClock.advanceTimeBy(1450)
+        shot("motion-end-mach3-a")
+        compose.mainClock.advanceTimeBy(900)
+        shot("motion-end-mach3-ring")
+        compose.mainClock.advanceTimeBy(2500)
+        shot("motion-end-mach3-done")
     }
 
     @Test fun leavingAsksFirst() {
