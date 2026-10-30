@@ -56,6 +56,23 @@ snap() {
   log "$name"
 }
 
+# Tap the node $1, then take one or two screenshots inside the SAME device shell (names $2 / $4, delays $3 / $5 s after the
+# tap): a flight lasts 2-3.6 s and an adb round trip on CI takes about as long, so only this catches the machines in the air.
+tapsnap() {
+  local b; b=$(dump | tr '>' '\n' | grep -E "(text|content-desc)=\"$1\"" | head -1 | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"')
+  [ -n "$b" ] || fail "no \"$1\" on screen"
+  local n; n=($(echo "$b" | grep -oE '[0-9]+'))
+  shoot_after "$(( (n[0] + n[2]) / 2 ))" "$(( (n[1] + n[3]) / 2 ))" "$2" "${3:-0.8}" "${4:-}" "${5:-0}"
+}
+shoot_after() {
+  N=$((N + 1)); local f1; f1=$(printf "%02d-%s" "$N" "$3"); local cmd="input tap $1 $2; sleep $4; screencap -p /sdcard/$f1.png"; local f2=""
+  if [ -n "$5" ]; then N=$((N + 1)); f2=$(printf "%02d-%s" "$N" "$5"); cmd="$cmd; sleep $6; screencap -p /sdcard/$f2.png"; fi
+  $T adb shell "$cmd"
+  $T adb pull "/sdcard/$f1.png" "$WALK/$f1.png" > /dev/null; log "$f1"
+  if [ -n "$f2" ]; then $T adb pull "/sdcard/$f2.png" "$WALK/$f2.png" > /dev/null; log "$f2"; fi
+}
+scrolldown() { $T adb shell input swipe $((W / 2)) $((H * 70 / 100)) $((W / 2)) $((H * 45 / 100)) 300; sleep 0.8; }
+
 # Wait (up to ${2:-15} s) until a node with this text or content-desc is on screen.
 waitfor() {
   local end=$((SECONDS + ${2:-15}))
@@ -145,7 +162,7 @@ press Continue
 shot P2-start
 log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
 tapnode 1 3; snap P2-armed 0.5
-tapnode 6 0; snap P2-tapfly-a 0.3; snap P2-tapfly-b 0.4
+board; shoot_after $(npx 6 0) P2-tapfly-a 0.5 P2-tapfly-b 0.7
 sleep 5; shot P2-landed 0.5
 press Check; shot P2-wrong
 has "(Hmm, think about that again\.|Not quite.*)"
@@ -155,23 +172,23 @@ shot P3; has "Two points, each moved a steps right and b steps up."; press Conti
 for P in "P4 1 2 2 2" "P5 1 3 3 1" "P6 3 2 2 3"; do
   set -- $P
   shot "$1-start" 0.5
-  press "Tile $2" 0.4; press "Tile $3"; press Check 0.1; snap "$1-flight" 0.5
+  press "Tile $2" 0.4; press "Tile $3"; tapsnap Check "$1-flight" 0.9
   waitfor "Try again" 15; shot "$1-wrong"
-  press "Try again"; press "Start over"; sleep 1.5
-  press "Tile $4" 0.4; press "Tile $5"; press Check 0.1; snap "$1-flight-2" 0.5
+  press "Try again"; scrolldown; press "Start over"; sleep 1.5
+  press "Tile $4" 0.4; press "Tile $5"; tapsnap Check "$1-flight-2" 0.9
   waitfor "Continue" 15; shot "$1-correct"
   press Continue
 done
 shot P7; press Play 1.5; press Continue
 # The splash shows for 1.7 s; the UI tree is read after it, so the check is on the first item.
 shot skill-splash 0.3; sleep 2.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
-press "Tile 3" 0.4; press "Tile 2"; press Check 0.1; snap skill-SC1-flight 0.5
+press "Tile 3" 0.4; press "Tile 2"; tapsnap Check skill-SC1-flight 0.9
 sleep 6
 press "I don(&apos;|.)t know" 1.5
-press "Tile 1" 0.4; press "Tile 4"; press Check 0.1; snap skill-SC3-flight 0.5
+press "Tile 1" 0.4; press "Tile 4"; tapsnap Check skill-SC3-flight 0.9
 waitfor "That was tricky!" 20; shot skill-score; has "That was tricky!"
 press "Skip review"; shot skill-retry; has "Retry skill check"
-press "Skip retry" 0.3; snap mach3-a 0.2; snap mach3-b 0.5
+tapsnap "Skip retry" mach3-a 1.3 mach3-b 1.2
 sleep 3; shot lesson-end; has "Lesson complete"; has "75 sparks earned."
 press Continue 2; shot back-from-lesson
 has "Lesson 1.1, Translating Points, done"
@@ -185,9 +202,9 @@ has "Complete the translation to send the SR-71s to the targets."
 for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
   set -- $P
   if [ $# -eq 1 ]; then shot "l12-$1"; press Play 1.5; press Continue; continue; fi
-  press "Tile $2"; press Check 0.1; snap "l12-$1-flight" 0.5
+  press "Tile $2"; tapsnap Check "l12-$1-flight" 0.9
   waitfor "Try again" 15; shot "l12-$1-wrong"
-  press "Try again"; press "Start over"; sleep 1.5
+  press "Try again"; scrolldown; press "Start over"; sleep 1.5
   press "Tile $3"; press Check 0.1
   waitfor "Continue" 15; shot "l12-$1-correct"
   press Continue
@@ -197,7 +214,7 @@ press "Tile -2"; press Check 0.1; sleep 6
 press "Tile 3"; press Check 0.1; sleep 6
 press "Tile -2" 0.4; press "Tile 0"; press Check 0.1
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
-press Continue 0.3; snap l12-mach3 0.8; sleep 3; shot l12-end; has "Lesson complete"; has "75 sparks earned."
+tapsnap Continue l12-mach3 1.6; sleep 2; shot l12-end; has "Lesson complete"; has "75 sparks earned."
 press Continue 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
