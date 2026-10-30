@@ -39,7 +39,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.mcompany.humo.data.course.Level
+import com.mcompany.humo.data.course.Lesson
 import com.mcompany.humo.ui.glass.AuroraBackground
 import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.GlassStage
@@ -62,7 +62,7 @@ private val BarCompactWidth = 440.dp
 fun AppShell(
     startTab: Int = 0,
     /** Home's path; tests pass a fixed state instead of the Hilt ViewModel. */
-    path: @Composable (PaddingValues, (Level) -> Unit) -> Unit = { padding, open -> PathScreenRoute(padding, onOpenLevel = open) },
+    path: @Composable (PaddingValues, (Lesson) -> Unit) -> Unit = { padding, open -> PathScreenRoute(padding, onOpenLevel = open) },
     /** A level's lesson; tests pass the player without the Hilt ViewModel. */
     lesson: @Composable (Int, PaddingValues, () -> Unit) -> Unit = { level, padding, close -> LessonEntry(level, padding, close) },
 ) {

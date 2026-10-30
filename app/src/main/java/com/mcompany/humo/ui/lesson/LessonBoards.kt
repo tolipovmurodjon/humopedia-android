@@ -28,13 +28,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
@@ -43,18 +45,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -63,64 +69,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.pressScale
-import com.mcompany.humo.ui.path.HeadingSpring
+import com.mcompany.humo.ui.path.rememberJetAtlas
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.Random
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.max
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Brilliant's page easing (cubic-bezier(.2,.8,.2,1)) and the decelerating glide measured on P7's Play (≈ ease-out cubic). */
+/** Brilliant's page easing (cubic-bezier(.2,.8,.2,1)) and the decelerating glide measured on P7's Play (~ ease-out cubic). */
 internal val BrilliantEase = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
 internal val GlideEase = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
-private val FlightEase = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)
 private const val NOSE_UP = -PI.toFloat() / 2f
 
+/** The puff and the burst are sized from the jet's length. */
+private const val PUFF_R = 0.07f
+
 /**
- * The SR-71 that follows Brilliant's point (fly-layer.js): it closes 16 % of the gap each 60 Hz frame, turns its nose
- * into the move through a heading spring, burns while it moves and leaves a puff of smoke every 70 ms.
+ * Lets the player ask a tile board to fly its machines before a check is graded (Boss: "I enter numbers, I click Check,
+ * it should animate and then check the answer"). The board registers itself; a board with nothing to fly leaves it null.
  */
-internal class FlyCraft(var pos: Offset) {
-    private val spring = HeadingSpring(maxDegPerFrame = 9f, share = 0.3f).also { it.snapTo(NOSE_UP) }
-    val heading: Float get() = spring.value
-    var speed = 0f
-        private set
-    val puffs = ArrayList<Pair<Offset, Long>>()
-    private var lastPuff = 0L
-    var burstAt = -10_000L
-
-    /** One frame toward [target]; returns true while anything still moves. */
-    fun step(target: Offset, dtMs: Float, now: Long, cell: Float, len: Float): Boolean {
-        val k = 1f - 0.84f.pow(dtMs / 16.7f)
-        val d = target - pos
-        val far = d.getDistance()
-        if (far > 0.5f) {
-            pos += d * k
-            if (far > 3f) spring.step(atan2(d.y, d.x), dtMs / 16.7f)
-        } else pos = target
-        speed = (far / cell).coerceAtMost(1f)
-        if (speed > 0.08f && now - lastPuff > 70) {
-            lastPuff = now
-            val h = heading
-            puffs.add(Offset(pos.x - kotlin.math.cos(h) * len * 0.45f, pos.y - kotlin.math.sin(h) * len * 0.45f) to now)
-        }
-        puffs.removeAll { now - it.second > 1100 }
-        return far > 0.5f || puffs.isNotEmpty() || now - burstAt < 650
-    }
-
-    fun place(at: Offset, heading: Float) { pos = at; spring.snapTo(heading); speed = 0f; puffs.clear() }
+internal class FlightDeck {
+    var launcher: (suspend () -> Unit)? = null
+    suspend fun fly() { launcher?.invoke() }
 }
 
 /**
  * P1, P2: Brilliant's "Graph" with one draggable point (spec §3). Drag it (it snaps to the nearest node on release), or
- * on the fly layer tap the jet and then a node: it takes off and flies there. Check shows the tick or the cross; the
- * point (or the jet) stays where the child put it.
+ * on the fly layer tap the jet and then a node: the nose turns first, then it flies there calmly while every other touch
+ * is held back. The jet is glued to the point while it is dragged; Check shows the tick or the cross and the jet stays
+ * exactly where the child put it.
  */
 @Composable
 internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion: Boolean, width: Dp) {
@@ -130,22 +116,24 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
     val text = rememberTextMeasurer()
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    val frames = if (fly) JetFrames.map { ImageBitmap.imageResource(it) } else null
+    val atlas = if (fly) rememberJetAtlas() else null
     val start = g.px(page.points[0])
     val handle = remember(page, wPx) { Animatable(flow.dragAt?.let { g.px(it) } ?: start, Offset.VectorConverter) }
     var dragging by remember(page) { mutableStateOf(false) }
     var armed by remember(page) { mutableStateOf(false) }
+    var busy by remember(page) { mutableStateOf(false) }
+    val wake = remember(page) { mutableIntStateOf(0) }
     val dotR by animateFloatAsState(if (dragging) 15f else 5f, tween(if (motion) 120 else 0), label = "dot")
     val len = g.cell * 0.9f
-    val craft = remember(page, wPx) { FlyCraft(handle.value) }
+    val craft = remember(page, wPx) { Craft(handle.value) }
     val tick = remember { mutableLongStateOf(0L) }
-    val turn = remember { mutableFloatStateOf(0f) }
+    val rnd = remember { Random(3) }
 
     // The point follows the lesson's state: Start over puts it back where it began; a node set from outside a gesture
     // (state restore, tests) moves it there. A drop or a flight already animating is left alone.
     LaunchedEffect(flow.dragAt) {
         val to = flow.dragAt?.let { g.px(it) } ?: start
-        if (dragging || handle.isRunning || handle.value == to) return@LaunchedEffect
+        if (dragging || busy || handle.isRunning || handle.value == to) return@LaunchedEffect
         if (motion && flow.dragAt == null) handle.animateTo(to, tween(200, easing = BrilliantEase)) else handle.snapTo(to)
     }
     // The jet's frame loop runs only while something moves; then it waits for the point to move or the jet to be armed.
@@ -153,35 +141,53 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
         if (!fly || !motion) return@LaunchedEffect
         var last = -1L
         while (isActive) {
-            var moving = true
-            while (moving || armed) {
+            var live = true
+            while (live) {
                 withFrameMillis { now ->
                     val dt = if (last < 0) 16.7f else (now - last).toFloat().coerceIn(1f, 64f)
                     last = now
-                    moving = craft.step(handle.value, dt, now, g.cell, len)
-                    turn.floatValue = (turn.floatValue + dt * 0.09f) % 360f
+                    val moving = Flying.glue(craft, handle.value, dt, now, g.cell, len / 0.857f, 5f * density.density, steering = dragging || busy, flying = busy, rnd = rnd)
+                    live = moving || dragging || busy || armed
                     tick.longValue = now
                 }
             }
             last = -1L
-            snapshotFlow { handle.value to armed }.first { (h, a) -> a || dist(h, craft.pos) > 0.5f }
+            val seen = wake.intValue
+            snapshotFlow { Triple(handle.value, armed, wake.intValue) }.first { (h, a, w) -> a || w != seen || dist(h, craft.pos) > 0.5f }
         }
     }
 
-    fun drop(n: Node) {
+    fun land(n: Node) {
         flow.dropAt(n)
-        LessonSounds.play(Cue.Toggle)
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
     }
 
+    // Tap-then-tap: the nose turns to the spot first (at most 700 ms), then a calm eased flight (40+ frames), a soft tick on
+    // every node it crosses; every other touch is ignored until it has landed.
     fun flyTo(n: Node) {
         val to = g.px(n)
         val from = handle.value
-        val steps = max(18, (dist(from, to) / (5f * g.s)).roundToInt())
-        craft.burstAt = tick.longValue
+        if (!motion) { scope.launch { handle.snapTo(to); land(n) }; return }
+        busy = true
+        wake.intValue++
         scope.launch {
-            if (motion) handle.animateTo(to, tween(steps * 16, easing = FlightEase)) else handle.snapTo(to)
-            drop(n)
+            try {
+                val aim = Flying.bearing(from, to)
+                craft.aim = aim
+                val t0 = System.nanoTime()
+                while (abs(Flying.angDiff(craft.deg, aim)) > 6f && System.nanoTime() - t0 < 700_000_000L) withFrameMillis { }
+                craft.burstAt = tick.longValue
+                LessonSounds.play(Cue.Whoosh)
+                val steps = max(40f, dist(from, to) / density.density / 2.4f)
+                val ticks = launch { snapshotFlow { g.snapPx(handle.value) }.distinctUntilChanged().drop(1).collect { LessonSounds.play(Cue.Toggle) } }
+                handle.animateTo(to, tween((steps * 16.7f).roundToInt(), easing = Flying.InOut))
+                ticks.cancel()
+                land(n)
+                delay(450)
+            } finally {
+                craft.aim = null
+                busy = false
+            }
         }
     }
 
@@ -193,6 +199,12 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
             .pointerInput(page, fly, wPx) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    if (busy) {
+                        // a flight is under way: this touch is held back (a hover cannot steer it)
+                        down.consume()
+                        waitForUpOrCancellation()
+                        return@awaitEachGesture
+                    }
                     if (flow.locked) return@awaitEachGesture
                     val grab = max(28.dp.toPx(), if (fly) len * 0.6f else 0f)
                     if (dist(down.position, handle.value) > grab) {
@@ -212,7 +224,8 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         if (dragged) {
                             val (cx, cy) = g.cells(change.position + grabOffset)
                             val p = g.px(cx.coerceIn(-0.3f, page.graph.xMax + 0.3f), cy.coerceIn(-0.3f, page.graph.yMax + 0.3f))
-                            scope.launch { handle.snapTo(p) }
+                            // the jet is glued to the finger: the point moves at once, not on the next dispatch
+                            scope.launch(start = CoroutineStart.UNDISPATCHED) { handle.snapTo(p) }
                             val n = g.snapPx(p)
                             if (n != lastNode) { lastNode = n; LessonSounds.play(Cue.Toggle) }
                         }
@@ -222,9 +235,10 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         dragging = false
                         val n = g.snapPx(handle.value)
                         scope.launch { if (motion) handle.animateTo(g.px(n), tween(90, easing = GlideEase)) else handle.snapTo(g.px(n)) }
-                        drop(n)
+                        land(n)
                     } else if (fly) {
                         armed = !armed
+                        wake.intValue++
                         LessonSounds.play(Cue.Tick)
                     }
                 }
@@ -238,22 +252,23 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
         val p = handle.value
         val ok = flow.phase == Phase.Correct
         val bad = flow.phase == Phase.Wrong
-        if (frames != null) {
+        if (atlas != null) {
+            val now = tick.longValue
             val at = if (motion) craft.pos else p
             val heading = when {
                 motion -> craft.heading
                 moved -> atan2(p.y - start.y, p.x - start.x)
                 else -> NOSE_UP
             }
-            if (!motion) craft.place(p, heading)
-            puffs(craft.puffs.map { it.first to ((tick.longValue - it.second) / 1100f).coerceIn(0f, 1f) }, g.cell)
-            val sinceBurst = tick.longValue - craft.burstAt
+            drawPuffs(craft.puffs, now, len * PUFF_R)
+            val sinceBurst = now - craft.burstAt
             if (motion && sinceBurst in 0..650) {
                 val u = sinceBurst / 650f
-                drawCircle(androidx.compose.ui.graphics.Brush.radialGradient(0f to Color(0xFFFFF6D6), 0.4f to Color(0xFFFFB347), 1f to Color.Transparent, center = at, radius = g.cell * 0.9f * (0.3f + u)), g.cell * 0.9f * (0.3f + u), at, alpha = 0.95f * (1f - u))
+                drawCircle(Brush.radialGradient(0f to Color(0xFFFFF6D6), 0.4f to Color(0xFFFFB347), 1f to Color.Transparent, center = at, radius = g.cell * 0.9f * (0.3f + u)), g.cell * 0.9f * (0.3f + u), at, alpha = 0.95f * (1f - u))
             }
-            jetAt(frames, at, heading, len, flames = if (motion) craft.speed else 0f, t = tick.longValue / 1000f, motion = motion)
-            if (armed) armedRing(at, len * 0.62f, turn.floatValue, s)
+            val flames = if (motion && busy && craft.speed > 0.02f) max(craft.speed, 0.3f) else 0f
+            jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion)
+            if (armed) armedRing(at, len * 0.62f, s)
             if (ok || bad) badge(Offset(at.x, at.y - len * 0.55f - 12f * s), ok, s)
         } else {
             val dot = when { ok -> BoardColors.Green; bad -> BoardColors.Yellow; else -> BoardColors.Blue }
@@ -269,43 +284,140 @@ internal fun FigureBoard(page: LessonPage, fly: Boolean, width: Dp) {
     val wPx = with(LocalDensity.current) { width.toPx() }
     val g = remember(page, wPx) { BoardGeo(page.graph, wPx / page.graph.boxW) }
     val text = rememberTextMeasurer()
-    val frames = if (fly) JetFrames.map { ImageBitmap.imageResource(it) } else null
+    val atlas = if (fly) rememberJetAtlas() else null
     Canvas(Modifier.width(width).height(width * (page.graph.boxH / page.graph.boxW)).semantics { contentDescription = "Two points, each moved a steps right and b steps up." }) {
-        explainer(g, page, text, frames)
+        explainer(g, page, text, atlas)
+    }
+}
+
+/** A layer that fades its content to [a] (0 ... 1) around [c]. */
+private fun DrawScope.faded(a: Float, c: Offset, r: Float, block: DrawScope.() -> Unit) {
+    if (a >= 0.99f) { block(); return }
+    drawIntoCanvas { canvas ->
+        canvas.saveLayer(Rect(c.x - r, c.y - r, c.x + r, c.y + r), Paint().apply { alpha = a })
+        block()
+        canvas.restore()
     }
 }
 
 /**
  * The transformation workspace (P4-P6, the skill check) and the recap (P7), spec §5-6: the graph in a framed box with the
- * "translate by ( , )" row under it, the tile tray, and Start over. When both slots are full the points glide by that
- * translation; pale ghosts stay where they began. P7 has fixed tiles and a Play button instead of the tray.
+ * "translate by ( , )" row under it, the tile tray, and Start over. When both slots are full Brilliant's blue points glide
+ * by that translation as a preview, with pale ghosts where they began; the machines WAIT where they are while numbers are
+ * tried. On Check ([deck]) they take off, climb, fly a gentle curve to the preview and land; then the answer is graded.
+ * P7 has fixed tiles and a Play button: the machines ride the points exactly.
  */
 @Composable
-internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion: Boolean, width: Dp) {
+internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion: Boolean, width: Dp, deck: FlightDeck) {
     val density = LocalDensity.current
     val u = width / 350f
     val wPx = with(density) { width.toPx() }
     val s = wPx / 350f
     val g = remember(page, wPx) { BoardGeo(page.graph, s) }
     val text = rememberTextMeasurer()
-    val frames = if (fly) JetFrames.map { ImageBitmap.imageResource(it) } else null
+    val atlas = if (fly) rememberJetAtlas() else null
     val recap = page.kind == PageKind.Recap
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val shown = flow.shownMove
+    val settled = flow.answered
     fun cells(n: Node?) = n?.let { Offset(it.x.toFloat(), it.y.toFloat()) } ?: Offset.Zero
     val disp = remember(page) { Animatable(cells(shown), Offset.VectorConverter) }
-    var heading by remember(page) { mutableFloatStateOf(if (shown == null || shown == Node(0, 0)) NOSE_UP else atan2(-shown.y.toFloat(), shown.x.toFloat())) }
     var playing by remember(page) { mutableStateOf(false) }
+    val wake = remember(page) { mutableIntStateOf(0) }
+    val tick = remember { mutableLongStateOf(0L) }
+    val rnd = remember { Random(5) }
+    val len = g.cell * 0.9f
+
+    // One machine per point. A board opened already checked (review, state restore) has them landed; otherwise they wait
+    // at their start. The recap's ride the points exactly.
+    val crafts = remember(page, wPx) {
+        page.points.map { p ->
+            val begin = g.px(p)
+            val end = shown?.let { g.px(p + it) }
+            if (end != null && (recap || settled)) Craft(end, Flying.bearing(begin, end)) else Craft(begin)
+        }
+    }
 
     LaunchedEffect(shown) {
         val to = cells(shown)
         if (disp.value == to) return@LaunchedEffect
-        val d = to - disp.value
-        heading = atan2(-d.y, d.x)
         if (!motion) { disp.snapTo(to); return@LaunchedEffect }
+        wake.intValue++
         delay(200)
         disp.animateTo(to, tween(700, easing = GlideEase))
+    }
+    // A board that was checked without a flight (state restore, review) puts the machines where the numbers send them;
+    // Start over quietly slides them back to their start.
+    LaunchedEffect(settled, shown, atlas != null) {
+        if (recap || atlas == null) return@LaunchedEffect
+        crafts.forEachIndexed { i, c ->
+            if (c.flight != null) return@forEachIndexed
+            val want = when {
+                settled && shown != null -> g.px(page.points[i] + shown)
+                !settled && shown == null -> g.px(page.points[i])
+                else -> null
+            } ?: return@forEachIndexed
+            if (dist(c.pos, want) < 1f) return@forEachIndexed
+            if (motion) {
+                Flying.plan(c, want, withFrameMillis { it }, density.density, climb = false)
+                wake.intValue++
+            } else { c.deg = Flying.bearing(c.pos, want); c.pos = want }
+        }
+    }
+    // Check: the machines fly first; the player grades afterwards.
+    val shownNow = rememberUpdatedState(shown)
+    DisposableEffect(deck, crafts, atlas != null) {
+        deck.launcher = launcher@{
+            val move = shownNow.value
+            if (move == null || recap || atlas == null) return@launcher
+            if (!motion) {
+                crafts.forEachIndexed { i, c -> val to = g.px(page.points[i] + move); c.deg = Flying.bearing(c.pos, to); c.pos = to }
+                return@launcher
+            }
+            val now = withFrameMillis { it }
+            var longest = 0L
+            crafts.forEachIndexed { i, c -> longest = max(longest, Flying.plan(c, g.px(page.points[i] + move), now, density.density)) }
+            if (longest > 0L) {
+                LessonSounds.play(Cue.Whoosh)
+                wake.intValue++
+                delay(longest + 120L)
+            }
+        }
+        onDispose { deck.launcher = null }
+    }
+    LaunchedEffect(page, fly, motion) {
+        if (!fly || !motion) return@LaunchedEffect
+        var last = -1L
+        while (isActive) {
+            var live = true
+            while (live) {
+                withFrameMillis { now ->
+                    val dt = if (last < 0) 16.7f else (now - last).toFloat().coerceIn(1f, 64f)
+                    last = now
+                    var any = disp.isRunning || playing
+                    crafts.forEachIndexed { i, c ->
+                        if (recap) {
+                            val b = g.px(page.points[i].x + disp.value.x, page.points[i].y + disp.value.y)
+                            val d = dist(c.pos, b)
+                            if (d > g.cell * 0.9f) c.fadeAt = now // the demo jumped back to its start: show it there with a short fade
+                            else if (d > 0.5f) c.deg += Flying.angDiff(c.deg, Flying.bearing(c.pos, b)) * 0.3f
+                            c.speed = if (d > 0.5f && d <= g.cell * 0.9f) 0.5f else 0f
+                            c.pos = b
+                        } else {
+                            Flying.fly(c, now, dt, g.cell)
+                            Flying.puff(c, now, len / 0.857f * (1f + 0.45f * c.alt), c.flight != null, rnd)
+                        }
+                        any = any || c.flight != null || c.puffs.isNotEmpty()
+                    }
+                    live = any
+                    tick.longValue = now
+                }
+            }
+            last = -1L
+            val seen = wake.intValue
+            snapshotFlow { wake.intValue }.first { it != seen }
+        }
     }
 
     val frameH = u * (12f + page.graph.boxH)
@@ -320,8 +432,8 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             Canvas(Modifier.width(width).height(frameH).testTag("board").semantics { contentDescription = described }) {
                 translate(2f * s, 12f * s) {
                     graph(g, text)
+                    val now = tick.longValue
                     val run = disp.value
-                    val moving = disp.isRunning
                     if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
                     page.points.forEach { start ->
                         val a = g.px(start)
@@ -329,16 +441,18 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         if (dist(a, b) > 0.5f) ghost(a, b, flow.phase.takeIf { !flow.inSkill } ?: Phase.Idle, s)
                     }
                     val phase = if (flow.inSkill) Phase.Idle else flow.phase
-                    page.points.forEach { start ->
+                    page.points.forEachIndexed { i, start ->
                         val b = g.px(start.x + run.x, start.y + run.y)
-                        if (frames != null) {
-                            if (moving) for (i in 1..5) {
-                                val back = Offset(start.x + run.x, start.y + run.y) - Offset(kotlin.math.cos(heading), -kotlin.math.sin(heading)) * (i * 0.22f)
-                                drawCircle(Color(0xFF787C84), g.cell * 0.07f * (1f + i * 0.35f), g.px(back.x, back.y), alpha = 0.3f * (1f - i / 6f))
-                            }
-                            jetAt(frames, b, heading, g.cell * 0.9f, flames = if (moving) 1f else 0f, t = 0f, motion = motion)
-                            if (phase != Phase.Idle) badge(Offset(b.x + g.cell * 0.42f, b.y - g.cell * 0.42f), phase == Phase.Correct, s)
-                        } else workPoint(b, phase, s)
+                        if (atlas == null) { workPoint(b, phase, s); return@forEachIndexed }
+                        val c = crafts[i]
+                        // Brilliant's point is the preview of where the numbers send the machine; a machine sitting on it hides it
+                        if (!recap && dist(c.pos, b) >= max(6f * s, g.cell * 0.3f)) workPoint(b, phase, s)
+                        drawPuffs(c.puffs, now, len * PUFF_R)
+                        val flames = if (c.speed > 0.02f && (c.flight != null || recap)) c.speed else 0f
+                        faded(((now - c.fadeAt) / 220f).coerceIn(0f, 1f), c.pos, len) {
+                            jetAt(atlas, c.pos, c.heading, len, flames = flames, t = now / 1000f, motion = motion, alt = c.alt)
+                        }
+                        if (phase != Phase.Idle) badge(Offset(c.pos.x + g.cell * 0.42f, c.pos.y - g.cell * 0.42f), phase == Phase.Correct, s)
                     }
                     drawCircle(BoardColors.Axis, 5f * s, g.px(Node(0, 0)))
                 }
@@ -356,7 +470,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         LessonSounds.play(Cue.Tick)
                         scope.launch {
                             playing = true
-                            heading = atan2(-page.move.y.toFloat(), page.move.x.toFloat())
+                            wake.intValue++
                             disp.snapTo(Offset.Zero)
                             if (motion) { delay(200); disp.animateTo(cells(page.move), tween(600, easing = GlideEase)) } else disp.snapTo(cells(page.move))
                             playing = false
@@ -370,24 +484,30 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         drawPath(Path().apply { moveTo(size.width * 0.12f, 0f); lineTo(size.width, size.height / 2f); lineTo(size.width * 0.12f, size.height); close() }, if (playing) Color(0xFFBDBDBD) else Color.Black)
                     }
                     Spacer(Modifier.width(8.dp * (u / 1.dp)))
-                    Text("Play", fontFamily = Glass.Body, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * (u / 1.dp)).toSp() }, color = if (playing) Color(0xFFBDBDBD) else Color.Black)
+                    Text("Play", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * (u / 1.dp)).toSp() }, color = if (playing) Color(0xFFBDBDBD) else Color.Black)
                 }
             }
         } else {
             // The tray keeps its place even when hidden, so nothing under it jumps (RULES: no layout jumps).
             Spacer(Modifier.height(14.dp * (u / 1.dp)))
             val tray = flow.slots.trayShown && !flow.locked
+            // Brilliant's tray: 0..5 in one row (60 px); -5..5 in two rows of 6 and 5 (104 px), 10 px apart.
+            val rows = page.tiles.chunked(6)
             Box(
-                Modifier.width(width).height(60.dp * (u / 1.dp)).alpha(if (tray) 1f else 0f)
+                Modifier.width(width).height((if (rows.size > 1) 104.dp else 60.dp) * (u / 1.dp)).alpha(if (tray) 1f else 0f)
                     .clip(RoundedCornerShape(4.dp * (u / 1.dp))).background(Color(0xFFDAE2FF)),
                 contentAlignment = Alignment.Center,
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp * (u / 1.dp))) {
-                    L11.tiles.forEach { v ->
-                        Tile(v, u, enabled = tray) {
-                            flow.tapTile(v)
-                            LessonSounds.play(Cue.Tick)
-                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp * (u / 1.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+                    rows.forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp * (u / 1.dp))) {
+                            row.forEach { v ->
+                                Tile(v, u, enabled = tray) {
+                                    flow.tapTile(v)
+                                    LessonSounds.play(Cue.Tick)
+                                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                }
+                            }
                         }
                     }
                 }
@@ -408,7 +528,7 @@ private fun Tile(v: Int, u: Dp, enabled: Boolean, onTap: () -> Unit) {
     ) {
         Box(Modifier.offset(y = 2.dp * k).size(40.dp * k, 34.dp * k).clip(RoundedCornerShape(6.dp * k)).background(Color(0x66000000)))
         Box(Modifier.size(40.dp * k, 34.dp * k).clip(RoundedCornerShape(6.dp * k)).background(Color.White), contentAlignment = Alignment.Center) {
-            Text("$v", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * k).toSp() }, color = Color.Black)
+            Text(signed(v), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * k).toSp() }, color = Color.Black)
         }
     }
 }
@@ -429,11 +549,11 @@ private fun ActionRow(page: LessonPage, flow: LessonFlow, recap: Boolean, u: Dp)
             Modifier.height(32.dp * k).clip(RoundedCornerShape(4.dp * k)).background(Color(0xFFF2F2F2)).padding(horizontal = 8.dp * k),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("translate", fontFamily = Glass.Body, fontWeight = FontWeight.Medium, fontSize = fs, color = Color(0xFF294BC6))
-            Text(" by (", fontFamily = Glass.Body, fontSize = fs, color = Color.Black)
-            if (recap) { Fixed("${page.move.x}", u); Text(",", fontSize = fs); Fixed("${page.move.y}", u) }
+            Text("translate", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = fs, color = Color(0xFF294BC6))
+            Text(" by (", fontFamily = LessonType.Figtree, fontSize = fs, color = Color.Black)
+            if (recap) { Fixed(signed(page.move.x), u); Text(",", fontSize = fs); Fixed(signed(page.move.y), u) }
             else { Slot(0, flow, u); Text(",", fontSize = fs, color = Color.Black); Slot(1, flow, u) }
-            Text(")", fontFamily = Glass.Body, fontSize = fs, color = Color.Black)
+            Text(")", fontFamily = LessonType.Figtree, fontSize = fs, color = Color.Black)
         }
     }
 }
@@ -450,6 +570,10 @@ private fun Fixed(v: String, u: Dp) {
 private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
     val k = u / 1.dp
     val v = flow.slots[i]
+    if (i in flow.slots.fixed && v != null) {
+        Box(Modifier.padding(horizontal = 1.dp).semantics { contentDescription = "Slot ${i + 1}, $v, given" }) { Fixed(signed(v), u) }
+        return
+    }
     val active = flow.slots.active == i && !flow.locked
     val border = when {
         active -> Color(0xFF456DFF)
@@ -465,7 +589,7 @@ private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
             .semantics { contentDescription = "Slot ${i + 1}, ${v ?: "empty"}" }.testTag("slot-$i"),
         contentAlignment = Alignment.Center,
     ) {
-        if (v != null) Text("$v", fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, color = Color.Black)
+        if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, color = Color.Black)
     }
 }
 

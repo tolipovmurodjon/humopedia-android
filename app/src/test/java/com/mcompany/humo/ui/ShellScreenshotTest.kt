@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -31,7 +29,9 @@ import com.mcompany.humo.data.course.CoordinateTransformations
 import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.GlassTheme
 import com.mcompany.humo.ui.lesson.LessonPlayer
+import com.mcompany.humo.ui.lesson.lessonAt
 import com.mcompany.humo.ui.path.Jet
+import com.mcompany.humo.ui.path.rememberJetAtlas
 import com.mcompany.humo.ui.path.PathScreen
 import com.mcompany.humo.ui.path.PathUiState
 import com.mcompany.humo.ui.shell.AppShell
@@ -53,7 +53,8 @@ import org.robolectric.annotation.GraphicsMode
 class ShellScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private val demo = PathUiState(CoordinateTransformations, current = 3, gems = 120, streakDays = 3)
+    /** Lesson 1.1 done, 1.2 current (both built), 1.3 locked. */
+    private val demo = PathUiState(CoordinateTransformations, current = 2, gems = 120, streakDays = 3)
 
     private var tab by mutableIntStateOf(0)
     private var scale by mutableFloatStateOf(1f)
@@ -73,7 +74,7 @@ class ShellScreenshotTest {
                             AppShell(
                                 startTab = tab,
                                 path = { padding, open -> PathScreen(demo, padding, open, motion = false) },
-                                lesson = { _, padding, close -> LessonPlayer(padding, onExit = close, onFinish = { close() }, motion = false) },
+                                lesson = { n, padding, close -> LessonPlayer(padding, onExit = close, onFinish = { close() }, lesson = lessonAt(n), motion = false) },
                             )
                         }
                     }
@@ -87,7 +88,7 @@ class ShellScreenshotTest {
 
     @Test fun pathOpensAtTheCurrentStone() {
         shell()
-        compose.onNodeWithContentDescription("Level 3, Rotations, current").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Lesson 1.2, Negative Translations, current").assertIsDisplayed()
         shot("01-home-path")
     }
 
@@ -102,32 +103,32 @@ class ShellScreenshotTest {
 
     @Test fun oneTapOnTheCurrentIslandStartsTheLesson() {
         shell()
-        compose.onNodeWithContentDescription("Level 3, Rotations, current").performClick()
+        compose.onNodeWithContentDescription("Lesson 1.2, Negative Translations, current").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Move the point 3 steps to the right and 1 up.").assertIsDisplayed()
+        compose.onNodeWithText("Complete the translation to send the points to the targets.").assertIsDisplayed()
         shot("03b-lesson")
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Leave").performClick()
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("Level 3, Rotations, current").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Lesson 1.2, Negative Translations, current").assertIsDisplayed()
         shot("03c-back-from-lesson")
     }
 
     @Test fun aDoneIslandOpensItsSheetToReplay() {
         shell()
-        compose.onNodeWithContentDescription("Level 2, Translations in Coordinates, done").performClick()
+        compose.onNodeWithContentDescription("Lesson 1.1, Translating Points, done").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Takrorlash").assertIsDisplayed()
-        compose.onNodeWithText("4 ta dars · tugatilgan").assertIsDisplayed()
+        compose.onNodeWithText("Tugatilgan").assertIsDisplayed()
         shot("03-level-sheet")
     }
 
     @Test fun aLockedIslandSaysWhyAndHasNoGoButton() {
         shell()
-        compose.onNodeWithContentDescription("Level 4, Rotations in Coordinates, locked").performClick()
+        compose.onNodeWithContentDescription("Lesson 1.3, Translating Shapes, locked").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Avval 3-darajani tugating.").assertIsDisplayed()
+        compose.onNodeWithText("Avval 1.2-darsni tugating.").assertIsDisplayed()
         compose.onNodeWithText("Davom etish").assertDoesNotExist()
         shot("09-locked-sheet")
     }
@@ -156,8 +157,8 @@ class ShellScreenshotTest {
     @Test fun pathScrolledToTheTop() {
         shell()
         // The story ends six islands above the current one; the rest is under the cloud bank, not on the map.
-        compose.onNodeWithContentDescription("Level 9, Combining Reflections, locked").assertExists()
-        compose.onNodeWithContentDescription("Level 10, Congruence and Symmetry, locked").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Lesson 2.2, Translating Shapes in x and y, locked").assertExists()
+        compose.onNodeWithContentDescription("Lesson 2.3, Fitting within a Region, locked").assertDoesNotExist()
         compose.onNodeWithContentDescription("Path").performScrollToTop()
         shot("04-home-path-top")
     }
@@ -181,10 +182,10 @@ class ShellScreenshotTest {
         shot("11-home-path-360x800")
     }
 
-    /** The SR-71 sprite in all 16 headings (a full circle, clockwise from nose-up), flames on, banked on the odd ones. */
+    /** The SR-71 sprite in 16 of its 64 headings (a full circle, clockwise from nose-up), flames on, banked on the odd ones. */
     @Test fun jetInEveryHeading() {
         compose.setContent {
-            val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
+            val frames = rememberJetAtlas()
             Box(Modifier.fillMaxSize().background(Glass.Page).drawBehind {
                 val cell = size.width / 4f
                 for (i in 0 until 16) {
@@ -203,11 +204,11 @@ class ShellScreenshotTest {
 
     /**
      * A turn, three frames apart, as the path draws it (Boss on alpha05: "turning sharp, tick tick"): nose-up, halfway
-     * between frame 0 and frame 1 (a crossfade of both), then frame 1; each with its soft 12 % shadow.
+     * between frame 0 and frame 1 (frame 0 turned by its rest), then frame 2; each with its soft 12 % shadow.
      */
     @Test fun jetTurnStrip() {
         compose.setContent {
-            val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
+            val frames = rememberJetAtlas()
             Box(Modifier.fillMaxSize().background(Glass.Page).drawBehind {
                 val cell = size.width / 3f
                 for (i in 0 until 3) {

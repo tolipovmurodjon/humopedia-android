@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object BattleRoute : NavKey
 @Serializable data object LeaderboardRoute : NavKey
 @Serializable data object MeRoute : NavKey
-/** A level's lesson, opened by one tap on its stone. The lesson player is the next phase; this is its placeholder. */
+/** Lesson [level] of the course (its place on the path, 1 = lesson 1.1), opened by one tap on its island. */
 @Serializable data class LessonRoute(val level: Int) : NavKey
 
 /**

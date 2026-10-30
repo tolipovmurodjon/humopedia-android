@@ -11,13 +11,15 @@ import kotlin.math.roundToInt
 fun snap(cx: Float, cy: Float, xMax: Int, yMax: Int): Node = Node(cx.roundToInt().coerceIn(0, xMax), cy.roundToInt().coerceIn(0, yMax))
 
 /**
- * The two slots of "translate by ( , )" and which one the tray fills next (Brilliant's workspace, spec §5): slot 0 starts
- * active; a tile fills the active slot and the next empty one turns active; once both are full nothing is active and the
- * tray hides. Tapping a full slot makes it active again (its tile stays until another replaces it).
+ * The two slots of "translate by ( , )" and which one the tray fills next (Brilliant's workspace, spec §5): the first
+ * open slot starts active; a tile fills the active slot and the next empty one turns active; once both are full nothing
+ * is active and the tray hides. Tapping a full slot makes it active again (its tile stays until another replaces it).
+ * A [fixed] slot is filled in by Brilliant (L1.2's "( , 0)") and never changes.
  */
-data class Slots(val a: Int? = null, val b: Int? = null, val active: Int? = 0) {
+data class Slots(val a: Int? = null, val b: Int? = null, val active: Int? = 0, val fixed: Set<Int> = emptySet()) {
     val full: Boolean get() = a != null && b != null
-    val empty: Boolean get() = a == null && b == null
+    /** Nothing the learner placed is left. */
+    val empty: Boolean get() = (0..1).all { it in fixed || this[it] == null }
     val trayShown: Boolean get() = active != null
     val move: Node? get() = if (full) Node(a!!, b!!) else null
     operator fun get(i: Int): Int? = if (i == 0) a else b
@@ -25,11 +27,19 @@ data class Slots(val a: Int? = null, val b: Int? = null, val active: Int? = 0) {
     fun place(v: Int): Slots {
         val i = active ?: return this
         val next = if (i == 0) copy(a = v) else copy(b = v)
-        val nextActive = listOf(0, 1).firstOrNull { it != i && next[it] == null }
+        val nextActive = listOf(0, 1).firstOrNull { it != i && it !in fixed && next[it] == null }
         return next.copy(active = nextActive)
     }
 
-    fun select(i: Int): Slots = copy(active = i)
+    fun select(i: Int): Slots = if (i in fixed) this else copy(active = i)
+
+    companion object {
+        /** A page's slots before any tile: Brilliant's given values in, the first open slot active. */
+        fun start(p: LessonPage): Slots {
+            val fixed = setOfNotNull(if (p.fixedX != null) 0 else null, if (p.fixedY != null) 1 else null)
+            return Slots(p.fixedX, p.fixedY, (0..1).firstOrNull { it !in fixed }, fixed)
+        }
+    }
 }
 
 enum class Phase { Idle, Correct, Wrong }
@@ -49,15 +59,14 @@ sealed interface Screen {
  * verdict per item, the score, review, retry and the end card. Grading, sparks, praise order and the tile flow live
  * here so the JVM tests check them without a screen. Values are snapshot state, so the screen redraws on change.
  */
-class LessonFlow(
-    val pages: List<LessonPage> = L11.pages,
-    val skill: List<LessonPage> = L11.skill,
-) {
+class LessonFlow(val lesson: LessonContent = L11) {
+    val pages: List<LessonPage> = lesson.pages
+    val skill: List<LessonPage> = lesson.skill
     var screen by mutableStateOf<Screen>(Screen.Page(0)); private set
     var phase by mutableStateOf(Phase.Idle); private set
     /** The drag page's point (a grid node); null = still at its start. */
     var dragAt by mutableStateOf<Node?>(null); private set
-    var slots by mutableStateOf(Slots()); private set
+    var slots by mutableStateOf(Slots.start(lesson.pages[0])); private set
     var sparks by mutableIntStateOf(0); private set
     /** "+15" shows once per page, on its first right answer. */
     var sparkBurst by mutableIntStateOf(0); private set
@@ -87,18 +96,22 @@ class LessonFlow(
 
     val inSkill: Boolean get() = screen is Screen.Skill
     val canGoBack: Boolean get() = (screen as? Screen.Page)?.let { it.i > 0 } ?: false
-    val locked: Boolean get() = phase != Phase.Idle || screen is Screen.Skill && skillResults[(screen as Screen.Skill).j] != null
+    /** Checked: a verdict shows (lesson pages, review) or the skill item was answered (no verdict there). */
+    val answered: Boolean get() = phase != Phase.Idle || screen is Screen.Skill && skillResults[(screen as Screen.Skill).j] != null
+    /** The machines are flying to where the numbers sent them; the board waits for them before it grades (Check). */
+    var flying by mutableStateOf(false)
+    val locked: Boolean get() = answered || flying
 
     /** Check is live once the board changed (Brilliant greys it out on an untouched board). */
     val canCheck: Boolean get() {
         val p = page ?: return false
-        return phase == Phase.Idle && when (p.kind) {
+        return phase == Phase.Idle && !flying && when (p.kind) {
             PageKind.Drag -> dragAt != null && dragAt != p.points[0]
             PageKind.Translate -> slots.full
             else -> false
         }
     }
-    val canStartOver: Boolean get() = phase == Phase.Idle && when (page?.kind) {
+    val canStartOver: Boolean get() = phase == Phase.Idle && !flying && when (page?.kind) {
         PageKind.Drag -> dragAt != null && dragAt != page!!.points[0]
         PageKind.Translate -> !slots.empty
         else -> false
@@ -115,7 +128,7 @@ class LessonFlow(
     fun dropAt(n: Node) { if (!locked) dragAt = n }
     fun tapTile(v: Int) { if (!locked) slots = slots.place(v) }
     fun tapSlot(i: Int) { if (!locked) slots = slots.select(i) }
-    fun startOver() { if (!locked) { dragAt = null; slots = Slots() } }
+    fun startOver() { if (!locked) { dragAt = null; slots = page?.let { Slots.start(it) } ?: Slots() } }
 
     /** Is the board right? Brilliant grades the landing: the dragged node, or the slots' translation. */
     fun isRight(p: LessonPage = page!!): Boolean = when (p.kind) {
@@ -178,15 +191,16 @@ class LessonFlow(
 
     private fun show(s: Screen) {
         screen = s
+        flying = false
         phase = Phase.Idle
         verdict = null
         whyOpen = false
         dragAt = null
-        slots = Slots()
+        slots = page?.let { Slots.start(it) } ?: Slots()
         if (s is Screen.Review) {
             // The missed item comes back as the learner left it, in its wrong colours, until Try again.
             val j = reviewQueue[s.k]
-            slots = (skillAnswers[j] ?: Slots()).copy(active = null).let { if (it.empty) Slots() else it }
+            slots = (skillAnswers[j] ?: Slots.start(skill[j])).copy(active = null).let { if (it.empty) Slots.start(skill[j]) else it }
             phase = Phase.Wrong
         }
     }

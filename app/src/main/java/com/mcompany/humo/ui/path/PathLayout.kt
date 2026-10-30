@@ -48,7 +48,7 @@ data class Lane(val cx: Float, val cy: Float, val rx: Float, val ry: Float) {
  * the footbridges after each unit, trees on the free ground, a low-poly cloud bank above the story and the SR-71's
  * loop. Pure numbers: tested on the JVM, the screen only draws them.
  */
-class PathLayout(val count: Int, val width: Float) {
+class PathLayout(val count: Int, val width: Float, private val bridgesAfter: List<Int> = BRIDGE_AFTER) {
     val gap = 168f
     val top = 320f
     val bottom = 220f
@@ -86,8 +86,8 @@ class PathLayout(val count: Int, val width: Float) {
         return Pt(x, y)
     }
 
-    /** Hops whose middle is a footbridge: after levels 3, 7 and 11 (the unit ends), where the river crosses. */
-    val bridgeHops: List<Int> = BRIDGE_AFTER.map { it - 1 }.filter { it + 1 < count }
+    /** Hops whose middle is a footbridge: after each unit's last island, where the river crosses. */
+    val bridgeHops: List<Int> = bridgesAfter.map { it - 1 }.filter { it + 1 < count }
 
     val bridges: List<Bridge> = bridgeHops.map { i ->
         val a = stone(i); val b = stone(i + 1)
@@ -300,7 +300,7 @@ class PathLayout(val count: Int, val width: Float) {
         const val STORY = 6
         /** How much of the cloud bank shows at the very top of the scroll (dp). */
         const val BANK_SHOWN = 250f
-        /** Levels that close a unit; the trail crosses the river on a footbridge after each. */
+        /** The default unit ends (tests and a 14-island map); the app passes the course's own. */
         val BRIDGE_AFTER = listOf(3, 7, 11)
     }
 }

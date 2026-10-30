@@ -7,18 +7,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.mcompany.humo.ui.path.Jet
 import com.mcompany.humo.ui.path.Jet.jet
 import com.mcompany.humo.ui.path.Jet.jetShadow
 import kotlin.math.atan2
@@ -58,28 +55,40 @@ internal class BoardGeo(val spec: GraphSpec, val s: Float) {
 internal fun DrawScope.graph(g: BoardGeo, text: TextMeasurer, dragging: Boolean = false) {
     val sp = g.spec
     val s = g.s
-    val o = g.px(Node(0, 0))
+    // Brilliant's axes run 30 px past the last whole number and, on a board with negatives, 20 px before the first;
+    // the grid runs half a cell past both.
+    val over = 30f / sp.cell
+    val under = 20f / sp.cell
+    val x0 = if (sp.xMin < 0) sp.xMin - 0.5f else 0f
+    val y0 = if (sp.yMin < 0) sp.yMin - 0.5f else 0f
     val gx = sp.xMax + 0.5f
     val gy = sp.yMax + 0.5f
-    for (i in 1..sp.xMax) drawLine(BoardColors.Grid, g.px(i.toFloat(), 0f), g.px(i.toFloat(), gy), 1f * s)
-    for (j in 1..sp.yMax) drawLine(BoardColors.Grid, g.px(0f, j.toFloat()), g.px(gx, j.toFloat()), 1f * s)
-    if (dragging) for (i in 0..sp.xMax) for (j in 0..sp.yMax) drawCircle(BoardColors.NodeDot, 2f * s, g.px(Node(i, j)))
-    val ax = g.px(sp.xMax + 0.78f, 0f)
-    val ay = g.px(0f, sp.yMax + 0.78f)
-    drawLine(BoardColors.Axis, o, ax, 1.5f * s)
-    drawLine(BoardColors.Axis, o, ay, 1.5f * s)
+    for (i in sp.xMin..sp.xMax) if (i != 0) drawLine(BoardColors.Grid, g.px(i.toFloat(), y0), g.px(i.toFloat(), gy), 1f * s)
+    for (j in sp.yMin..sp.yMax) if (j != 0) drawLine(BoardColors.Grid, g.px(x0, j.toFloat()), g.px(gx, j.toFloat()), 1f * s)
+    if (dragging) for (i in sp.xMin..sp.xMax) for (j in sp.yMin..sp.yMax) drawCircle(BoardColors.NodeDot, 2f * s, g.px(Node(i, j)))
+    val ax = g.px(sp.xMax + over, 0f)
+    val ay = g.px(0f, sp.yMax + over)
+    val bx = g.px(if (sp.xMin < 0) sp.xMin - under else 0f, 0f)
+    val by = g.px(0f, if (sp.yMin < 0) sp.yMin - under else 0f)
+    drawLine(BoardColors.Axis, bx, ax, 1.5f * s)
+    drawLine(BoardColors.Axis, by, ay, 1.5f * s)
     drawPath(Path().apply { moveTo(ax.x + 1f * s, ax.y); lineTo(ax.x - 10.5f * s, ax.y - 5f * s); lineTo(ax.x - 10.5f * s, ax.y + 5f * s); close() }, BoardColors.Axis)
     drawPath(Path().apply { moveTo(ay.x, ay.y - 1f * s); lineTo(ay.x - 5f * s, ay.y + 10.5f * s); lineTo(ay.x + 5f * s, ay.y + 10.5f * s); close() }, BoardColors.Axis)
-    val style = TextStyle(fontSize = (16f * s / density).sp / fontScale, color = BoardColors.Label)
-    for (i in 1..sp.xMax) {
+    val style = TextStyle(fontFamily = LessonType.Figtree, fontSize = (16f * s / density).sp / fontScale, color = BoardColors.Label)
+    for (i in sp.xMin..sp.xMax) {
+        if (i == 0) continue
         val p = g.px(i.toFloat(), 0f)
         drawLine(BoardColors.Axis, Offset(p.x, p.y - 5f * s), Offset(p.x, p.y + 5f * s), 1.5f * s)
-        if (sp.labelEvery > 0 && i % sp.labelEvery == 0) label(text, "$i", Offset(p.x, p.y + 18f * s), style)
+        if (sp.labelEvery > 0 && i % sp.labelEvery == 0) label(text, signed(i), Offset(p.x, p.y + 18f * s), style)
     }
-    for (j in 1..sp.yMax) {
+    for (j in sp.yMin..sp.yMax) {
+        if (j == 0) continue
         val p = g.px(0f, j.toFloat())
         drawLine(BoardColors.Axis, Offset(p.x - 5f * s, p.y), Offset(p.x + 5f * s, p.y), 1.5f * s)
-        if (sp.labelEvery > 0 && j % sp.labelEvery == 0) label(text, "$j", Offset(p.x - 18f * s, p.y), style)
+        if (sp.labelEvery > 0 && j % sp.labelEvery == 0) {
+            val m = text.measure(signed(j), style)
+            label(text, signed(j), Offset(p.x - 10f * s - m.size.width / 2f, p.y), style)
+        }
     }
     if (sp.names) {
         val bold = style.copy(fontWeight = FontWeight.Bold)
@@ -141,7 +150,7 @@ internal fun DrawScope.ghost(from: Offset, to: Offset, phase: Phase, s: Float) {
  * P3's figure (spec §4): two points moved by (3, 1); each start dot grey, the end dot coloured, the coloured segment
  * between them, the grey legs a then b and their dimension markers. On the fly layer the end dots are jets.
  */
-internal fun DrawScope.explainer(g: BoardGeo, page: LessonPage, text: TextMeasurer, frames: List<ImageBitmap>?) {
+internal fun DrawScope.explainer(g: BoardGeo, page: LessonPage, text: TextMeasurer, atlas: ImageBitmap?) {
     graph(g, text)
     val s = g.s
     val legStyle = TextStyle(fontSize = (16f * s / density).sp / fontScale, color = Color(0xFF808080), fontWeight = FontWeight.Medium)
@@ -170,31 +179,35 @@ internal fun DrawScope.explainer(g: BoardGeo, page: LessonPage, text: TextMeasur
         drawRect(Color.White, Offset(mb.x - 9f * s, mb.y - 9f * s), Size(18f * s, 18f * s))
         label(text, "b", mb, legStyle)
         drawCircle(BoardColors.Start, 5f * s, a)
-        if (frames == null) drawCircle(colour, 5f * s, b)
-        else jetAt(frames, b, atan2(b.y - a.y, b.x - a.x), g.cell * 0.9f, flames = 0f, t = 0f, motion = false)
+        if (atlas == null) drawCircle(colour, 5f * s, b)
+        else jetAt(atlas, b, atan2(b.y - a.y, b.x - a.x), g.cell * 0.9f, flames = 0f, t = 0f, motion = false)
     }
     drawCircle(BoardColors.Axis, 5f * s, g.px(Node(0, 0)))
 }
 
-/** The SR-71 as the point: [len] its nose-to-tail length in px; the sprite frame is 1/0.857 of that. */
-internal fun DrawScope.jetAt(frames: List<ImageBitmap>, c: Offset, heading: Float, len: Float, flames: Float, t: Float, motion: Boolean, shadow: Boolean = true) {
+/** The SR-71 as the point: [len] its nose-to-tail length in px; the sprite frame is 1/0.857 of that. [alt] 0 ... 1 lifts it. */
+internal fun DrawScope.jetAt(atlas: ImageBitmap, c: Offset, heading: Float, len: Float, flames: Float, t: Float, motion: Boolean, shadow: Boolean = true, alt: Float = 0f) {
     val frame = len / 0.857f
-    if (shadow) jetShadow(frames, c, frame, heading, 0f, 0f, 0.2f, len / 60f)
-    jet(frames, c, frame, heading, 0f, 0f, t, motion, flames)
+    if (shadow) jetShadow(atlas, c, frame, heading, 0f, 0f, 0.2f + 0.8f * alt, len / 60f)
+    jet(atlas, c, frame * (1f + 0.45f * alt), heading, 0f, 0f, t, motion, flames)
 }
 
-/** The armed jet (tap-then-tap): a dashed blue ring around it, turning slowly. */
-internal fun DrawScope.armedRing(c: Offset, r: Float, turn: Float, s: Float) {
-    rotate(turn, c) {
-        drawCircle(Color(0xFF375CE3), r, c, style = Stroke(2f * s, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f * s, 5f * s))))
-    }
-}
-
-/** A smoke puff list: each (position, age 0..1). */
-internal fun DrawScope.puffs(list: List<Pair<Offset, Float>>, cell: Float) {
-    for ((p, age) in list) drawCircle(Color(0xFF787C84), cell * 0.16f * (0.5f + 1.7f * age), p, alpha = 0.32f * (1f - age))
+/** The armed jet (tap-then-tap): one thin blue ring around it. */
+internal fun DrawScope.armedRing(c: Offset, r: Float, s: Float) {
+    drawCircle(Color(0x8C375CE3), r, c, style = Stroke(1.5f * s))
 }
 
 internal fun dist(a: Offset, b: Offset) = hypot(a.x - b.x, a.y - b.y)
 
-internal val JetFrames get() = Jet.Frames
+/**
+ * Brilliant's lesson face: Figtree (SIL OFL 1.1, docs/assets/fonts/Figtree-OFL.txt), the face their lesson text uses,
+ * bundled as one variable font so no first-launch download. Their widget face (CoFo Brilliant) is theirs and never ships.
+ */
+internal object LessonType {
+    private fun f(w: androidx.compose.ui.text.font.FontWeight) = androidx.compose.ui.text.font.Font(
+        com.mcompany.humo.R.font.figtree, w, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(w, androidx.compose.ui.text.font.FontStyle.Normal),
+    )
+    val Figtree = androidx.compose.ui.text.font.FontFamily(
+        f(FontWeight.Normal), f(FontWeight.Medium), f(FontWeight.SemiBold), f(FontWeight.Bold), f(FontWeight.ExtraBold),
+    )
+}

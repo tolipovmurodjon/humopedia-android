@@ -1,7 +1,6 @@
 package com.mcompany.humo.ui
 
 import com.mcompany.humo.data.course.CoordinateTransformations
-import com.mcompany.humo.data.course.firstLessonLabel
 import com.mcompany.humo.ui.path.HeadingSpring
 import com.mcompany.humo.ui.path.Jet
 import com.mcompany.humo.ui.path.PathLayout
@@ -16,14 +15,20 @@ import kotlin.math.abs
 class PathLayoutTest {
     private val layout = PathLayout(14, 390f)
 
-    @Test fun `course 15 has the 14 levels of the curriculum, in order`() {
-        val levels = CoordinateTransformations.levels
+    @Test fun `course 15 is the real course - 14 units, 62 lessons, in Brilliant's order`() {
+        val lessons = CoordinateTransformations.lessons
         assertEquals("trans", CoordinateTransformations.id)
-        assertEquals((1..14).toList(), levels.map { it.n })
-        assertEquals("Translations", levels.first().title)
-        assertEquals("Stretching", levels.last().title)
-        assertEquals("Lesson 1.1 · Translating Points", levels.first().firstLessonLabel())
-        assertEquals("Lesson 10.1 · Congruence", levels[9].firstLessonLabel())
+        assertEquals(62, lessons.size)
+        assertEquals((1..62).toList(), lessons.map { it.n })
+        assertEquals(14, lessons.last().unit)
+        assertEquals("1.1" to "Translating Points", lessons[0].code to lessons[0].title)
+        assertEquals("1.2" to "Negative Translations", lessons[1].code to lessons[1].title)
+        assertEquals("10.1" to "Congruence", lessons.first { it.unit == 10 }.let { it.code to it.title })
+        assertEquals("14.4" to "Transforming Points Into Targets", lessons.last().code to lessons.last().title)
+        assertEquals(listOf("1.1", "1.2"), lessons.filter { it.built }.map { it.code })
+        // a footbridge after each unit's last lesson: 1.6, 2.4, 3.4, ...
+        assertEquals(13, CoordinateTransformations.unitEnds.size)
+        assertEquals(listOf(6, 10, 14), CoordinateTransformations.unitEnds.take(3))
     }
 
     @Test fun `level 1 is at the bottom and the river climbs`() {
@@ -185,27 +190,26 @@ class PathLayoutTest {
         assertEquals(180f, abs(deg(prev)), 2f)
     }
 
-    @Test fun `the jet crossfades the two nearest frames by the fractional heading`() {
+    @Test fun `the jet turns only the rest of the heading after its nearest of 64 frames`() {
         val pi = Math.PI.toFloat()
-        val (k0, k1, w) = Jet.blend(-pi / 2f + 11.25f * pi / 180f)
-        assertEquals(0, k0); assertEquals(1, k1); assertEquals(0.5f, w, 0.001f)
-        val (a0, a1, aw) = Jet.blend(-pi / 2f - 5.625f * pi / 180f)
-        assertEquals(15, a0); assertEquals(0, a1); assertEquals(0.75f, aw, 0.001f)
+        assertEquals(0f, Jet.rest(-pi / 2f), 0.001f)
+        assertEquals(1f, Jet.rest(-pi / 2f + 1f * pi / 180f), 0.01f)
+        assertTrue(abs(Jet.rest(-pi / 2f + 1f)) <= 2.8125f + 0.001f)
         assertTrue(Jet.SHADOW_ALPHA <= 0.12f)
     }
 
     private fun deg(r: Float) = Math.toDegrees(HeadingSpring.wrap(r).toDouble()).toFloat()
 
-    @Test fun `the jet picks the sprite frame facing its heading, clockwise from nose-up`() {
+    @Test fun `the jet picks the atlas frame facing its heading, clockwise from nose-up`() {
         val pi = Math.PI.toFloat()
         assertEquals(0, Jet.frameOf(-pi / 2f))
-        assertEquals(2, Jet.frameOf(-pi / 4f))
-        assertEquals(4, Jet.frameOf(0f))
-        assertEquals(8, Jet.frameOf(pi / 2f))
-        assertEquals(12, Jet.frameOf(pi))
-        assertEquals(12, Jet.frameOf(-pi))
-        assertEquals(15, Jet.frameOf(-pi / 2f - 0.39f))
-        assertEquals(16, Jet.Frames.size)
+        assertEquals(8, Jet.frameOf(-pi / 4f))
+        assertEquals(16, Jet.frameOf(0f))
+        assertEquals(32, Jet.frameOf(pi / 2f))
+        assertEquals(48, Jet.frameOf(pi))
+        assertEquals(48, Jet.frameOf(-pi))
+        assertEquals(63, Jet.frameOf(-pi / 2f - 0.1f))
+        assertEquals(64, Jet.HEADINGS)
     }
 
     @Test fun `the map fits a 360 dp phone too`() {

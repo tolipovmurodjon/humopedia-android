@@ -18,8 +18,11 @@ private val Context.progress by preferencesDataStore(name = "progress")
  */
 @Singleton
 class ProgressStore @Inject constructor(@ApplicationContext private val context: Context) {
-    /** The level the learner is on (1-based). The demo starts at 3, Boss's likely start (NATIVE-BRIEF N0). */
-    val currentLevel: Flow<Int> = context.progress.data.map { it[CURRENT_LEVEL] ?: DEMO_START_LEVEL }
+    /**
+     * The lesson the learner is on (1-based place on the path; 1 = lesson 1.1). A new key since alpha07: the path's
+     * islands became lessons, so the old level number (demo 3) must not carry over.
+     */
+    val currentLesson: Flow<Int> = context.progress.data.map { it[CURRENT_LESSON] ?: 1 }
 
     /** Gems earned (shown in the top bar). Nothing earns them yet, so a new learner honestly has 0. */
     val gems: Flow<Int> = context.progress.data.map { it[GEMS] ?: 0 }
@@ -27,32 +30,17 @@ class ProgressStore @Inject constructor(@ApplicationContext private val context:
     /** Days in a row with a finished lesson (the flame in the top bar); 0 until lessons count it. */
     val streakDays: Flow<Int> = context.progress.data.map { it[STREAK_DAYS] ?: 0 }
 
-    suspend fun setCurrentLevel(level: Int) {
-        context.progress.edit { it[CURRENT_LEVEL] = level }
-    }
-
-    /** Lessons finished in [level] (shown on its island sheet later). */
-    fun lessonsDone(level: Int): Flow<Int> = context.progress.data.map { it[doneKey(level)] ?: 0 }
-
-    /**
-     * A finished lesson: one more lesson done in [level] (at most [lessons]), its sparks added to the gems, and when the
-     * current level's last lesson is done the next level becomes current.
-     */
-    suspend fun lessonDone(level: Int, lessons: Int, sparks: Int) {
+    /** A finished lesson: the next one opens (never moves back on a replay) and its sparks are added to the gems. */
+    suspend fun lessonDone(n: Int, sparks: Int) {
         context.progress.edit {
-            val done = ((it[doneKey(level)] ?: 0) + 1).coerceAtMost(lessons)
-            it[doneKey(level)] = done
+            it[CURRENT_LESSON] = maxOf(it[CURRENT_LESSON] ?: 1, n + 1)
             it[GEMS] = (it[GEMS] ?: 0) + sparks
-            val current = it[CURRENT_LEVEL] ?: DEMO_START_LEVEL
-            if (done >= lessons && level == current) it[CURRENT_LEVEL] = current + 1
         }
     }
 
     companion object {
-        const val DEMO_START_LEVEL = 3
-        private val CURRENT_LEVEL = intPreferencesKey("trans.current_level")
+        private val CURRENT_LESSON = intPreferencesKey("trans.current_lesson")
         private val GEMS = intPreferencesKey("gems")
         private val STREAK_DAYS = intPreferencesKey("streak_days")
-        private fun doneKey(level: Int) = intPreferencesKey("trans.done.$level")
     }
 }

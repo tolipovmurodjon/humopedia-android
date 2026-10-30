@@ -54,7 +54,6 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -67,7 +66,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -79,7 +77,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mcompany.humo.data.course.Level
+import com.mcompany.humo.data.course.Lesson
 import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.Pane
 import com.mcompany.humo.ui.glass.TabIcons
@@ -105,7 +103,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Composable
-fun PathRoute(padding: PaddingValues, onOpenLevel: (Level) -> Unit, vm: PathViewModel = hiltViewModel()) {
+fun PathRoute(padding: PaddingValues, onOpenLevel: (Lesson) -> Unit, vm: PathViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     PathScreen(state, padding, onOpenLevel)
 }
@@ -132,11 +130,11 @@ private const val JET_FRAME = 84f
 fun PathScreen(
     state: PathUiState?,
     padding: PaddingValues,
-    onOpenLevel: (Level) -> Unit,
+    onOpenLevel: (Lesson) -> Unit,
     scroll: ScrollState = rememberScrollState(),
     motion: Boolean = rememberSystemMotion(),
 ) {
-    val count = state?.course?.levels?.size ?: 14
+    val count = state?.course?.lessons?.size ?: 14
     val current = state?.current ?: 1
     var sheetLevel by rememberSaveable { mutableStateOf<Int?>(null) }
     var coursesOpen by rememberSaveable { mutableStateOf(false) }
@@ -151,7 +149,7 @@ fun PathScreen(
             if (motion) rollAt.floatValue = 0.6f
         }
     }
-    val start: (Level) -> Unit = { level ->
+    val start: (Lesson) -> Unit = { level ->
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
         sheetLevel = null
         lessonOpen = true
@@ -159,7 +157,7 @@ fun PathScreen(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val layout = remember(maxWidth) { PathLayout(count, maxWidth.value) }
+        val layout = remember(maxWidth, count) { PathLayout(count, maxWidth.value, state?.course?.unitEnds ?: PathLayout.BRIDGE_AFTER) }
         val cut = layout.cut(current)
         val density = LocalDensity.current
         val viewport = with(density) { constraints.maxHeight.toDp().value }
@@ -177,13 +175,14 @@ fun PathScreen(
                 Ground(layout, current, cut)
                 if (state != null) {
                     val top = layout.storyTop(current)
-                    state.course.levels.forEachIndexed { i, level ->
+                    state.course.lessons.forEachIndexed { i, level ->
                         // Islands under the bank are not drawn and cannot be tapped: the story ends at the clouds.
                         if (i > top) return@forEachIndexed
                         val at = layout.stone(i).let { Pt(it.x, it.y - cut) }
                         val stone = stoneState(level.n, current)
                         Island(level, stone, at, seconds, motion, inView = { (at.y - scroll.value / density.density) in 60f..(visible - 40f) }) {
-                            if (stone == StoneState.Current) {
+                            // A built current lesson starts with one tap; anything else opens its sheet.
+                            if (stone == StoneState.Current && level.built) {
                                 start(level)
                             } else {
                                 haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -218,15 +217,15 @@ fun PathScreen(
         ) { CourseSheet(state) }
 
         // Remember the last level so the sheet keeps its words while it slides away.
-        var shown by remember { mutableStateOf<Level?>(null) }
-        sheetLevel?.let { n -> shown = state?.course?.levels?.firstOrNull { it.n == n } }
+        var shown by remember { mutableStateOf<Lesson?>(null) }
+        sheetLevel?.let { n -> shown = state?.course?.lessons?.firstOrNull { it.n == n } }
         AnimatedVisibility(
             sheetLevel != null && state != null,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding() + 8.dp),
             enter = fadeIn() + slideInVertically(spring(dampingRatio = 0.86f, stiffness = 420f)) { it / 2 },
             exit = fadeOut() + slideOutVertically { it / 2 },
         ) {
-            shown?.let { level -> LevelSheet(level, stoneState(level.n, current), current) { start(level) } }
+            shown?.let { level -> LevelSheet(level, stoneState(level.n, current), state?.course?.lessons?.getOrNull(current - 1)) { start(level) } }
         }
     }
 }
@@ -304,10 +303,10 @@ private fun Ground(layout: PathLayout, current: Int, cut: Float) {
 /**
  * One level's island. No words on the map: the state is in the picture (done = moss + a tick that sparkles as it comes
  * into view, current = sunny gold + a waving flag + a breathing ring, locked = slate + padlock). TalkBack
- * reads "Level 3, Rotations, current".
+ * reads "Lesson 1.2, Negative Translations, current".
  */
 @Composable
-private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float>, motion: Boolean, inView: () -> Boolean, onTap: () -> Unit) {
+private fun Island(level: Lesson, stone: StoneState, at: Pt, seconds: State<Float>, motion: Boolean, inView: () -> Boolean, onTap: () -> Unit) {
     val w = if (stone == StoneState.Current) CurrentW else IslandW
     val h = w * ISLAND_H
     val density = LocalDensity.current
@@ -330,7 +329,7 @@ private fun Island(level: Level, stone: StoneState, at: Pt, seconds: State<Float
             )
             .pressScale(interaction)
             .clickable(interaction, null, role = Role.Button, onClick = onTap)
-            .clearAndSetSemantics { contentDescription = "Level ${level.n}, ${level.title}, $status"; role = Role.Button },
+            .clearAndSetSemantics { contentDescription = "Lesson ${level.code}, ${level.title}, $status"; role = Role.Button },
     ) {
         if (stone == StoneState.Current) {
             // The one obvious "tap me": a mint ring that breathes out from under the island every 1.6 s.
@@ -412,7 +411,7 @@ private fun Sky(
     seconds: State<Float>, motion: Boolean, rollAt: State<Float>,
 ) {
     val rows = remember(layout, current) { layout.bank(current) }
-    val frames = Jet.Frames.map { ImageBitmap.imageResource(it) }
+    val frames = rememberJetAtlas()
     // The jet's own lane, fixed in the world for this level and screen (it keeps its place when the child scrolls).
     // The search tries a few thousand ellipses (~10-50 ms), so on a phone it runs off the main thread once per open.
     val still = remember(layout, current, visible, motion) { if (motion) null else layout.lane(current, visible) }
@@ -556,28 +555,32 @@ private fun CourseSheet(state: PathUiState?) {
     }
 }
 
-/** The sheet a tap on an island opens: the level's name, how many lessons, and one big button (or why it is shut). */
+/**
+ * The sheet a tap on an island opens: the unit, the lesson's name, and one big button (or why it is shut). A lesson that
+ * is not built yet says so honestly instead of opening an empty screen.
+ */
 @Composable
-private fun LevelSheet(level: Level, stone: StoneState, current: Int, onGo: () -> Unit) {
+private fun LevelSheet(lesson: Lesson, stone: StoneState, current: Lesson?, onGo: () -> Unit) {
     Pane(Modifier.padding(horizontal = 16.dp).widthIn(max = 440.dp).fillMaxWidth(), radius = 28.dp) {
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("${level.n}-daraja", style = MaterialTheme.typography.labelSmall, color = Glass.PrimaryInk, fontWeight = FontWeight.SemiBold)
-            Text(level.title, style = MaterialTheme.typography.headlineSmall, color = Glass.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text("${lesson.unit}-daraja · ${lesson.unitTitle}", style = MaterialTheme.typography.labelSmall, color = Glass.PrimaryInk, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${lesson.code} ${lesson.title}", style = MaterialTheme.typography.headlineSmall, color = Glass.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
-                when (stone) {
-                    StoneState.Done -> "${level.lessons} ta dars · tugatilgan"
-                    StoneState.Current -> "${level.lessons} ta dars"
-                    StoneState.Locked -> "Avval $current-darajani tugating."
+                when {
+                    stone == StoneState.Locked -> "Avval ${current?.code ?: ""}-darsni tugating."
+                    !lesson.built -> "Bu dars tez orada qoʻshiladi."
+                    stone == StoneState.Done -> "Tugatilgan"
+                    else -> "Keyingi dars"
                 },
                 style = MaterialTheme.typography.bodyLarge, color = Glass.Muted,
             )
             Spacer(Modifier.height(12.dp))
-            if (stone != StoneState.Locked) {
+            if (stone != StoneState.Locked && lesson.built) {
                 BigButton(if (stone == StoneState.Done) "Takrorlash" else "Davom etish", onGo)
             } else {
                 // The button's slot is kept, so the sheet is one height for every island.
                 Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(28.dp)).background(Glass.Ink.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
-                    Text("Yopiq", style = MaterialTheme.typography.labelLarge, color = Glass.Muted)
+                    Text(if (stone == StoneState.Locked) "Yopiq" else "Tez orada", style = MaterialTheme.typography.labelLarge, color = Glass.Muted)
                 }
             }
         }

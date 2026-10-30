@@ -14,7 +14,7 @@ import kotlin.math.sin
  * a public repo). Each matches the character of Brilliant's cue as measured (docs/qa/l11-spec.md §9): length, pitch
  * direction and a soft envelope. Clean tones only, no noise, no buzz (Boss: "I hate buzzy sounds").
  */
-enum class Cue { Correct, Incorrect, Tick, Toggle, Start, Complete }
+enum class Cue { Correct, Incorrect, Tick, Toggle, Start, Complete, Whoosh, Boom }
 
 object LessonSounds {
     private const val RATE = 44_100
@@ -35,6 +35,50 @@ object LessonSounds {
         Cue.Toggle -> listOf(Note(180.0, 0.0, 0.05, 0.6, rise = 0.002, to = 120.0))
         Cue.Start -> listOf(523.3, 659.3, 784.0, 1046.5).mapIndexed { i, f -> Note(f, i * 0.1, 0.3, 0.8) }
         Cue.Complete -> listOf(523.3, 659.3, 784.0, 1046.5, 1318.5).mapIndexed { i, f -> Note(f, i * 0.11, if (i == 4) 0.9 else 0.35, 0.8) }
+        Cue.Whoosh, Cue.Boom -> emptyList()
+    }
+
+    /**
+     * The take-off whoosh (fly-layer.js whoosh): noise through a band-pass that sweeps down (900 -> 320 Hz over 0.6 s),
+     * a soft 80 ms rise and a long fall; [big] (the sound barrier) is lower, longer and adds a low thump. Quiet, never a tone.
+     */
+    internal fun whooshPcm(big: Boolean): ShortArray {
+        val len = if (big) 1.1 else 0.6
+        val out = DoubleArray((RATE * len).toInt())
+        val rnd = java.util.Random(7)
+        val f0 = if (big) 1400.0 else 900.0
+        val f1 = if (big) 260.0 else 320.0
+        val peak = if (big) 0.16 else 0.07
+        var low = 0.0
+        var band = 0.0
+        for (i in out.indices) {
+            val t = i.toDouble() / RATE
+            val f = 2 * sin(PI * (f0 * Math.pow(f1 / f0, t / len)) / RATE)
+            val high = (rnd.nextDouble() * 2 - 1) - low - 1.25 * band
+            band += f * high
+            low += f * band
+            val env = if (t < 0.08) 0.0001 * Math.pow(peak / 0.0001, t / 0.08) else peak * Math.pow(0.0001 / peak, (t - 0.08) / (len - 0.08))
+            out[i] = band * env
+        }
+        var top = out.maxOf { abs(it) }.coerceAtLeast(1e-9)
+        for (i in out.indices) out[i] = out[i] / top * peak * 4
+        if (big) {
+            val s = (0.25 * RATE).toInt()
+            var phase = 0.0
+            for (i in s until minOf(out.size, (0.75 * RATE).toInt())) {
+                val t = (i - s).toDouble() / RATE
+                phase += 2 * PI * (90.0 * Math.pow(38.0 / 90.0, t / 0.35).coerceAtLeast(38.0 / 90.0 * 0.5)) / RATE
+                val env = if (t < 0.03) t / 0.03 else exp(ln(0.001) * ((t - 0.03) / 0.47).coerceAtMost(1.0))
+                out[i] += 0.22 * 4 * env * sin(phase)
+            }
+        }
+        top = out.maxOf { abs(it) }.coerceAtLeast(1e-9)
+        val loud = if (big) 0.9 else 0.5
+        for (i in out.indices) out[i] = out[i] / top * loud
+        // a short fade-out so the last sample is silence
+        val fade = (0.02 * RATE).toInt()
+        for (i in 0 until fade) out[out.size - 1 - i] *= i.toDouble() / fade
+        return ShortArray(out.size) { (out[it] * 0.9 * Short.MAX_VALUE).toInt().toShort() }
     }
 
     /** The cue as 16-bit mono PCM, normalised to 0.9 of full scale times the cue's loudest note. */
@@ -65,7 +109,7 @@ object LessonSounds {
         if (muted) return
         runCatching {
             val t = tracks[cue] ?: run {
-                val data = pcm(cue)
+                val data = if (cue == Cue.Whoosh) whooshPcm(false) else if (cue == Cue.Boom) whooshPcm(true) else pcm(cue)
                 AudioTrack.Builder()
                     .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
                     .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())

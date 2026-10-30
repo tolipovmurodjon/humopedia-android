@@ -1,7 +1,13 @@
 package com.mcompany.humo.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
@@ -20,13 +26,21 @@ import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.mcompany.humo.ui.glass.GlassTheme
+import com.mcompany.humo.ui.lesson.Craft
+import com.mcompany.humo.ui.lesson.Flying
 import com.mcompany.humo.ui.lesson.L11
+import com.mcompany.humo.ui.lesson.L12
+import com.mcompany.humo.ui.lesson.LessonContent
 import com.mcompany.humo.ui.lesson.LessonFlow
 import com.mcompany.humo.ui.lesson.LessonPlayer
 import com.mcompany.humo.ui.lesson.LessonTheme
 import com.mcompany.humo.ui.lesson.Node
 import com.mcompany.humo.ui.lesson.PageKind
 import com.mcompany.humo.ui.lesson.Screen
+import com.mcompany.humo.ui.lesson.drawPuffs
+import com.mcompany.humo.ui.lesson.jetAt
+import com.mcompany.humo.ui.path.rememberJetAtlas
+import java.util.Random
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -51,7 +65,7 @@ class LessonScreenshotTest {
         compose.setContent {
             val d = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, flow = flow, motion = false) }
+                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = false) }
             }
         }
         compose.waitForIdle()
@@ -61,11 +75,11 @@ class LessonScreenshotTest {
     private fun act(block: () -> Unit) { compose.runOnIdle(block); compose.waitForIdle() }
 
     /** Every page: start, then (graded pages) a wrong answer, then the right one. */
-    private fun everyPage(theme: LessonTheme, tag: String, fontScale: Float = 1f, pages: IntRange = 0..6) {
-        val flow = player(theme, fontScale = fontScale)
-        for (i in pages) {
+    private fun everyPage(theme: LessonTheme, tag: String, fontScale: Float = 1f, lesson: LessonContent = L11) {
+        val flow = player(theme, LessonFlow(lesson), fontScale = fontScale)
+        for (i in lesson.pages.indices) {
             act { flow.goTo(Screen.Page(i)) }
-            val p = L11.pages[i]
+            val p = lesson.pages[i]
             shot("$tag-${p.id}-start")
             when (p.kind) {
                 PageKind.Drag -> {
@@ -75,11 +89,12 @@ class LessonScreenshotTest {
                     shot("$tag-${p.id}-correct")
                 }
                 PageKind.Translate -> {
-                    act { flow.tapTile(p.move.x) }
-                    shot("$tag-${p.id}-one-tile")
-                    act { flow.tapTile(p.move.y + 1); flow.check() }
+                    // a wrong try: the open slot(s) one off the answer (L1.1: the second tile; L1.2: the one open slot)
+                    fun fill(dx: Int, dy: Int) { if (p.fixedX == null) flow.tapTile(p.move.x + dx); if (p.fixedY == null) flow.tapTile(p.move.y + dy) }
+                    if (p.fixedX == null && p.fixedY == null) { act { flow.tapTile(p.move.x) }; shot("$tag-${p.id}-one-tile"); act { flow.tapTile(p.move.y + 1); flow.check() } }
+                    else act { fill(if (p.move.x > 0) -1 else 1, if (p.move.y > 0) -1 else 1); flow.check() }
                     shot("$tag-${p.id}-wrong")
-                    act { flow.tryAgain(); flow.startOver(); flow.tapTile(p.move.x); flow.tapTile(p.move.y); flow.check() }
+                    act { flow.tryAgain(); flow.startOver(); fill(0, 0); flow.check() }
                     shot("$tag-${p.id}-correct")
                 }
                 else -> Unit
@@ -95,6 +110,16 @@ class LessonScreenshotTest {
     @Test fun everyPageSmallPhone() = everyPage(LessonTheme.Fly, "360x800")
 
     @Test fun everyPageBigFont() = everyPage(LessonTheme.Fly, "font150", fontScale = 1.5f)
+
+    @Test fun l12EveryPagePlain() = everyPage(LessonTheme.Plain, "l12-plain", lesson = L12)
+
+    @Test fun l12EveryPageFly() = everyPage(LessonTheme.Fly, "l12-fly", lesson = L12)
+
+    @Config(qualifiers = "w360dp-h800dp-xxhdpi")
+    @Test fun l12SmallPhoneBigFont() = everyPage(LessonTheme.Fly, "l12-360-font150", fontScale = 1.5f, lesson = L12)
+
+    @Config(qualifiers = "+night")
+    @Test fun darkPhone() = everyPage(LessonTheme.Fly, "dark", lesson = L12)
 
     @Test fun dragThePointWithAFinger() {
         val flow = player(LessonTheme.Plain)
@@ -195,6 +220,28 @@ class LessonScreenshotTest {
         compose.onNodeWithText("Continue").performClick()
         compose.waitForIdle()
         assertEquals(0, sparks)
+    }
+
+    /** Take-off in three steps (altitude 0, 0.5, 1): the jet grows and its shadow drops away; two afterburners, two smoke trails. */
+    @Test fun climbingJetWithTwinSmoke() {
+        compose.setContent {
+            val atlas = rememberJetAtlas()
+            Box(Modifier.fillMaxSize().background(Color.White).drawBehind {
+                val len = 70f * density
+                for ((i, alt) in listOf(0f, 0.5f, 1f).withIndex()) {
+                    val craft = Craft(Offset(size.width * (i + 0.5f) / 3f, size.height * 0.4f), 35f)
+                    craft.alt = alt
+                    craft.speed = 1f
+                    val rnd = Random(2)
+                    for (k in 0 until 6) { craft.pos = craft.pos + Offset(0f, 14f * density); Flying.puff(craft, 100L * (k + 1), len / 0.857f, true, rnd) }
+                    craft.pos = Offset(size.width * (i + 0.5f) / 3f, size.height * 0.4f)
+                    drawPuffs(craft.puffs, 700L, len * 0.07f)
+                    jetAt(atlas, craft.pos, craft.heading, len, flames = 1f, t = 0f, motion = false, alt = alt)
+                }
+            })
+        }
+        compose.waitForIdle()
+        shot("fly-climb-and-smoke")
     }
 
     @Test fun leavingAsksFirst() {

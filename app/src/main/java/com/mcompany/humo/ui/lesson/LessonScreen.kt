@@ -44,7 +44,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -61,6 +63,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -84,6 +87,10 @@ import com.mcompany.humo.ui.glass.Glass
 import com.mcompany.humo.ui.glass.pressScale
 import com.mcompany.humo.ui.path.rememberSystemMotion
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.pointerInput
 
 /** Brilliant's lesson chrome colours (spec §1-2). */
 private object Chrome {
@@ -110,7 +117,7 @@ private object Chrome {
 enum class LessonTheme { Plain, Fly }
 
 /**
- * Lesson L1.1 "Translating Points", rebuilt natively 1:1 with Brilliant (PHASE-LESSON-L11): the same seven pages, texts,
+ * A Brilliant lesson (L1.1 "Translating Points", L1.2 "Negative Translations"), rebuilt natively 1:1: the same pages, texts,
  * numbers, grading, Check / Why? / Try again / Start over / Continue, the skill check, the score and the end card, laid
  * out to the numbers in docs/qa/l11-spec.md. On [LessonTheme.Fly] every point is Boss's SR-71 (fly-layer.js).
  * [onFinish] gets the sparks earned; [onExit] leaves without finishing.
@@ -122,7 +129,8 @@ fun LessonPlayer(
     onExit: () -> Unit,
     onFinish: (sparks: Int) -> Unit,
     theme: LessonTheme = LessonTheme.Fly,
-    flow: LessonFlow = remember { LessonFlow() },
+    lesson: LessonContent = L11,
+    flow: LessonFlow = remember(lesson) { LessonFlow(lesson) },
     motion: Boolean = rememberSystemMotion(),
 ) {
     var leaving by rememberSaveable { mutableStateOf(false) }
@@ -132,14 +140,23 @@ fun LessonPlayer(
         when { flow.phase == Phase.Correct && !flow.inSkill -> Color(0x213FCE69); flow.phase == Phase.Wrong && flow.screen !is Screen.Review -> Color(0x2EF6D545); else -> Color.Transparent },
         tween(350), label = "tint",
     )
-    Box(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }) {
+    // A tap anywhere boosts the Mach 3 pass at the end; the root only counts it (the Initial pass), the buttons still get it.
+    val taps = remember { mutableIntStateOf(0) }
+    Box(
+        Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) { if (awaitPointerEvent(PointerEventPass.Initial).changes.any { it.changedToDown() }) taps.intValue++ }
+            }
+        },
+    ) {
         // The faint page tint on a verdict: only the edges, so nothing reflows (spec §1).
         Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(0.55f to Color.Transparent, 1f to tint, center = center, radius = size.maxDimension * 0.75f)) })
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
             TopBar(flow, onClose = { leaving = true })
             LessonCard(flow, theme == LessonTheme.Fly, motion, muted, onMute = { muted = !muted; LessonSounds.muted = muted }, onFinish = onFinish)
         }
-        WhySheet(flow, Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()))
+        if (theme == LessonTheme.Fly && motion && flow.screen is Screen.End) MachPass(taps)
+        WhySheet(flow, theme == LessonTheme.Fly, Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()))
     }
     if (leaving) {
         AlertDialog(
@@ -187,7 +204,7 @@ private fun TopBar(flow: LessonFlow, onClose: () -> Unit) {
         }
         Spacer(Modifier.width(12.dp))
         Row(Modifier.widthIn(min = 52.dp).semantics(mergeDescendants = true) { contentDescription = "${flow.sparks} sparks" }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
-            Text("${flow.sparks}", fontFamily = Glass.Heading, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = if (flow.sparks > 0) Chrome.Ink else Color(0xFF9B9B9B))
+            Text("${flow.sparks}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = if (flow.sparks > 0) Chrome.Ink else Color(0xFF9B9B9B))
             Spacer(Modifier.width(4.dp))
             Spark(flow.sparks > 0, 20.dp)
         }
@@ -269,18 +286,26 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, muted: Boo
     // A skill item moves on by itself half a second after Check (Brilliant: no verdict per item).
     LaunchedEffect(advancing) { if (advancing) { delay(500); flow.nextSkill() } }
 
+    // Check: on a tile board the machines fly to where the numbers sent them first, and only then is the answer graded
+    // (Brilliant's own tick or cross); in the skill check the same flight comes before the next item.
+    val deck = remember(flow.screen) { FlightDeck() }
+    val scope = rememberCoroutineScope()
     fun check() {
-        val ok = flow.check()
-        if (flow.inSkill) { advancing = true; return }
-        if (ok) { LessonSounds.play(Cue.Correct); haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
-        else { LessonSounds.play(Cue.Incorrect); haptics.performHapticFeedback(HapticFeedbackType.Reject) }
+        scope.launch {
+            flow.flying = true
+            try { deck.fly() } finally { flow.flying = false }
+            val ok = flow.check()
+            if (flow.inSkill) { advancing = true; return@launch }
+            if (ok) { LessonSounds.play(Cue.Correct); haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
+            else { LessonSounds.play(Cue.Incorrect); haptics.performHapticFeedback(HapticFeedbackType.Reject) }
+        }
     }
 
     val review = flow.screen is Screen.Review
     val buttons: List<BtnSpec> = when {
         advancing -> emptyList()
         flow.inSkill -> listOf(
-            BtnSpec("I don't know", Kind.Outline) { LessonSounds.play(Cue.Tick); flow.dontKnow(); advancing = true },
+            BtnSpec("I don't know", Kind.Outline, enabled = !flow.flying) { LessonSounds.play(Cue.Tick); flow.dontKnow(); advancing = true },
             BtnSpec("Check", Kind.Dark, enabled = flow.canCheck) { check() },
         )
         page.kind == PageKind.Explainer || page.kind == PageKind.Recap -> listOf(BtnSpec("Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.next() })
@@ -309,20 +334,25 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, muted: Boo
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             val boardW = (maxWidth - 24.dp).coerceAtMost(420.dp)
             Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(horizontal = 12.dp).padding(bottom = 64.dp),
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(horizontal = 12.dp).padding(bottom = 8.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Prompt(page.prompt, bold = page.skill, modifier = Modifier.width(boardW))
+                Prompt(if (fly) Words.machine(page.prompt) else page.prompt, bold = page.skill, modifier = Modifier.width(boardW))
                 Spacer(Modifier.height(if (page.kind == PageKind.Drag || page.kind == PageKind.Explainer) 30.dp else 26.dp))
                 when (page.kind) {
                     PageKind.Drag -> DragBoard(page, flow, fly, motion, boardW)
                     PageKind.Explainer -> FigureBoard(page, fly, boardW)
-                    PageKind.Translate, PageKind.Recap -> WorkspaceBoard(page, flow, fly, motion, boardW)
+                    PageKind.Translate, PageKind.Recap -> WorkspaceBoard(page, flow, fly, motion, boardW, deck)
                 }
                 if (page.graded && !page.skill) StartOver(flow, Modifier.width(boardW))
             }
-            Bubble(flow.verdict, flow.phase == Phase.Correct, Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 8.dp))
+        }
+        // The verdict's own row, two lines tall at any font size, kept even when empty: it never covers the board or
+        // Start over, and nothing moves when it appears (RULES: no layout jumps).
+        val bubbleRow = with(LocalDensity.current) { (21.75.sp * 2).toDp() } + 26.dp
+        Box(Modifier.fillMaxWidth().height(bubbleRow).padding(horizontal = 12.dp), contentAlignment = Alignment.BottomStart) {
+            Bubble(flow.verdict, flow.phase == Phase.Correct, Modifier)
         }
         ButtonsRow(buttons, motion, key = "${flow.screen}-${flow.phase}-$advancing")
     }
@@ -344,7 +374,7 @@ private fun Prompt(text: String, bold: Boolean, modifier: Modifier) {
     Text(
         styled,
         modifier = modifier.semantics { heading() },
-        style = TextStyle(fontFamily = Glass.Body, fontSize = if (bold) 18.sp else 16.sp, lineHeight = if (bold) 28.8.sp else 25.6.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, color = Chrome.Ink),
+        style = TextStyle(fontFamily = LessonType.Figtree, fontSize = if (bold) 18.sp else 16.sp, lineHeight = if (bold) 28.8.sp else 25.6.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, color = Chrome.Ink),
     )
 }
 
@@ -362,7 +392,7 @@ private fun StartOver(flow: LessonFlow, modifier: Modifier) {
             val c = if (on) Chrome.Ink else Color(0x66000000)
             RestartIcon(c, 18.dp)
             Spacer(Modifier.width(6.dp))
-            Text("Start over", fontFamily = Glass.Body, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = c)
+            Text("Start over", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = c)
         }
     }
 }
@@ -374,8 +404,9 @@ private fun Bubble(text: String?, good: Boolean, modifier: Modifier) {
     if (text != null) last = text
     AnimatedVisibility(text != null, modifier, enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 4 }, exit = fadeOut(tween(120))) {
         Text(
-            last, Modifier.widthIn(max = 280.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Chrome.GoodBubble else Chrome.BadBubble).padding(horizontal = 16.dp, vertical = 12.dp),
-            fontFamily = Glass.Body, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
+            last, Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Chrome.GoodBubble else Chrome.BadBubble).padding(horizontal = 16.dp, vertical = 12.dp),
+            fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
+            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }
@@ -389,7 +420,7 @@ private fun SparkChip(burst: Int) {
     LaunchedEffect(burst) { if (burst > seen[0]) { seen[0] = burst; shown = true; delay(1400); shown = false } }
     AnimatedVisibility(shown, enter = fadeIn(tween(160)) + scaleIn(tween(220, easing = EaseOutStrong), initialScale = 0.7f), exit = fadeOut(tween(300))) {
         Row(Modifier.padding(end = 6.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDDF6E4)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("+${L11.SPARKS_PER_PAGE}", fontFamily = Glass.Heading, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF15803D))
+            Text("+${L11.SPARKS_PER_PAGE}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF15803D))
             Spacer(Modifier.width(3.dp))
             Spark(true, 14.dp)
         }
@@ -431,7 +462,7 @@ private fun LButton(label: String, kind: Kind, enabled: Boolean, modifier: Modif
                 .then(if (kind == Kind.Outline && enabled) Modifier.border(1.dp, Chrome.GrayEdge, RoundedCornerShape(24.dp)) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, fontFamily = Glass.Body, fontWeight = FontWeight.SemiBold, fontSize = if (kind == Kind.Dark || kind == Kind.Teal) 16.sp else 17.sp, color = ink, maxLines = 1)
+            Text(label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = if (kind == Kind.Dark || kind == Kind.Teal) 16.sp else 17.sp, color = ink, maxLines = 1)
         }
     }
 }
@@ -443,10 +474,10 @@ private fun CenterScreen(big: (@Composable () -> Unit)?, title: String, line: St
         if (big == null) CheckBadge()
         else big()
         Spacer(Modifier.height(28.dp))
-        Text(title, fontFamily = Glass.Heading, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, lineHeight = 38.sp, color = Chrome.Ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+        Text(title, fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, lineHeight = 38.sp, color = Chrome.Ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
         if (line != null) {
             Spacer(Modifier.height(8.dp))
-            Text(line, fontFamily = Glass.Body, fontSize = 16.sp, color = Color(0xFF6B6B6B), textAlign = TextAlign.Center)
+            Text(line, fontFamily = LessonType.Figtree, fontSize = 16.sp, color = Color(0xFF6B6B6B), textAlign = TextAlign.Center)
         }
         Spacer(Modifier.height(36.dp))
         buttons.forEachIndexed { i, b ->
@@ -480,8 +511,8 @@ private fun ScoreView(flow: LessonFlow) {
     CenterScreen(
         big = {
             Row(verticalAlignment = Alignment.Top, modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$n out of $total" }) {
-                Text("$n", fontFamily = Glass.Heading, fontWeight = FontWeight.ExtraBold, fontSize = 72.sp, lineHeight = 72.sp, color = Chrome.Ink)
-                Text("/$total", fontFamily = Glass.Heading, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF9B9B9B), modifier = Modifier.offset { IntOffset(0, 8) })
+                Text("$n", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 72.sp, lineHeight = 72.sp, color = Chrome.Ink)
+                Text("/$total", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF9B9B9B), modifier = Modifier.offset { IntOffset(0, 8) })
             }
         },
         title = L11.scoreTitle(n, total),
@@ -503,8 +534,8 @@ private fun EndView(flow: LessonFlow, onFinish: (Int) -> Unit) {
  * explanation text and the same two answers. Both close it.
  */
 @Composable
-private fun WhySheet(flow: LessonFlow, modifier: Modifier) {
-    val last = flow.page?.explain ?: ""
+private fun WhySheet(flow: LessonFlow, fly: Boolean, modifier: Modifier) {
+    val last = flow.page?.explain?.let { if (fly) Words.machine(it) else it } ?: ""
     AnimatedVisibility(flow.whyOpen, modifier, enter = slideInVertically(tween(280, easing = EaseOutStrong)) { it } + fadeIn(), exit = slideOutVertically(tween(200)) { it } + fadeOut()) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(bottom = 8.dp)
@@ -520,12 +551,12 @@ private fun WhySheet(flow: LessonFlow, modifier: Modifier) {
             }
             Text(
                 "Why is this the answer?", Modifier.align(Alignment.End).clip(RoundedCornerShape(12.dp)).border(1.dp, Chrome.Line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
-                fontFamily = Glass.Body, fontSize = 15.sp, color = Chrome.Ink,
+                fontFamily = LessonType.Figtree, fontSize = 15.sp, color = Chrome.Ink,
             )
             Spacer(Modifier.height(10.dp))
             Text(
                 "$last\n\nDoes that make sense?", Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFEEF3F8)).padding(horizontal = 14.dp, vertical = 12.dp),
-                fontFamily = Glass.Body, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
+                fontFamily = LessonType.Figtree, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -533,7 +564,7 @@ private fun WhySheet(flow: LessonFlow, modifier: Modifier) {
                     Text(
                         chip, Modifier.clip(RoundedCornerShape(18.dp)).border(1.dp, Chrome.GrayEdge, RoundedCornerShape(18.dp))
                             .clickable(role = Role.Button) { LessonSounds.play(Cue.Tick); flow.whyOpen = false }.padding(horizontal = 14.dp, vertical = 9.dp),
-                        fontFamily = Glass.Body, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Chrome.Ink,
+                        fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Chrome.Ink,
                     )
                 }
             }

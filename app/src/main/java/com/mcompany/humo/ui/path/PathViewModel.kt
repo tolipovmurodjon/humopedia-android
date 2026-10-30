@@ -12,13 +12,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-/** The path as the screen draws it: the course, the level the learner is on, and the top bar's two counts. */
+/** The path as the screen draws it: the course, the lesson the learner is on ([current], 1-based), and the top bar's two counts. */
 data class PathUiState(val course: Course, val current: Int, val gems: Int = 0, val streakDays: Int = 0)
 
 @HiltViewModel
 class PathViewModel @Inject constructor(progress: ProgressStore) : ViewModel() {
     /** Null until DataStore answers (a frame or two): the screen draws the map and waits, never the wrong stone. */
-    val state: StateFlow<PathUiState?> = combine(progress.currentLevel, progress.gems, progress.streakDays) { level, gems, streak ->
-        PathUiState(CoordinateTransformations, level.coerceIn(1, CoordinateTransformations.levels.size), gems, streak)
+    val state: StateFlow<PathUiState?> = combine(progress.currentLesson, progress.gems, progress.streakDays) { lesson, gems, streak ->
+        PathUiState(CoordinateTransformations, lesson.coerceIn(1, CoordinateTransformations.lessons.size), gems, streak)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

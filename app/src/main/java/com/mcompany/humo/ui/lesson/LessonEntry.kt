@@ -14,17 +14,19 @@ import javax.inject.Inject
 /** Saves a finished lesson on the phone (level progress + the sparks as gems), then hands back to the path. */
 @HiltViewModel
 class LessonViewModel @Inject constructor(private val progress: ProgressStore) : ViewModel() {
-    fun finish(level: Int, sparks: Int, done: () -> Unit) {
-        val lessons = CoordinateTransformations.levels.firstOrNull { it.n == level }?.lessons ?: 1
+    fun finish(n: Int, sparks: Int, done: () -> Unit) {
         viewModelScope.launch {
-            progress.lessonDone(level, lessons, sparks)
+            progress.lessonDone(n, sparks)
             done()
         }
     }
 }
 
-/** The current island's one tap opens L1.1 (the only lesson built so far); finishing returns to the path. */
+/** Lesson [n] of the course (its place on the path); finishing saves it and returns to the path. */
 @Composable
-fun LessonEntry(level: Int, padding: PaddingValues, close: () -> Unit, vm: LessonViewModel = hiltViewModel()) {
-    LessonPlayer(padding, onExit = close, onFinish = { sparks -> vm.finish(level, sparks, close) })
+fun LessonEntry(n: Int, padding: PaddingValues, close: () -> Unit, vm: LessonViewModel = hiltViewModel()) {
+    LessonPlayer(padding, onExit = close, onFinish = { sparks -> vm.finish(n, sparks, close) }, lesson = lessonAt(n))
 }
+
+/** The built lesson at place [n] on the path (L1.1 when the place has none yet, which the path never opens). */
+fun lessonAt(n: Int): LessonContent = Lessons[CoordinateTransformations.lessons.getOrNull(n - 1)?.code] ?: L11

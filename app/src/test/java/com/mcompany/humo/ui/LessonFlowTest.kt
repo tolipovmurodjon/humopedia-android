@@ -2,6 +2,8 @@ package com.mcompany.humo.ui
 
 import com.mcompany.humo.ui.lesson.Cue
 import com.mcompany.humo.ui.lesson.L11
+import com.mcompany.humo.ui.lesson.L12
+import com.mcompany.humo.ui.lesson.signed
 import com.mcompany.humo.ui.lesson.LessonFlow
 import com.mcompany.humo.ui.lesson.LessonSounds
 import com.mcompany.humo.ui.lesson.Node
@@ -29,6 +31,48 @@ class LessonFlowTest {
         assertEquals(listOf(Node(3, 4), Node(3, 5), Node(5, 4), Node(5, 5)), L11.pages[5].targets)
         assertEquals(listOf(Node(3, 2), Node(0, 3), Node(2, 4)), L11.skill.map { it.move })
         assertEquals(listOf(Node(4, 3), Node(6, 3)), L11.skill[0].targets)
+    }
+
+    @Test fun `L1_2 is Brilliant's Negative Translations - answers, given slots and the -5 to 5 tray`() {
+        assertEquals(listOf("P1", "P2", "P3", "P4", "P5", "P6", "P7"), L12.pages.map { it.id })
+        assertEquals(listOf(Node(2, 0), Node(-4, 0), Node(-4, 0), Node(0, -1), Node(0, 3), Node(0, -3), Node(0, -3)), L12.pages.map { it.move })
+        assertEquals(listOf(Node(0, -2), Node(3, 0), Node(-2, 0)), L12.skill.map { it.move })
+        assertEquals((-5..5).toList(), L12.pages[0].tiles)
+        assertEquals(listOf(Node(1, 1), Node(1, -1)), L12.pages[0].targets)
+        assertEquals("\u22124", signed(-4))
+    }
+
+    @Test fun `L1_2 - a given slot is filled in, never active, and only the open slot is graded by the tray`() {
+        val flow = LessonFlow(L12)
+        assertEquals(0, flow.slots.b)
+        assertEquals(0, flow.slots.active)
+        flow.tapSlot(1)
+        assertEquals("a given slot cannot be picked", 0, flow.slots.active)
+        flow.tapTile(-5)
+        assertEquals(Node(-5, 0), flow.slots.move)
+        assertFalse(flow.check())
+        flow.tryAgain(); flow.startOver()
+        assertEquals("start over keeps Brilliant's 0", Slots(null, 0, 0, setOf(1)), flow.slots)
+        assertFalse(flow.canStartOver)
+        flow.tapTile(2)
+        assertTrue(flow.check())
+        // P4: the x slot is given, the y slot is the learner's
+        flow.goTo(Screen.Page(3))
+        assertEquals(1, flow.slots.active)
+        flow.tapTile(-1)
+        assertTrue(flow.check())
+        // SC3: both slots open
+        flow.goTo(Screen.Skill(2))
+        flow.tapTile(-2); flow.tapTile(0)
+        assertTrue(flow.check())
+    }
+
+    @Test fun `L1_2 - a perfect skill check goes straight to the end`() {
+        val flow = LessonFlow(L12)
+        flow.startSkill()
+        for (j in 0..2) { val m = flow.page!!.move; if (flow.page!!.fixedX == null) flow.tapTile(m.x); if (flow.page!!.fixedY == null) flow.tapTile(m.y); assertTrue(flow.check()); flow.nextSkill() }
+        assertEquals(3, flow.skillRight)
+        assertEquals("Perfect!", L11.scoreTitle(3, 3))
     }
 
     @Test fun `snap picks the nearest node and stays on the board`() {
@@ -178,6 +222,12 @@ class LessonFlowTest {
             assertTrue("$cue is ${pcm.size / 44_100.0} s", pcm.size / 44_100.0 <= max)
             assertTrue(pcm.maxOf { abs(it.toInt()) } <= (0.9 * Short.MAX_VALUE).toInt() + 1)
             assertEquals("$cue ends in silence", 0, abs(pcm.last().toInt()) / 200)
+        }
+        for ((big, max) in mapOf(false to 0.7, true to 1.2)) {
+            val pcm = LessonSounds.whooshPcm(big)
+            assertTrue("whoosh $big is ${pcm.size / 44_100.0} s", pcm.size / 44_100.0 <= max)
+            assertTrue(pcm.maxOf { abs(it.toInt()) } <= (0.9 * Short.MAX_VALUE).toInt() + 1)
+            assertEquals("whoosh $big ends in silence", 0, abs(pcm.last().toInt()) / 200)
         }
     }
 }

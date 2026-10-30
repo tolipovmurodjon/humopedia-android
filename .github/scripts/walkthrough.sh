@@ -48,6 +48,25 @@ tap() {
   $T adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
 }
 
+# A screenshot only, no UI tree: while the machines fly the screen redraws every frame, so a tree dump could stall.
+snap() {
+  N=$((N + 1)); local name; name=$(printf "%02d-%s" "$N" "$1")
+  sleep "${2:-0.2}"
+  $T adb exec-out screencap -p > "$WALK/$name.png"
+  log "$name"
+}
+
+# Wait (up to ${2:-15} s) until a node with this text or content-desc is on screen.
+waitfor() {
+  local end=$((SECONDS + ${2:-15}))
+  while [ $SECONDS -lt $end ]; do
+    dump > "$WALK/_wait.xml"
+    grep -q -E "(text|content-desc)=\"$1\"" "$WALK/_wait.xml" && { LAST="$WALK/_wait.xml"; return 0; }
+    sleep 1
+  done
+  fail "timed out waiting for \"$1\""
+}
+
 has() { grep -q -E "(text|content-desc)=\"$1\"" "$LAST" || fail "step $(basename "$LAST") has no \"$1\""; }
 
 screen_size() { $T adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1; }
@@ -70,14 +89,14 @@ log "ok: running, no crash, no ANR"
 $T adb shell dumpsys gfxinfo "$PKG" reset > /dev/null
 shot home
 has "Path"
-has "Level 3, Rotations, current"
+has "Lesson 1.1, Translating Points, current"
 for t in "Bosh sahifa" Olamlar Jang Reyting Men; do has "$t"; done
 
 for t in Olamlar Jang Reyting Men; do
   tap "$t"; shot "tab-$t"; has "$t"; has "Tez orada"
 done
 tap "Bosh sahifa"; shot back-home
-has "Level 3, Rotations, current"
+has "Lesson 1.1, Translating Points, current"
 
 SIZE=$(screen_size); W=${SIZE%x*}; H=${SIZE#*x}
 log "-- scroll the path up into the clouds, to the top"
@@ -87,8 +106,8 @@ for i in 1 2 3 4 5 6; do $T adb shell input swipe $((W / 2)) $((H * 25 / 100)) $
 shot path-top-clouds
 has "Kurs: Coordinate Transformations"
 # The story: the current island and the six after it; everything above is under the cloud bank, not on the map.
-has "Level 9, Combining Reflections, locked"
-grep -q 'content-desc="Level 10, ' "$LAST" && fail "level 10 is above the cloud bank and must not be on the map"
+has "Lesson 2.1, Coordinate-wise Translation, locked"
+grep -q 'content-desc="Lesson 2.2, ' "$LAST" && fail "lesson 2.2 is above the cloud bank and must not be on the map"
 
 log "-- the course chip opens the course list; Back closes it"
 tap "Kurs: Coordinate Transformations"; shot course-list
@@ -98,11 +117,11 @@ has "Bosh sahifa"
 
 log "-- leave Home and come back: the path opens at the current stone again"
 tap Jang; sleep 1; tap "Bosh sahifa"; shot path-at-current
-has "Level 3, Rotations, current"
+has "Lesson 1.1, Translating Points, current"
 
 log "-- one tap on the current island starts L1.1 (no sheet); Back asks before leaving"
-tap "Level 3, Rotations, current"; shot lesson
-has "Move the point 3 steps to the right and 1 up."
+tap "Lesson 1.1, Translating Points, current"; shot lesson
+has "Move the SR-71 3 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
 has "Leave the lesson\?"
 tap "Keep going"; sleep 1
@@ -115,41 +134,86 @@ npx() { awk -v l="$BX1" -v t="$BY1" -v r="$BX2" -v x="$1" -v y="$2" 'BEGIN{s=(r-
 drag() { board; local a b; a=$(npx "$1" "$2"); b=$(npx "$3" "$4"); $T adb shell input swipe $a $b 700; sleep 0.8; }
 press() { tap "$1"; sleep "${2:-0.8}"; }
 
+tapnode() { board; local a; a=$(npx "$1" "$2"); $T adb shell input tap $a; }
+shot P1-start; has "Move the SR-71 3 steps to the right and 1 up."
 drag 2 1 3 4; press Check; shot P1-wrong
 has "Hmm, think about that again."
 press "Try again"; drag 3 4 5 2; press Check; shot P1-correct
 has "Good!"
 press "Why\?"; shot P1-why; has "Why is this the answer\?"; press "Yes, that makes sense"
 press Continue
-drag 1 3 2 6; press Check; press "Try again"; drag 2 6 4 4; press Check; shot P2-correct
+shot P2-start
+log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
+tapnode 1 3; snap P2-armed 0.5
+tapnode 6 0; snap P2-tapfly-a 0.3; snap P2-tapfly-b 0.4
+sleep 5; shot P2-landed 0.5
+press Check; shot P2-wrong
+has "Hmm, think about that again."
+press "Try again"; drag 6 0 4 4; press Check; shot P2-correct
 has "Continue"; press Continue
 shot P3; has "Two points, each moved a steps right and b steps up."; press Continue
 for P in "P4 1 2 2 2" "P5 1 3 3 1" "P6 3 2 2 3"; do
   set -- $P
-  press "Tile $2" 0.4; press "Tile $3"; press Check; shot "$1-wrong"
-  has "Try again"; press "Try again"; press "Start over"
-  press "Tile $4" 0.4; press "Tile $5"; press Check; shot "$1-correct"
-  has "Continue"; press Continue
+  shot "$1-start" 0.5
+  press "Tile $2" 0.4; press "Tile $3"; press Check 0.1; snap "$1-flight" 0.5
+  waitfor "Try again" 15; shot "$1-wrong"
+  press "Try again"; press "Start over"; sleep 1.5
+  press "Tile $4" 0.4; press "Tile $5"; press Check 0.1; snap "$1-flight-2" 0.5
+  waitfor "Continue" 15; shot "$1-correct"
+  press Continue
 done
 shot P7; press Play 1.5; press Continue
-shot skill-splash 0.3; has "Skill check"; sleep 2.5
-press "Tile 3" 0.4; press "Tile 2"; press Check 1.2
-press "I don(&apos;|.)t know" 1.2
-press "Tile 1" 0.4; press "Tile 4"; press Check 1.5
-shot skill-score; has "That was tricky!"
+# The splash shows for 1.7 s; the UI tree is read after it, so the check is on the first item.
+shot skill-splash 0.3; sleep 2.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
+press "Tile 3" 0.4; press "Tile 2"; press Check 0.1; snap skill-SC1-flight 0.5
+sleep 6
+press "I don(&apos;|.)t know" 1.5
+press "Tile 1" 0.4; press "Tile 4"; press Check 0.1; snap skill-SC3-flight 0.5
+waitfor "That was tricky!" 20; shot skill-score; has "That was tricky!"
 press "Skip review"; shot skill-retry; has "Retry skill check"
-press "Skip retry"; shot lesson-end; has "Lesson complete"; has "75 sparks earned."
+press "Skip retry" 0.3; snap mach3-a 0.2; snap mach3-b 0.5
+sleep 3; shot lesson-end; has "Lesson complete"; has "75 sparks earned."
 press Continue 2; shot back-from-lesson
-has "Level 3, Rotations, current"
+has "Lesson 1.1, Translating Points, done"
+has "Lesson 1.2, Negative Translations, current"
 has "Olmos: 75"
 shot jet-roll-done 1.5
 
+log "-- L1.2 Negative Translations, the next island: one wrong try on every graded page, then a perfect skill check"
+tap "Lesson 1.2, Negative Translations, current"; shot l12-lesson
+has "Complete the translation to send the SR-71s to the targets."
+for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
+  set -- $P
+  if [ $# -eq 1 ]; then shot "l12-$1"; press Play 1.5; press Continue; continue; fi
+  press "Tile $2"; press Check 0.1; snap "l12-$1-flight" 0.5
+  waitfor "Try again" 15; shot "l12-$1-wrong"
+  press "Try again"; press "Start over"; sleep 1.5
+  press "Tile $3"; press Check 0.1
+  waitfor "Continue" 15; shot "l12-$1-correct"
+  press Continue
+done
+sleep 2.5; shot l12-SC1; has "I don(&apos;|.)t know"
+press "Tile -2"; press Check 0.1; sleep 6
+press "Tile 3"; press Check 0.1; sleep 6
+press "Tile -2" 0.4; press "Tile 0"; press Check 0.1
+waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
+press Continue 0.3; snap l12-mach3 0.8; sleep 3; shot l12-end; has "Lesson complete"; has "75 sparks earned."
+press Continue 2; shot back-from-l12
+has "Lesson 1.2, Negative Translations, done"
+has "Lesson 1.3, Translating Shapes, current"
+has "Olmos: 150"
+
+log "-- the next island is not built yet: its sheet says so, with no fake button"
+tap "Lesson 1.3, Translating Shapes, current"; shot coming-sheet
+has "Bu dars tez orada qoʻshiladi."
+$T adb shell input keyevent 4; sleep 1
+
 log "-- a done island opens its sheet to replay; Back closes it"
-tap "Level 2, Translations in Coordinates, done"; shot done-sheet
+tap "Lesson 1.2, Negative Translations, done"; shot done-sheet
 has "Takrorlash"
-has "4 ta dars · tugatilgan"
+has "Tugatilgan"
 $T adb shell input keyevent 4; shot done-sheet-closed
-has "Level 3, Rotations, current"
+has "Lesson 1.3, Translating Shapes, current"
 
 log "-- rotate"
 $T adb shell settings put system accelerometer_rotation 0
@@ -167,7 +231,7 @@ tap "Bosh sahifa"; shot font100-home 2
 
 log "-- Back on Home leaves the app; Back on another tab goes Home first"
 tap Jang; sleep 1; $T adb shell input keyevent 4; shot back-goes-home
-has "Level 3, Rotations, current"
+has "Lesson 1.3, Translating Shapes, current"
 
 log "-- frame stats"
 $T adb shell dumpsys gfxinfo "$PKG" | grep -E "Total frames|Janky frames|percentile|Number Slow|Number Frozen" | tee -a "$WALK/steps.txt"
