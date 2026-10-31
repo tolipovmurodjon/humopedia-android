@@ -519,7 +519,7 @@ private fun Bubble(text: String?, phase: Phase, inSkill: Boolean, modifier: Modi
         Text(
             last, Modifier.widthIn(max = 250.dp).clip(RoundedCornerShape(12.dp)).background(face).border(1.dp, edge, RoundedCornerShape(12.dp)).padding(horizontal = 17.dp, vertical = 12.dp),
             fontFamily = LessonType.Figtree, fontWeight = if (face == Chrome.SayBubble) FontWeight.Normal else FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
-            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }
