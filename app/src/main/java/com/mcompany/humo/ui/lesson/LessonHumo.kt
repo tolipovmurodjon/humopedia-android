@@ -1,6 +1,9 @@
 package com.mcompany.humo.ui.lesson
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -30,6 +33,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** What Humo's face shows (humo-live.js FACES: the ones the lesson uses). */
@@ -230,7 +234,7 @@ private fun DrawScope.ellipseOf(cx: Float, cy: Float, rx: Float, ry: Float, rot:
     withTransform({ rotate(rot, Offset(cx, cy)) }) { drawOval(color, Offset(cx - rx, cy - ry), Size(2 * rx, 2 * ry)) }
 }
 
-private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean) {
+private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean, layers: HumoLayers) {
     val happy = h.x[HumoState.Ch.Happy.ordinal].coerceIn(0f, 1f)
     val blink = h.blink
     val lookX = h.x[HumoState.Ch.LookX.ordinal]
@@ -254,18 +258,13 @@ private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean) {
     val open = (1f - blink) * (1f - happy)
     if (open > 0.15f) {
         val yc = e.cy + 0.35f * e.ry
+        val clip = Path().apply { addOval(androidx.compose.ui.geometry.Rect(e.cx - e.rx, e.cy - e.ry, e.cx + e.rx, e.cy + e.ry)) }
         withTransform({ translate(e.cx, yc); scale(1f, max(0.05f, open), Offset.Zero); translate(-e.cx, -yc) }) {
-            withTransform({ rotate(e.rot, Offset(e.cx, e.cy)); translate(e.cx, e.cy); scale(e.rx, e.ry, Offset.Zero) }) {
-                drawOval(Brush.radialGradient(0f to c(0xFFFCFCFC), 0.72f to c(0xFFFCFCFC), 0.8f to c(0xFFFEFEFE), 0.92f to c(0xFFF8F8F8), 0.96f to c(0xFFEEEEEE), 1f to c(0xFFDDE5E2), center = Offset.Zero, radius = 1f), Offset(-1f, -1f), Size(2f, 2f))
-            }
-            val clip = Path().apply { addOval(androidx.compose.ui.geometry.Rect(e.cx - e.rx, e.cy - e.ry, e.cx + e.rx, e.cy + e.ry)) }
             withTransform({ rotate(e.rot, Offset(e.cx, e.cy)) }) {
                 clipPath(clip) {
-                    withTransform({ rotate(-e.rot, Offset(e.cx, e.cy)); translate(lookX * 0.14f * e.rx, lookY * 0.14f * e.ry) }) {
-                        withTransform({ rotate(e.prot, Offset(e.px, e.py)) }) {
-                            drawOval(Brush.radialGradient(0.083f to c(0xFF0B0706), 0.25f to c(0xFF0E0706), 0.583f to c(0xFF180F0E), 0.917f to c(0xFF2E2321), center = Offset(e.px, e.py), radius = e.pr), Offset(e.px - e.prx, e.py - e.pry), Size(2 * e.prx, 2 * e.pry))
-                        }
-                        e.glints.forEach { g -> ellipseOf(g[0], g[1], g[2], g[3], g[4], Color.White) }
+                    withTransform({ rotate(-e.rot, Offset(e.cx, e.cy)) }) {
+                        layerImage(layers.whites, layers.s)
+                        withTransform({ translate(lookX * 0.14f * e.rx, lookY * 0.14f * e.ry) }) { layerImage(layers.pupils, layers.s) }
                     }
                 }
             }
@@ -296,8 +295,49 @@ private fun DrawScope.mouth(kind: String) {
     }
 }
 
+private const val HEAD = 1024f * 0.14f
+
+/** The parts that never change shape, painted once into bitmaps at the drawn size (the light layers are slow to paint every frame on a cheap GPU). */
+private class HumoLayers(val s: Float, val body: ImageBitmap, val hair: ImageBitmap, val whites: ImageBitmap, val pupils: ImageBitmap)
+
+private fun DrawScope.layerImage(img: ImageBitmap, s: Float) {
+    withTransform({ translate(0f, -HEAD); scale(1f / s, 1f / s, Offset.Zero) }) { drawImage(img) }
+}
+
+private fun androidx.compose.ui.draw.CacheDrawScope.bakeLayers(): HumoLayers {
+    val vbH = 1024f * 1.14f
+    val s = min(size.width / 1024f, size.height / vbH).coerceAtLeast(0.01f)
+    val w = max(1, (1024f * s).roundToInt())
+    val h = max(1, (vbH * s).roundToInt())
+    fun layer(block: DrawScope.() -> Unit): ImageBitmap {
+        val bmp = ImageBitmap(w, h)
+        CanvasDrawScope().draw(this, layoutDirection, androidx.compose.ui.graphics.Canvas(bmp), Size(w.toFloat(), h.toFloat())) {
+            withTransform({ scale(s, s, Offset.Zero); translate(0f, HEAD) }) { block() }
+        }
+        return bmp
+    }
+    return HumoLayers(
+        s,
+        body = layer { clipPath(HumoShapes.body) { bodyPaint() } },
+        hair = layer { clipPath(HumoShapes.leafBig) { bodyPaint() }; clipPath(HumoShapes.leafSmall) { bodyPaint() } },
+        whites = layer {
+            for (e in listOf(EyeL, EyeR)) withTransform({ rotate(e.rot, Offset(e.cx, e.cy)); translate(e.cx, e.cy); scale(e.rx, e.ry, Offset.Zero) }) {
+                drawOval(Brush.radialGradient(0f to c(0xFFFCFCFC), 0.72f to c(0xFFFCFCFC), 0.8f to c(0xFFFEFEFE), 0.92f to c(0xFFF8F8F8), 0.96f to c(0xFFEEEEEE), 1f to c(0xFFDDE5E2), center = Offset.Zero, radius = 1f), Offset(-1f, -1f), Size(2f, 2f))
+            }
+        },
+        pupils = layer {
+            for (e in listOf(EyeL, EyeR)) {
+                withTransform({ rotate(e.prot, Offset(e.px, e.py)) }) {
+                    drawOval(Brush.radialGradient(0.083f to c(0xFF0B0706), 0.25f to c(0xFF0E0706), 0.583f to c(0xFF180F0E), 0.917f to c(0xFF2E2321), center = Offset(e.px, e.py), radius = e.pr), Offset(e.px - e.prx, e.py - e.pry), Size(2 * e.prx, 2 * e.pry))
+                }
+                e.glints.forEach { g -> ellipseOf(g[0], g[1], g[2], g[3], g[4], Color.White) }
+            }
+        },
+    )
+}
+
 /** The body, sprout and face in one picture; the view box is the rig's with 14 % headroom for jumps (humo-live.js). */
-private fun DrawScope.humoPicture(h: HumoState) {
+private fun DrawScope.humoPicture(h: HumoState, layers: HumoLayers) {
     val sq = h.x[HumoState.Ch.Squash.ordinal]
     val sy = 1f - sq
     val sx = 1f + sq * 0.5f
@@ -312,13 +352,10 @@ private fun DrawScope.humoPicture(h: HumoState) {
         }
     }
     withTransform({ translate(0f, -hop); rotate(tilt, Offset(fx, fy)); translate(fx, fy); scale(sx, sy, Offset.Zero); translate(-fx, -fy) }) {
-        withTransform({ rotate(h.x[HumoState.Ch.Sway.ordinal], Offset(536.6f, 253.1f)) }) {
-            clipPath(HumoShapes.leafBig) { bodyPaint() }
-            clipPath(HumoShapes.leafSmall) { bodyPaint() }
-        }
-        clipPath(HumoShapes.body) { bodyPaint() }
-        eye(EyeL, h, true)
-        eye(EyeR, h, false)
+        withTransform({ rotate(h.x[HumoState.Ch.Sway.ordinal], Offset(536.6f, 253.1f)) }) { layerImage(layers.hair, layers.s) }
+        layerImage(layers.body, layers.s)
+        eye(EyeL, h, true, layers)
+        eye(EyeR, h, false, layers)
         mouth(h.mouth)
     }
 }
@@ -327,12 +364,17 @@ private fun DrawScope.humoPicture(h: HumoState) {
 @Composable
 fun Humo(state: HumoState, modifier: Modifier = Modifier) {
     HumoMotion(state)
-    Canvas(modifier) {
-        state.frame.longValue
-        val vbH = 1024f * 1.14f
-        val s = min(size.width / 1024f, size.height / vbH)
-        withTransform({ translate((size.width - 1024f * s) / 2f, (size.height - vbH * s)); scale(s, s, Offset.Zero); translate(0f, 1024f * 0.14f) }) { humoPicture(state) }
-    }
+    Spacer(
+        modifier.drawWithCache {
+            val layers = bakeLayers()
+            val vbH = 1024f * 1.14f
+            val s = min(size.width / 1024f, size.height / vbH)
+            onDrawBehind {
+                state.frame.longValue
+                withTransform({ translate((size.width - 1024f * s) / 2f, (size.height - vbH * s)); scale(s, s, Offset.Zero); translate(0f, HEAD) }) { humoPicture(state, layers) }
+            }
+        },
+    )
 }
 
 /** Where a machine at ([x], [y]) in a [w] x [h] board is, as Humo (bottom left of the screen) looks at it: right and up. */
