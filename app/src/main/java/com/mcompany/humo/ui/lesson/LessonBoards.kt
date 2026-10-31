@@ -558,7 +558,7 @@ private fun ActionRow(page: LessonPage, flow: LessonFlow, recap: Boolean, u: Dp)
 private fun Fixed(v: String, u: Dp) {
     val k = u / 1.dp
     Box(Modifier.size(32.dp * k, 24.dp * k).clip(RoundedCornerShape(4.dp * k)).background(Color(0x0D000000)).border(2.dp * k, Color(0x0D000000), RoundedCornerShape(4.dp * k)), contentAlignment = Alignment.Center) {
-        Text(v, fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, color = Color.Black)
+        Text(v, fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, lineHeight = with(LocalDensity.current) { (16.dp * k).toSp() }, maxLines = 1, color = Color.Black)
     }
 }
 
@@ -585,6 +585,6 @@ private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
             .semantics { contentDescription = "Slot ${i + 1}, ${v ?: "empty"}" }.testTag("slot-$i"),
         contentAlignment = Alignment.Center,
     ) {
-        if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, color = Color.Black)
+        if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, lineHeight = with(LocalDensity.current) { (16.dp * k).toSp() }, maxLines = 1, color = Color.Black)
     }
 }

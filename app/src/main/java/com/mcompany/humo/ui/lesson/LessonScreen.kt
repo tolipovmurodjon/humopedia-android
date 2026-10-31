@@ -508,7 +508,7 @@ private fun Panel(ok: Boolean, text: String, bottomInset: Dp, onFlag: () -> Unit
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Text(text, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 26.sp, color = if (ok) Chrome.MintInk else Chrome.YellowInk)
+            Text(text, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, lineHeight = 24.sp, color = if (ok) Chrome.MintInk else Chrome.YellowInk)
             Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Report this page", onClick = onFlag).semantics { contentDescription = "Report this page" }, contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
