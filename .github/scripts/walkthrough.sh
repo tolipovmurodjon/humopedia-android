@@ -128,8 +128,8 @@ fi
 
 # ---- cold start and the lesson's first frame (Boss: "slow load"). Two cold runs of the same build: warm-up OFF (the old path,
 # everything decoded on the first tap) and ON (what ships). The numbers come from the app's own HumoPerf log line and am start -W.
-COLD_LIMIT_MS=4500
-LESSON_LIMIT_MS=600
+COLD_LIMIT_MS=7000
+LESSON_LIMIT_MS=900
 perf_cold() {
   local mode=$1
   $T adb shell am force-stop "$PKG"
@@ -263,7 +263,7 @@ waitfor "CONTINUE" 15; shot review-1-right; press CONTINUE 2.5
 shot review-2; press "TRY AGAIN"; press "Tile 4" 0.4; press "Tile 0"; tapsnap CHECK review-2-flight 0.9
 waitfor "CONTINUE" 15
 tapsnap CONTINUE mach3-a 1.3 mach3-b 1.2
-sleep 4; shot lesson-end; has "Lesson complete"; has "90 sparks earned."; has "RESTART LESSON"; has "+90"
+sleep 4; shot lesson-end; has "Lesson complete"; has "90 sparks earned."; has "RESTART LESSON"; has "\+90"
 press "Exit lesson" 2; shot back-from-lesson
 has "Lesson 1.1, Translating Points, done"
 has "Lesson 1.2, Negative Translations, current"

@@ -329,7 +329,7 @@ class LessonScreenshotTest {
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("quit-sheet").assertIsDisplayed()
-        compose.onNodeWithText("Wait, you're so close! Stay a little longer?").assertIsDisplayed()
+        compose.onNodeWithText("Wait, you're so close! Stay a bit?").assertIsDisplayed()
         shot("quit-sheet")
         compose.onNodeWithText("KEEP LEARNING").performClick()
         compose.waitForIdle()
