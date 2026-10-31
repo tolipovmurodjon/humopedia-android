@@ -45,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -321,11 +322,14 @@ internal fun Chunky(
                 .then(if (kind == Kind.Secondary && enabled) Modifier.border(2.dp, edge, shape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Row(Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The label shrinks until it fits its button (a narrow phone, a big font): never cut, never wrapped.
+            var fit by remember(label) { mutableFloatStateOf(1f) }
+            Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 leading?.invoke()
                 Text(
                     if (caps) label.uppercase() else label, fontFamily = LessonType.Figtree, fontWeight = if (caps) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    fontSize = if (caps) 15.sp else 17.sp, letterSpacing = if (caps) 0.8.sp else 0.sp, color = ink, maxLines = 1,
+                    fontSize = (if (caps) 15.sp else 17.sp) * fit, letterSpacing = if (caps) 0.8.sp else 0.sp, color = ink, maxLines = 1, softWrap = false,
+                    onTextLayout = { if (it.didOverflowWidth && fit > 0.45f) fit *= 0.92f },
                 )
             }
         }
@@ -504,7 +508,7 @@ private fun Panel(ok: Boolean, text: String, bottomInset: Dp, onFlag: () -> Unit
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Text(text, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 26.sp, color = if (ok) Chrome.MintInk else Chrome.YellowInk, maxLines = 3)
+            Text(text, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 26.sp, color = if (ok) Chrome.MintInk else Chrome.YellowInk)
             Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Report this page", onClick = onFlag).semantics { contentDescription = "Report this page" }, contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f

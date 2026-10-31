@@ -84,7 +84,10 @@ class ShellScreenshotTest {
         compose.waitForIdle()
     }
 
-    private fun shot(name: String) = compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
+    private fun shot(name: String) {
+        ScreenChecks.check(compose, name)
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
+    }
 
     @Test fun pathOpensAtTheCurrentStone() {
         shell()

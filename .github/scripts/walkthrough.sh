@@ -88,9 +88,19 @@ has() { grep -q -E "(text|content-desc)=\"$1\"" "$LAST" || fail "step $(basename
 
 screen_size() { $T adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1; }
 
+log "== fake Humopedia backend on :8787 (the smoke APK sends registerPushDevice there)"
+python3 .github/scripts/fake-humo.py serve 8787 "$OUT/fake-humo.log" &
+FAKE_PID=$!
+# The server must not outlive the script: emulator-runner waits for every child, and a left-over server hung a run for 30 min.
+trap 'kill $FAKE_PID 2> /dev/null' EXIT
+for i in $(seq 1 20); do curl -fs http://127.0.0.1:8787/health > /dev/null && break; sleep 0.5; done
+
 log "== root adb, install $APK"
 $T adb root > /dev/null; $T adb wait-for-device
 $T adb install -r -g "$APK" || fail "install"
+VERSION=$($T adb shell dumpsys package "$PKG" | grep -m1 -oE 'versionName=[^ ]+' | cut -d= -f2 | tr -d '
+')
+[ -n "$VERSION" ] || fail "could not read the installed versionName"
 
 log "== launch, alive after 20 s"
 $T adb logcat -c
@@ -105,6 +115,16 @@ grep -q "Process: $PKG, PID" "$OUT/logcat-launch.txt" && fail "crash at launch (
 grep -q "ANR in $PKG" "$OUT/logcat-launch.txt" && fail "ANR at launch"
 log "ok: running, no crash, no ANR"
 
+if [ "${QUICK:-}" = 1 ]; then
+  log "== quick mode: launch only, then the request assertion"
+  sleep 15
+  $T adb logcat -d | grep -iE "HumoSmoke|registerPushDevice|FirebaseApp|FirebaseFunctions" > "$OUT/logcat-smoke.txt" || true
+  cat "$OUT/logcat-smoke.txt" | tail -30
+  python3 .github/scripts/fake-humo.py assert-requests "$OUT/fake-humo.log" "$VERSION" | tee -a "$WALK/steps.txt"
+  [ "${PIPESTATUS[0]}" = 0 ] || fail "the fake server did not receive what a launch should send"
+  log "== quick walkthrough passed"
+  exit 0
+fi
 
 # ---- cold start and the lesson's first frame (Boss: "slow load"). Two cold runs of the same build: warm-up OFF (the old path,
 # everything decoded on the first tap) and ON (what ships). The numbers come from the app's own HumoPerf log line and am start -W.
@@ -307,6 +327,14 @@ has "Lesson 1.3, Translating Shapes, current"
 log "-- frame stats"
 $T adb shell dumpsys gfxinfo "$PKG" | grep -E "Total frames|Janky frames|percentile|Number Slow|Number Frozen" | tee -a "$WALK/steps.txt"
 
+log "-- what the app sent: sockets of the app right now, then the fake server's log"
+UID_APP=$($T adb shell pm list packages -U "$PKG" | grep -oE 'uid:[0-9]+' | head -1 | cut -d: -f2)
+[ -n "$UID_APP" ] || fail "could not read the app's uid"
+$T adb shell cat /proc/net/tcp /proc/net/tcp6 | tr -d '
+' > "$OUT/proc-net-tcp.txt"
+python3 .github/scripts/fake-humo.py assert-connections "$OUT/proc-net-tcp.txt" "$UID_APP" | tee -a "$WALK/steps.txt"
+[ "${PIPESTATUS[0]}" = 0 ] || fail "the app talks to a host that is not the fake server"
+
 log "-- forced test crash is written to files/crashes/"
 $T adb shell am force-stop "$PKG"
 $T adb shell run-as "$PKG" rm -rf files/crashes
@@ -336,5 +364,9 @@ log "-- best effort, never fails the run: L1.2 replayed with animations ON, as o
   shot motion-L12-P1-landed
 ) || log "motion phase did not finish (the run goes on)"
 ANIM 0
+
+log "-- the requests the whole journey sent (first launch, 3 timed starts, forced crash, motion phase)"
+python3 .github/scripts/fake-humo.py assert-requests "$OUT/fake-humo.log" "$VERSION" | tee -a "$WALK/steps.txt"
+[ "${PIPESTATUS[0]}" = 0 ] || fail "the fake server did not receive exactly what the journey should send"
 
 log "== walkthrough passed ($N steps)"

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Debug builds only: the test channel installs its own updates (Google Play forbids that in the Play build, so the
+         release variant never merges this file). release.yml fails if the permission or these classes reach it. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- CI smoke: the callable goes to a fake server on the runner (10.0.2.2); the Play app has no cleartext exception. -->
+    <application android:networkSecurityConfig="@xml/debug_network_security">
+        <provider
+            android:name=".update.UpdateStartup"
+            android:authorities="${applicationId}.update_startup"
+            android:exported="false" />
+        <activity
+            android:name=".update.InstallTapActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
+    </application>
+
+</manifest>

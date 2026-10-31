@@ -5,7 +5,7 @@ name: build
 on:
   pull_request:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, "feat/**", "ci/**"]
 
 concurrency:
   group: build-${{ github.ref }}
@@ -34,6 +34,13 @@ jobs:
           stray=$(find app/src -type f \( -name '*.mp3' -o -name '*.ogg' -o -name '*.wav' \) -not -path 'app/src/debug/assets/sounds/*' -not -path 'app/src/main/assets/voice/*')
           [ -z "$stray" ] || { echo "sound files outside the allowed folders: $stray"; exit 1; }
           unzip -l app/build/outputs/apk/debug/*.apk | grep -q 'assets/sounds/correct.mp3' || { echo "the debug APK lost its sounds"; exit 1; }
+      # No cut text, no red, no emoji: one script lists every finding (Boss, 2026-10-31).
+      - name: Screen checks (cut text, red, emoji)
+        if: always()
+        run: |
+          python3 -m pip install --quiet pillow numpy
+          python3 .github/scripts/screen-checks.py --self-test
+          python3 .github/scripts/screen-checks.py
       - name: Keep the screenshots and test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -49,41 +56,4 @@ jobs:
         with:
           name: humopedia-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 7
-
-  # A real Android runtime opens the APK and a script uses it like a child: unit tests cannot see a crash at launch,
-  # a frozen first frame or a broken manifest; this can.
-  walkthrough:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: humopedia-debug-apk
-          path: apk
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      # ReactiveCircus/android-emulator-runner (vetted for PAGEL 2026-10-27).
-      - name: Emulator walkthrough (API 34)
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          ram-size: 4096M
-          heap-size: 576M
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash .github/scripts/walkthrough.sh
-      - name: Keep the evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: walkthrough-evidence
-          path: smoke-out/
           retention-days: 7

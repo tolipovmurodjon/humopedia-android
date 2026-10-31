@@ -11,6 +11,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.mcompany.humo.playupdate.PlayUpdateModel
+import com.mcompany.humo.playupdate.PlayUpdateSourceImpl
+import com.mcompany.humo.playupdate.UpdatePill
 import com.mcompany.humo.ui.glass.GlassStage
 import com.mcompany.humo.ui.glass.GlassTheme
 import com.mcompany.humo.ui.shell.AppShell
@@ -24,6 +27,9 @@ import kotlinx.coroutines.withContext
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    // Play In-App Updates serve the Play build; the debug test build updates itself (src/debug/.../update).
+    private val playUpdate by lazy { PlayUpdateModel(PlayUpdateSourceImpl(this)) }
+
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +39,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         GlassStage.coldStart()
         com.mcompany.humo.ui.lesson.LessonWarmup.start(this)
-        setContent { GlassTheme { AppShell() } }
+        setContent { GlassTheme { AppShell(onTopOverlay = { UpdatePill(playUpdate) }) } }
         if (savedInstanceState == null) afterFirstFrame()
         // Debug builds only: the CI smoke forces a crash to prove CrashRecorder writes it down.
         if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_TEST_CRASH, false) == true) {
@@ -41,10 +47,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (!BuildConfig.DEBUG) playUpdate.refresh()
+    }
+
     /** Push registration and the one-time notification question, never on the first frame. */
     private fun afterFirstFrame() {
         lifecycleScope.launch {
-            if (HumoApp.firebaseReady(application)) {
+            if (BuildConfig.SMOKE_BACKEND.isNotEmpty()) {
+                DailyPush.onLaunchAgainstFakeServer(application, BuildConfig.SMOKE_BACKEND, packageManager.getPackageInfo(packageName, 0).versionName.orEmpty())
+            } else if (HumoApp.firebaseReady(application)) {
                 DailyPush.onLaunch(intent, packageManager.getPackageInfo(packageName, 0).versionName.orEmpty())
             }
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@launch
