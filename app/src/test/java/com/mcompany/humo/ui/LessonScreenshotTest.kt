@@ -59,7 +59,10 @@ import org.robolectric.annotation.GraphicsMode
 class LessonScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun shot(name: String) = compose.onRoot().captureRoboImage("build/outputs/roborazzi/lesson/$name.png")
+    private fun shot(name: String) {
+        ScreenChecks.check(compose, "lesson/$name")
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/lesson/$name.png")
+    }
 
     private fun player(theme: LessonTheme, flow: LessonFlow = LessonFlow(), fontScale: Float = 1f, finished: (Int) -> Unit = {}, motion: Boolean = false): LessonFlow {
         compose.setContent {
