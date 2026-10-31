@@ -16,7 +16,7 @@ internal object LessonLines {
     const val STAY = "Sure. Take your time."
     const val REVIEW = "Ok, let's get into it."
     const val OPEN_FALLBACK = "Ok, let's go. What do you need?"
-    const val QUIT = "Wait, you're so close! Stay a bit?"
+    const val QUIT = "Leaving so soon? Your spot is saved. Come back when you are ready."
     const val AGAIN = "Say it another way?"
     const val MIC_ASK = "I need to hear you. Tap Allow, please."
     const val MIC_DENIED = "No problem. You can type, or tap one of these."
@@ -61,8 +61,35 @@ internal object LessonLines {
     /** The bold line on top of the card. */
     fun howTitle(page: LessonPage): String = "translate by (${page.move.x}, ${page.move.y})"
 
-    fun wrongTranslate(machine: String) = "Not all the ${machine}s landed on their targets, lowkey close though."
-    fun wrongDrag(machine: String) = "The $machine isn't in the right spot yet, no stress."
+    /**
+     * Humo's wrong-try lines (player.js `linePools`): each at most 8 words, casual, naming the real slip. [ex] / [ey] are how far
+     * right / up the try is off (positive = too far). A learner who misses again meets a new line each time.
+     */
+    class Pools(val xOnly: List<String>, val yOnly: List<String>, val both: List<String>, val swap: List<String>, val generic: List<String>)
+
+    fun linePools(ex: Int, ey: Int, machine: String): Pools {
+        val xs = "${abs(ex)} ${if (ex > 0) "too far" else "short"}"
+        val ys = "${abs(ey)} ${if (ey > 0) "too far" else "short"}"
+        return Pools(
+            xOnly = listOf("Up's good. Right is $xs.", "So close. Right is $xs.", "Half there! Right is $xs.", "Right's the slip: $xs.", "Up works. Count right again.", "Nice up. Right needs a recount."),
+            yOnly = listOf("Right's good. Up is $ys.", "So close. Up is $ys.", "Half there! Up is $ys.", "Up's the slip: $ys.", "Right works. Count up again.", "Nice right. Up needs a recount."),
+            both = listOf("Right $xs, up $ys.", "Both are off. Right first.", "Not yet. Count right, then up.", "Both slipped. Try one $machine first.", "Count the gap to one ring.", "Two to fix. Start with right."),
+            swap = listOf("Right first, up second. Swap them.", "Right numbers, wrong order.", "Flip those two numbers.", "Order slip: right goes first."),
+            generic = listOf("Not on the rings yet.", "Missed it. Look at the rings.", "Close! Try another pair.", "Off the mark. Count again.", "Rings still empty. Go again.", "Hmm, not quite. Recount.", "Still short. Try once more.", "Nope, not that one. Again?"),
+        )
+    }
+
+    /** The pools for one real try: ([learner's move] - [answer]); a swapped pair gets the order lines first. */
+    fun wrongPools(tried: Node, answer: Node, graded: Boolean, machine: String): List<List<String>> {
+        val ex = tried.x - answer.x
+        val ey = tried.y - answer.y
+        val p = linePools(ex, ey, machine)
+        val swapped = graded && tried.x == answer.y && tried.y == answer.x && ex != 0 && ey != 0
+        return listOf(if (swapped) p.swap else if (ex != 0 && ey == 0) p.xOnly else if (ey != 0 && ex == 0) p.yOnly else p.both, p.generic)
+    }
+
+    fun demoRight(m: Node) = if (m.y != 0) "Right ${m.x}, then up ${m.y}." else "Right ${m.x}. Nothing up."
+    fun youMoved(m: Node) = "You moved ${m.x} right, ${m.y} up."
 
     /** What the tutor can say about one page. */
     private fun tutor(page: LessonPage, fly: Boolean, machine: String): Set<String> = buildSet {
@@ -78,9 +105,15 @@ internal object LessonLines {
         return buildSet {
             lesson.pages.forEach { p -> lesson.coach[p.id]?.let(::add) }
             addAll(praise)
-            add(wrongTranslate(machine)); add(wrongDrag(machine)); add(REVIEW); add(OPEN_FALLBACK)
+            for (ex in -3..3) for (ey in -3..3) if (ex != 0 || ey != 0) linePools(ex, ey, machine).let { p ->
+                addAll(if (ex != 0 && ey == 0) p.xOnly else if (ey != 0 && ex == 0) p.yOnly else p.both); addAll(p.swap); addAll(p.generic)
+            }
+            for (a in 0..5) for (b in 0..5) add(youMoved(Node(a, b)))
+            (lesson.skill + lesson.fixit).forEach { add(demoRight(it.move)) }
+            if (lesson === L11) listOf("fixLook2", "fixNone", "fixThen", "fixNew", "fixPass", "fixTitle").forEach { addAll(L11.fx(it)) }
+            add(REVIEW); add(OPEN_FALLBACK)
             add(YES); add(SEE_IT); add(STAY); add(CHECK_FIRST); add(QUIT); add(AGAIN); add(MIC_ASK); add(MIC_DENIED)
-            (lesson.pages + lesson.skill).forEach { addAll(tutor(it, fly, machine)) }
+            (lesson.pages + lesson.skill + lesson.fixit).forEach { addAll(tutor(it, fly, machine)) }
         }
     }
 }

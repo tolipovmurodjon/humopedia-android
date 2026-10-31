@@ -425,6 +425,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                 translate(2f * s, 12f * s) {
                     graph(g, text)
                     humoMarks(g, flow.marks)
+                    humoBraces(g, flow.braces, text)
                     val now = tick.longValue
                     val run = disp.value
                     page.points.forEach { start ->
@@ -479,48 +480,6 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                     Text("Play", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * (u / 1.dp)).toSp() }, color = if (playing) Color(0xFFBDBDBD) else Color.Black)
                 }
             }
-        } else {
-            // The tray keeps its place even when hidden, so nothing under it jumps (RULES: no layout jumps).
-            Spacer(Modifier.height(14.dp * (u / 1.dp)))
-            val tray = flow.slots.trayShown && !flow.locked
-            // Brilliant's tray: 0..5 in one row (60 px); -5..5 in two rows of 6 and 5 (104 px), 10 px apart.
-            val rows = page.tiles.chunked(6)
-            Box(
-                Modifier.width(width).height((if (rows.size > 1) 104.dp else 60.dp) * (u / 1.dp)).alpha(if (tray) 1f else 0f)
-                    .clip(RoundedCornerShape(4.dp * (u / 1.dp))).background(Color(0xFFDAE2FF)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp * (u / 1.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-                    rows.forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp * (u / 1.dp))) {
-                            row.forEach { v ->
-                                Tile(v, u, enabled = tray) {
-                                    flow.tapTile(v)
-                                    LessonSounds.play(Cue.Tick)
-                                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Tile(v: Int, u: Dp, enabled: Boolean, onTap: () -> Unit) {
-    val density = LocalDensity.current
-    val interaction = remember { MutableInteractionSource() }
-    val k = u / 1.dp
-    Box(
-        Modifier.size(40.dp * k, 36.dp * k).pressScale(interaction)
-            .clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onTap)
-            .semantics { contentDescription = "Tile $v" }.testTag("tile-$v"),
-    ) {
-        Box(Modifier.offset(y = 2.dp * k).size(40.dp * k, 34.dp * k).clip(RoundedCornerShape(6.dp * k)).background(Color(0x66000000)))
-        Box(Modifier.size(40.dp * k, 34.dp * k).clip(RoundedCornerShape(6.dp * k)).background(Color.White), contentAlignment = Alignment.Center) {
-            Text(signed(v), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * k).toSp() }, color = Color.Black)
         }
     }
 }
@@ -572,14 +531,14 @@ private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
     }
     val active = flow.slots.active == i && !flow.locked
     val border = when {
-        active -> Color(0xFF456DFF)
+        active -> Color(0xFF23A06C)
         v != null -> Color(0x1A000000)
         else -> Color(0xFF999999)
     }
     val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier.padding(horizontal = 1.dp).size(32.dp * k, 24.dp * k).clip(RoundedCornerShape(4.dp * k))
-            .background(if (active) Color(0xFFECF0FF) else Color.White)
+            .background(if (active) Color(0xFFE3F4EC) else Color.White)
             .border(2.dp * k, border, RoundedCornerShape(4.dp * k))
             .clickable(interaction, null, enabled = !flow.locked && v != null, role = Role.Button) { flow.tapSlot(i); LessonSounds.play(Cue.Tick) }
             .semantics { contentDescription = "Slot ${i + 1}, ${v ?: "empty"}" }.testTag("slot-$i"),

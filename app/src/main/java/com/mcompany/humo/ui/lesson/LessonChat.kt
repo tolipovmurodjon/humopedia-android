@@ -95,14 +95,6 @@ class HumoChatState {
     internal fun openClean() { chips = Chips.More; request = null; current = ""; busy = false; open = true }
 }
 
-/** Humo's face and the word HUMO (Duolingo's lightbulb HELP): one button that opens the tutor sheet. */
-@Composable
-internal fun HumoButton(humo: HumoState, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Chunky("HUMO", Kind.Secondary, true, modifier.semantics { contentDescription = "Ask Humo" }, onClick = onClick, leading = {
-        Humo(humo, Modifier.size(34.dp))
-    })
-}
-
 /**
  * The tutor (Duolingo's bottom sheet): a grabber, Humo big on the left with an outlined speech bubble whose text types in
  * while his mouth moves and Jessa's voice plays, one row of chips that scrolls sideways, a field to type a question, and
@@ -198,13 +190,13 @@ internal fun TutorSheet(
     }
 
     Column(
-        modifier.fillMaxWidth().testTag("tutor-sheet").clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(Color.White)
-            .padding(top = 10.dp, bottom = 12.dp + bottomInset),
+        modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("tutor-sheet").chromeGlass(28.dp)
+            .padding(top = 10.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(width = 44.dp, height = 5.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFD9D9D9)))
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 20.dp, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Humo(humo, Modifier.size(110.dp))
+            Humo(humo, Modifier.size(92.dp))
             Spacer(Modifier.width(14.dp))
             Speech(chat.current.take(shown.coerceAtMost(chat.current.length)), Modifier.weight(1f))
         }
@@ -230,7 +222,7 @@ internal fun TutorSheet(
                 }
             }
         }
-        AskField(question, { question = it }, mic.listening, Modifier.padding(horizontal = 20.dp), onMic = ::micTapped, onSend = { q -> question = ""; typed(q) })
+        AskPill(question, { question = it }, mic.listening, mic.level, Modifier.padding(horizontal = 16.dp), onMic = ::micTapped, onCancel = { mic.cancel(); question = "" }, onSend = { q -> if (mic.listening) mic.stop() else { question = ""; typed(q) } })
         Spacer(Modifier.height(12.dp))
         Chunky("DONE", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 20.dp), onClick = ::close)
     }
@@ -267,37 +259,75 @@ private fun Chip(label: String, onClick: () -> Unit) {
 }
 
 /**
- * Type or say a question instead of tapping a chip: the words pick the nearest answer Humo has (his clips are a finite set).
- * The mic sits beside the field and pulses a ring while it listens.
+ * Brilliant's input pill (Boss: "the target"): a soft grey capsule. Listening: a round X (cancel), a dotted live waveform that
+ * swells with the child's voice (or the words as they come), a round send arrow. Not listening: a round mic, the field, the
+ * send arrow. Speak freely: the words pick the nearest answer Humo has (his clips are a finite set).
  */
 @Composable
-private fun AskField(value: String, onValue: (String) -> Unit, listening: Boolean, modifier: Modifier, onMic: () -> Unit, onSend: (String) -> Unit) {
-    fun send() { val t = value.trim(); if (t.isNotEmpty()) onSend(t) }
-    Row(modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(16.dp)).border(2.dp, if (listening) Color(0xFF3DC98C) else Color(0xFFE5E5E5), RoundedCornerShape(16.dp)).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        BasicTextField(
-            value, onValue, Modifier.weight(1f).testTag("tutor-input"), singleLine = true,
-            textStyle = TextStyle(fontFamily = LessonType.Figtree, fontSize = 16.sp, color = Color(0xFF3C3C3C)),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
-            decorationBox = { inner -> Box(contentAlignment = Alignment.CenterStart) { if (value.isEmpty()) Text(if (listening) "Listening..." else "Ask Humo something", fontFamily = LessonType.Figtree, fontSize = 16.sp, color = Color(0xFFAFAFAF)); inner() } },
-        )
-        val pulse by rememberInfiniteTransition(label = "mic").animateFloat(0f, 1f, infiniteRepeatable(tween(900), RepeatMode.Restart), label = "ring")
-        Box(Modifier.size(48.dp).clickable(role = Role.Button, onClickLabel = "Talk to Humo", onClick = onMic).semantics { contentDescription = if (listening) "Stop listening" else "Talk to Humo" }, contentAlignment = Alignment.Center) {
-            Canvas(Modifier.size(48.dp)) {
-                if (listening) drawCircle(Color(0xFF3DC98C), size.minDimension * (0.28f + 0.22f * pulse), alpha = 0.45f * (1f - pulse))
-                val c = if (listening) Color(0xFF23A06C) else Color(0xFF6B7079)
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-                val u = size.width / 48f
-                drawRoundRect(c, Offset(cx - 5f * u, cy - 11f * u), androidx.compose.ui.geometry.Size(10f * u, 17f * u), androidx.compose.ui.geometry.CornerRadius(5f * u))
-                drawArc(c, 0f, 180f, false, Offset(cx - 9f * u, cy - 8f * u), androidx.compose.ui.geometry.Size(18f * u, 18f * u), style = Stroke(2f * u, cap = StrokeCap.Round))
-                drawLine(c, Offset(cx, cy + 10f * u), Offset(cx, cy + 14f * u), 2f * u, StrokeCap.Round)
+private fun AskPill(value: String, onValue: (String) -> Unit, listening: Boolean, level: Float, modifier: Modifier, onMic: () -> Unit, onCancel: () -> Unit, onSend: (String) -> Unit) {
+    fun send() { val t = value.trim(); if (t.isNotEmpty() || listening) onSend(t) }
+    val ink = Color(0xFF3C3C3C)
+    Row(modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(27.dp)).background(Color(0xFFF1F1F1)).border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(27.dp)).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(if (listening) Color(0xFFD9D9D9) else Color(0xFFE6F6EE))
+                .clickable(role = Role.Button, onClickLabel = if (listening) "Cancel" else "Talk to Humo", onClick = if (listening) onCancel else onMic)
+                .semantics { contentDescription = if (listening) "Cancel listening" else "Talk to Humo" }.testTag(if (listening) "pill-cancel" else "pill-mic"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(22.dp)) {
+                val u = size.width / 22f
+                if (listening) {
+                    drawLine(ink, Offset(5f * u, 5f * u), Offset(17f * u, 17f * u), 2.6f * u, StrokeCap.Round)
+                    drawLine(ink, Offset(17f * u, 5f * u), Offset(5f * u, 17f * u), 2.6f * u, StrokeCap.Round)
+                } else {
+                    val c = Color(0xFF23A06C)
+                    drawRoundRect(c, Offset(8f * u, 2f * u), androidx.compose.ui.geometry.Size(6f * u, 11f * u), androidx.compose.ui.geometry.CornerRadius(3f * u))
+                    drawArc(c, 0f, 180f, false, Offset(5f * u, 5f * u), androidx.compose.ui.geometry.Size(12f * u, 11f * u), style = Stroke(1.8f * u, cap = StrokeCap.Round))
+                    drawLine(c, Offset(11f * u, 16f * u), Offset(11f * u, 20f * u), 1.8f * u, StrokeCap.Round)
+                }
             }
         }
-        Box(Modifier.size(48.dp).clickable(role = Role.Button, onClickLabel = "Send", onClick = ::send).semantics { contentDescription = "Send question" }, contentAlignment = Alignment.Center) {
-            Canvas(Modifier.size(20.dp)) {
-                val c = if (value.isBlank()) Color(0xFFAFAFAF) else Color(0xFF23A06C)
-                drawPath(Path().apply { moveTo(0f, 0f); lineTo(size.width, size.height / 2f); lineTo(0f, size.height); lineTo(size.width * 0.18f, size.height / 2f); close() }, c)
+        Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+            if (listening && value.isEmpty()) Dots(level) else if (listening) Text(value, fontFamily = LessonType.Figtree, fontSize = 16.sp, color = ink, maxLines = 1)
+            else BasicTextField(
+                value, onValue, Modifier.fillMaxWidth().testTag("tutor-input"), singleLine = true,
+                textStyle = TextStyle(fontFamily = LessonType.Figtree, fontSize = 16.sp, color = ink),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
+                decorationBox = { inner -> Box(contentAlignment = Alignment.CenterStart) { if (value.isEmpty()) Text("Ask Humo something", fontFamily = LessonType.Figtree, fontSize = 16.sp, color = Color(0xFFAFAFAF)); inner() } },
+            )
+        }
+        val live = listening || value.isNotBlank()
+        Box(
+            Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(if (live) Color(0xFF3DC98C) else Color(0xFFE0E0E0)).clickable(role = Role.Button, onClickLabel = "Send", onClick = ::send)
+                .semantics { contentDescription = "Send question" }.testTag("pill-send"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(18.dp)) {
+                val u = size.width / 18f
+                val c = if (live) Color.White else Color(0xFFAFAFAF)
+                drawLine(c, Offset(9f * u, 15f * u), Offset(9f * u, 3.5f * u), 2.4f * u, StrokeCap.Round)
+                drawLine(c, Offset(9f * u, 3.5f * u), Offset(4f * u, 8.5f * u), 2.4f * u, StrokeCap.Round)
+                drawLine(c, Offset(9f * u, 3.5f * u), Offset(14f * u, 8.5f * u), 2.4f * u, StrokeCap.Round)
             }
+        }
+    }
+}
+
+/** The pill drawn on its own, for the screenshot test (the recogniser cannot run on a CI emulator). */
+@Composable
+internal fun AskPillPreview(listening: Boolean, level: Float) = AskPill("", {}, listening, level, Modifier, {}, {}, {})
+
+/** The dotted live waveform: 18 dots that swell one after the other with how loud the child is. */
+@Composable
+private fun Dots(level: Float) {
+    val t by rememberInfiniteTransition(label = "dots").animateFloat(0f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Restart), label = "phase")
+    Canvas(Modifier.fillMaxWidth().height(24.dp).semantics { contentDescription = "Listening" }) {
+        val n = 18
+        val gap = size.width / n
+        for (i in 0 until n) {
+            val wave = (kotlin.math.sin((i / n.toFloat() - t) * 2f * Math.PI.toFloat()) + 1f) / 2f
+            val r = 2.2.dp.toPx() + (1.0f + 4.5.dp.toPx()) * level * wave
+            drawCircle(Color(0xFF8A8F96), r, Offset(gap * (i + 0.5f), size.height / 2f))
         }
     }
 }

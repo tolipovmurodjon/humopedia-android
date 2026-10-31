@@ -14,6 +14,15 @@ const pages = L.screens.filter((p) => p.type !== 'frame').map((p) => {
   if (p.targets) p.targets.forEach((t, j) => { if (t[0] !== p.planes[j][0] + p.order[0] || t[1] !== p.planes[j][1] + p.order[1]) throw new Error(`${p.page}: target ${j} is not point + move`); });
   return o;
 });
+// the fix-it gate (Boss, 2026-10-31): a pool of fresh problems and Humo's lines, read from the same file the web player reads
+const fixit = (L.fixit || []).map((p) => {
+  const g = p.grid, key = [g.x1, g.y1, g.every].join(',');
+  if (!grids[key]) throw new Error(`${p.page}: unknown grid ${key}`);
+  p.targets.forEach((t, j) => { if (t[0] !== p.planes[j][0] + p.order[0] || t[1] !== p.planes[j][1] + p.order[1]) throw new Error(`${p.page}: target ${j} is not point + move`); });
+  return { id: p.page, kind: 'Translate', grid: grids[key], prompt: S[p.lines[0]], points: p.planes, move: p.order, skill: false, explain: null };
+});
+const fx = {};
+for (const k of ['gate', 'fixTitle', 'fixGo', 'fixLook', 'fixLook2', 'fixNone', 'fixThen', 'fixNew', 'fixPass', 'showMe']) fx[k] = String(S[k]).split('|');
 const voiceDir = path.join(course, 'lessons/assets/voice'), outVoice = path.join(__dirname, '../app/src/main/assets/voice');
 const name = 'SR-71', w = (t) => t.replace(/\bthe points\b/g, `the ${name}s`).replace(/\bthe point\b/g, `the ${name}`).replace(/\bThe point\b/g, `The ${name}`).replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1');
 const lines = new Set([...Object.values(S.coach).map(w), ...S.praise.split('|'), ...S.nudge.split('|'), ...pages.map((p) => w(p.prompt)),
@@ -24,7 +33,7 @@ for (const t of lines) {
   const f = crypto.createHash('sha1').update('yj30vwTGJxSHezdAGsv9|' + t).digest('hex').slice(0, 16) + '.mp3';
   if (fs.existsSync(path.join(voiceDir, f))) { fs.copyFileSync(path.join(voiceDir, f), path.join(outVoice, f)); voice[t] = f; } else missing.push(t);
 }
-const out = { id, title: S.title, pages, coach: S.coach, praise: S.praise.split('|'), nudge: S.nudge.split('|'), voice };
+const out = { id, title: S.title, pages, fixit, fx, coach: S.coach, praise: S.praise.split('|'), nudge: S.nudge.split('|'), voice };
 fs.writeFileSync(path.join(__dirname, '../app/src/main/resources/lessons/' + id.replace('.', '').toLowerCase() + '.json'), JSON.stringify(out, null, 1));
 console.log(`${pages.length} pages, ${Object.keys(voice).length} voice files bundled, ${missing.length} lines without a cached mp3:`);
 missing.forEach((t) => console.log('  - ' + t));

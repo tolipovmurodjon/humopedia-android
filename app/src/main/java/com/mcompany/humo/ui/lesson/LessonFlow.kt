@@ -49,14 +49,25 @@ sealed interface Screen {
     data object SkillSplash : Screen
     data class Skill(val j: Int) : Screen
     data object Score : Screen
-    data class Review(val k: Int) : Screen
+    /** "Almost! Let's fix one.": a skill-check miss is never a fail screen, Humo starts the fix-it round (player.js `fixIntro`). */
+    data object FixIntro : Screen
+    /** Humo replays the missed problem on the board. */
+    data object Demo : Screen
+    /** One of the two fresh problems of a fix-it round. */
+    data class Fix(val k: Int) : Screen
     data object End : Screen
+    /** END LESSON with nowhere to go: a calm goodbye, never "Lesson complete" or sparks. */
+    data object Bye : Screen
 }
 
+/** A bracket Humo draws on the board: a short label beside a run of cells, from [from] to [to] (cells), one mark at a time. */
+data class Brace(val from: Node, val to: Node, val label: String)
+
 /**
- * L1.1's player as plain state (Brilliant's lesson player, brilliant.html flows): pages P1-P7, the skill check with no
- * verdict per item, the score, review, retry and the end card. Grading, sparks, praise order and the tile flow live
- * here so the JVM tests check them without a screen. Values are snapshot state, so the screen redraws on change.
+ * L1.1's player as plain state (Brilliant's lesson player, brilliant.html flows): pages P1-P7, the skill check as a mastery
+ * gate (3 of 3 on the first try passes; any miss or Show me goes to Humo's fix-it round and loops until two fresh problems
+ * are right), the end card. Grading, sparks, line pools and the tile flow live here so the JVM tests check them without a
+ * screen. Values are snapshot state, so the screen redraws on change.
  */
 class LessonFlow(val lesson: LessonContent = L11) {
     val pages: List<LessonPage> = lesson.pages
@@ -87,25 +98,44 @@ class LessonFlow(val lesson: LessonContent = L11) {
     var showHow by mutableStateOf(false)
     /** Teal squares Humo draws round points on the board when he looks at a wrong try with the learner. */
     var marks by mutableStateOf<List<Node>>(emptyList())
+    /** Short labels Humo draws on the board while he counts ("4 steps" right, then "up"); Koji-minimal. */
+    var braces by mutableStateOf<List<Brace>>(emptyList())
     /** Humo's teacher line for this page (shown in the bubble until a verdict replaces it). */
     val coach: String? get() = page?.id?.let { lesson.coach[it] }
     /** Lesson pages answered right at least once (sparks are paid once per page). */
     private val solved = mutableSetOf<Int>()
-    /** The web player picks the praise by the page's place in the whole flow (pages, splash, skill items); so do we. */
-    private fun praiseIndex(s: Screen): Int = when (s) {
-        is Screen.Page -> s.i
-        is Screen.Review -> pages.size + 1 + reviewQueue[s.k]
-        else -> 0
+    /** Lines said so far: no pool line is said twice in one lesson run until its pool is used up (player.js `fresh`). */
+    private val said = mutableSetOf<String>()
+    /** The first line of the first pool that has an unsaid one; when all are said the last pool starts over. */
+    fun fresh(vararg pools: List<String>): String {
+        for (pool in pools) { val a = pool.filter { it !in said }; if (a.isNotEmpty()) { said += a[0]; return a[0] } }
+        val last = pools.last()
+        said.removeAll(last.toSet()); said += last[0]
+        return last[0]
     }
     /** null = not answered yet; per skill item. */
     val skillResults = mutableStateListOf<Boolean?>().apply { repeat(skill.size) { add(null) } }
     private val skillAnswers = arrayOfNulls<Slots>(skill.size)
-    private var reviewQueue = emptyList<Int>()
+    /** What the learner tried on a missed problem (page id -> the move in the slots), so Humo can show it back. */
+    private val mine = mutableMapOf<String, Node?>()
+    /** The problem Humo replays now, and what the learner did on it. */
+    var demoPage by mutableStateOf<LessonPage?>(null); private set
+    var demoMine by mutableStateOf<Node?>(null); private set
+    /** Humo is still replaying: the board is his, Continue waits. */
+    var demoBusy by mutableStateOf(false)
+    private var fixPair = emptyList<LessonPage>()
+    private var fixN = 0
+    /** The right / wrong of the two fix-it problems of the round in play. */
+    val fixResults = mutableStateListOf<Boolean>()
+    /** The skill check was passed by way of fix-it: Humo bounces and says one warm line, no jet pass. */
+    var small by mutableStateOf(false); private set
+    var endLine by mutableStateOf<String?>(null); private set
 
     val page: LessonPage? get() = when (val s = screen) {
         is Screen.Page -> pages[s.i]
         is Screen.Skill -> skill[s.j]
-        is Screen.Review -> skill[reviewQueue[s.k]]
+        is Screen.Demo -> demoPage
+        is Screen.Fix -> fixPair.getOrNull(s.k)
         else -> null
     }
 
@@ -116,17 +146,18 @@ class LessonFlow(val lesson: LessonContent = L11) {
     }
 
     val inSkill: Boolean get() = screen is Screen.Skill
+    val inFix: Boolean get() = screen is Screen.Fix
     val canGoBack: Boolean get() = (screen as? Screen.Page)?.let { it.i > 0 } ?: false
-    /** Checked: a verdict shows (lesson pages, review) or the skill item was answered (no verdict there). */
+    /** Checked: a verdict shows (lesson pages, fix-it) or the skill item was answered (no verdict there). */
     val answered: Boolean get() = phase != Phase.Idle || screen is Screen.Skill && skillResults[(screen as Screen.Skill).j] != null
     /** The machines are flying to where the numbers sent them; the board waits for them before it grades (Check). */
     var flying by mutableStateOf(false)
-    val locked: Boolean get() = answered || flying
+    val locked: Boolean get() = answered || flying || demoBusy || screen is Screen.Demo
 
     /** Check is live once the board changed (Brilliant greys it out on an untouched board). */
     val canCheck: Boolean get() {
         val p = page ?: return false
-        return phase == Phase.Idle && !flying && !answered && when (p.kind) {
+        return phase == Phase.Idle && !flying && !answered && !locked && when (p.kind) {
             PageKind.Drag -> dragAt != null && dragAt != p.points[0]
             PageKind.Translate -> slots.full
             else -> false
@@ -150,12 +181,30 @@ class LessonFlow(val lesson: LessonContent = L11) {
     fun tapTile(v: Int) { if (!locked) slots = slots.place(v) }
     fun tapSlot(i: Int) { if (!locked) slots = slots.select(i) }
     fun startOver() { if (!locked) { dragAt = null; slots = page?.let { Slots.start(it) } ?: Slots() } }
+    /** The keypad's undo: the number in the slot just filled goes, and that slot is active again. */
+    fun undo() {
+        if (locked) return
+        val s = slots
+        val last = listOf(1, 0).firstOrNull { it !in s.fixed && s[it] != null } ?: return
+        slots = (if (last == 0) s.copy(a = null) else s.copy(b = null)).copy(active = last)
+    }
+    /** Humo sets the numbers himself while he replays a problem (null = empty slots). */
+    fun demoSet(move: Node?) { slots = if (move == null) Slots.start(page ?: return) else Slots(move.x, move.y, null, slots.fixed) }
 
     /** Is the board right? Brilliant grades the landing: the dragged node, or the slots' translation. */
     fun isRight(p: LessonPage = page!!): Boolean = when (p.kind) {
         PageKind.Drag -> dragAt == p.points[0] + p.move
         PageKind.Translate -> slots.move == p.move
         else -> true
+    }
+
+    /** Humo's line for a wrong try: the slip it names is the real one, and it is a new line each time (player.js `wrongLine`). */
+    private fun wrongLine(p: LessonPage): String {
+        val tried = when (p.kind) {
+            PageKind.Drag -> (dragAt ?: p.points[0]) - p.points[0]
+            else -> slots.move ?: Node(0, 0)
+        }
+        return fresh(*LessonLines.wrongPools(tried, p.move, p.kind == PageKind.Translate, machineName).toTypedArray())
     }
 
     /** Returns true when right. A skill item never shows a verdict: it is recorded and the screen moves on. */
@@ -166,17 +215,21 @@ class LessonFlow(val lesson: LessonContent = L11) {
             is Screen.Skill -> {
                 // The skill check keeps the page tint and shows a corner verdict instead of Humo's bubble (player.js graded).
                 skillResults[s.j] = ok; skillAnswers[s.j] = slots
+                if (!ok) mine[p.id] = slots.move
                 phase = if (ok) Phase.Correct else Phase.Wrong
-                verdict = if (ok) "Correct!" else "Not quite."
+                verdict = if (ok) "Correct!" else "Incorrect"
+                if (ok) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
+            }
+            is Screen.Fix -> {
+                fixResults += ok
+                if (!ok) mine[p.id] = slots.move
+                phase = if (ok) Phase.Correct else Phase.Wrong
+                verdict = if (ok) fresh(L11.praise) else wrongLine(p)
                 if (ok) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
             }
             else -> {
                 phase = if (ok) Phase.Correct else Phase.Wrong
-                verdict = when {
-                    ok -> L11.praise[praiseIndex(s) % L11.praise.size]
-                    p.kind == PageKind.Translate -> "Not all the ${machineName}s landed on their targets, lowkey close though."
-                    else -> "The $machineName isn't in the right spot yet, no stress."
-                }
+                verdict = if (ok) fresh(L11.praise) else wrongLine(p)
                 if (ok && s is Screen.Page && solved.add(s.i)) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
             }
         }
@@ -191,53 +244,77 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     /** Try again clears the verdict, Humo's marks and (on a translate page) both numbers, so the machines fly home. */
     fun tryAgain() {
-        phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList(); showHow = false
+        phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList(); braces = emptyList(); showHow = false
         val p = page
         if (p?.kind == PageKind.Translate) slots = Slots.start(p)
     }
 
-    /** "I don't know": counts as missed and the machines fly the right move (no shame, no tint). */
+    /** "Show me" in the skill check: counts as missed and goes on to Humo's fix-it round (no shame, no tint). */
     fun dontKnow() {
         val s = screen as? Screen.Skill ?: return
         val p = skill[s.j]
         skillResults[s.j] = false
+        mine[p.id] = null
         slots = Slots(p.move.x, p.move.y, null, slots.fixed)
         skillAnswers[s.j] = slots
         verdict = "Here's how it goes."
     }
 
-    /** After a skill item's Check (or "I don't know"): the next item, or the score. */
+    /** After a skill item's Check (or Show me): the next item, then the score (a clean 3 of 3) or the fix-it round. */
     fun nextSkill() {
         val s = screen as? Screen.Skill ?: return
-        if (s.j + 1 < skill.size) show(Screen.Skill(s.j + 1)) else show(Screen.Score)
+        when {
+            s.j + 1 < skill.size -> show(Screen.Skill(s.j + 1))
+            skillResults.all { it == true } -> show(Screen.Score)
+            else -> show(Screen.FixIntro)
+        }
     }
 
-    /** Continue on a lesson page / review item. */
+    /** Continue on a lesson page / fix-it problem / Humo's replay. */
     fun next() {
         when (val s = screen) {
             is Screen.Page -> show(if (s.i + 1 < pages.size) Screen.Page(s.i + 1) else Screen.SkillSplash)
-            is Screen.Review -> show(if (s.k + 1 < reviewQueue.size) Screen.Review(s.k + 1) else Screen.End)
+            is Screen.Demo -> show(Screen.Fix(0))
+            is Screen.Fix -> if (s.k == 0) show(Screen.Fix(1)) else fixDecide()
             else -> Unit
         }
     }
 
     fun back() { val s = screen as? Screen.Page ?: return; if (s.i > 0) show(Screen.Page(s.i - 1)) }
 
-    fun startSkill() { for (i in skillResults.indices) skillResults[i] = null; show(Screen.Skill(0)) }
+    fun startSkill() { for (i in skillResults.indices) skillResults[i] = null; mine.clear(); show(Screen.Skill(0)) }
     fun beginSkillSplash() = show(Screen.SkillSplash)
 
     val skillRight: Int get() = skillResults.count { it == true }
 
-    fun startReview() {
-        reviewQueue = skillResults.indices.filter { skillResults[it] != true }
-        if (reviewQueue.isEmpty()) show(Screen.End) else show(Screen.Review(0))
+    /** "Fix it with Humo": he replays a missed problem, then serves two fresh ones from the pool, in order, wrapping. */
+    fun fixStart(missed: LessonPage = skill[skillResults.indexOfFirst { it != true }.coerceAtLeast(0)]) {
+        val pool = lesson.fixit
+        fixPair = List(2) { pool[fixN++ % pool.size] }
+        fixResults.clear()
+        demoPage = missed.copy(skill = false)
+        demoMine = mine[missed.id]
+        show(Screen.Demo)
     }
 
-    fun skipReview() = show(Screen.End)
+    /** Both right = passed (Humo bounces, no jet); a miss replays that problem and serves a new pair. */
+    private fun fixDecide() {
+        if (fixResults.all { it }) { small = true; endLine = fresh(L11.fx("fixPass")); show(Screen.End) }
+        else fixStart(if (fixResults[0]) fixPair[1] else fixPair[0])
+    }
 
     /** "Restart lesson" on the end card: back to page 1 with nothing earned. */
-    fun restart() { sparks = 0; solved.clear(); for (i in skillResults.indices) skillResults[i] = null; show(Screen.Page(0)) }
+    fun restart() {
+        sparks = 0; solved.clear(); said.clear(); small = false; endLine = null; fixN = 0; mine.clear()
+        for (i in skillResults.indices) skillResults[i] = null
+        show(Screen.Page(0))
+    }
     fun finish() = show(Screen.End)
+    /** END LESSON with no screen to go back to. */
+    fun bye() { before = screen; show(Screen.Bye) }
+    private var before: Screen? = null
+    /** "Back to lesson" on the goodbye: the page the learner left, fresh. */
+    fun resume() = show(before?.takeIf { it !is Screen.Bye } ?: Screen.Page(0))
 
     /** Back to page [i] (tests and the end card's replay). */
     fun goTo(s: Screen) = show(s)
@@ -245,20 +322,15 @@ class LessonFlow(val lesson: LessonContent = L11) {
     private fun show(s: Screen) {
         screen = s
         flying = false
+        demoBusy = false
         phase = Phase.Idle
         verdict = null
         bubble = null
         gain = false
         showHow = false
         marks = emptyList()
+        braces = emptyList()
         dragAt = null
         slots = page?.let { Slots.start(it) } ?: Slots()
-        if (s is Screen.Review) {
-            // The missed item comes back as the learner left it, in its wrong colours, until Try again.
-            val j = reviewQueue[s.k]
-            slots = (skillAnswers[j] ?: Slots.start(skill[j])).copy(active = null).let { if (it.empty) Slots.start(skill[j]) else it }
-            phase = Phase.Wrong
-            verdict = LessonLines.REVIEW
-        }
     }
 }

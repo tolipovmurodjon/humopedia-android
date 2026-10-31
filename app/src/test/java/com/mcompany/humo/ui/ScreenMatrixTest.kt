@@ -146,7 +146,7 @@ abstract class ScreenMatrix(private val width: Int) {
         shot("$tag-chat-sheet")
     }
 
-    /** The skill check, its score, the review of what was missed, the retry card and the end card. */
+    /** The skill check with a miss, Humo's fix-it round and the end card. */
     private fun lessonEnding(font: Float, tag: String, lesson: LessonContent) {
         begin(font)
         val flow = LessonFlow(lesson)
@@ -164,11 +164,11 @@ abstract class ScreenMatrix(private val width: Int) {
             }
             act { flow.nextSkill() }
         }
-        shot("$tag-skill-score")
-        act { flow.startReview() }
-        shot("$tag-review")
-        act { flow.skipReview() }
-        shot("$tag-retry")
+        shot("$tag-fix-intro")
+        act { flow.fixStart() }
+        shot("$tag-fix-demo")
+        act { flow.next() }
+        shot("$tag-fix-1")
         act { flow.finish() }
         shot("$tag-end-card")
     }

@@ -161,28 +161,32 @@ class LessonFlowTest {
         assertEquals(75, flow.sparks)
     }
 
-    @Test fun `a wrong drag gets the same calm line, a right one the praise of its page place`() {
+    @Test fun `a wrong try is a new short line each time, a right one the next praise`() {
         val flow = LessonFlow()
         val said = mutableListOf<String?>()
-        repeat(2) { flow.goTo(Screen.Page(0)); flow.dropAt(Node(3, 3)); flow.check(); said += flow.verdict }
-        flow.goTo(Screen.Page(0)); flow.dropAt(Node(5, 3)); flow.check(); said += flow.verdict
-        flow.goTo(Screen.Page(1)); flow.dropAt(Node(6, 5)); flow.check(); said += flow.verdict
-        val calm = "The point isn't in the right spot yet, no stress."
-        assertEquals(listOf(calm, calm, L11.praise[0], L11.praise[1]), said)
-        assertEquals("Nice, that's it!", L11.praise[0])
+        repeat(3) { flow.goTo(Screen.Page(0)); flow.dropAt(Node(3, 3)); flow.check(); said += flow.verdict }
+        assertEquals("never the same line twice", 3, said.toSet().size)
+        assertTrue("every wrong line is 8 words or fewer: $said", said.all { it!!.split(' ').size <= 8 })
+        assertTrue("the slip it names is the real one (right is 2 short)", said.all { it!!.contains("2 short") || it.contains("Count right again") || it.contains("recount") })
+        flow.goTo(Screen.Page(0)); flow.dropAt(Node(5, 3)); flow.check()
+        assertEquals("Nice, that's it!", flow.verdict)
+        flow.goTo(Screen.Page(1)); flow.dropAt(Node(6, 5)); flow.check()
+        assertEquals("You've got it.", flow.verdict)
     }
 
-    @Test fun `Humo has one teacher line per page and a translate page says how it went wrong`() {
+    @Test fun `Humo has one teacher line per page and a translate page names how it went wrong`() {
         val flow = LessonFlow(L11)
         assertEquals("Ok so, let's go. Count the steps, then move it.", flow.coach)
         flow.goTo(Screen.Page(3))
         assertEquals("Now you pick the numbers. No stress.", flow.coach)
         flow.machineName = "SR-71"
         flow.tapTile(1); flow.tapTile(1); flow.check()
-        assertEquals("Not all the SR-71s landed on their targets, lowkey close though.", flow.verdict)
+        assertEquals("up is two short on this page (the move is 1, 3)", "Right's good. Up is 2 short.", flow.verdict)
         assertNull("the line waits for its delay", flow.bubble)
         flow.showVerdict()
-        assertTrue("the talk keeps the coach line and the verdict", flow.chat.lines.any { it.text.startsWith("Not all") })
+        assertTrue("the talk keeps the coach line and the verdict", flow.chat.lines.any { it.text.startsWith("Right's good") })
+        flow.tryAgain(); flow.tapTile(3); flow.tapTile(1); flow.check()
+        assertEquals("swapped numbers get the order line", "Right first, up second. Swap them.", flow.verdict)
     }
 
     @Test fun `Try again on a translate page clears both numbers and Humo's marks`() {
@@ -197,7 +201,7 @@ class LessonFlowTest {
         assertTrue(flow.marks.isEmpty())
     }
 
-    @Test fun `the walk - pages, skill check with a corner verdict, score, review, end`() {
+    @Test fun `the gate - a miss goes to fix-it, two fresh right pass without a jet, a clean 3 of 3 gets the Score`() {
         val flow = LessonFlow()
         repeat(7) { flow.next() }
         assertEquals(Screen.SkillSplash, flow.screen)
@@ -205,32 +209,78 @@ class LessonFlowTest {
         assertEquals(Screen.Skill(0), flow.screen)
         flow.tapTile(4); flow.tapTile(1)
         assertTrue(flow.check())
-        assertEquals(Phase.Correct, flow.phase)
         assertEquals("Correct!", flow.verdict)
         assertTrue(flow.locked)
         assertFalse("a checked item cannot be checked again", flow.canCheck)
-        assertEquals(15, flow.sparks - 0)
         flow.nextSkill()
         flow.dontKnow()
         assertEquals("Here's how it goes.", flow.verdict)
         assertEquals("the right move is shown", Node(4, 0), flow.slots.move)
-        assertEquals(Phase.Idle, flow.phase)
-        assertTrue(flow.locked)
         flow.nextSkill()
         flow.tapTile(1); flow.tapTile(4); assertFalse(flow.check())
-        assertEquals("Not quite.", flow.verdict)
+        assertEquals("Incorrect", flow.verdict)
         flow.nextSkill()
-        assertEquals(Screen.Score, flow.screen)
+        assertEquals("a miss is never a fail screen", Screen.FixIntro, flow.screen)
         assertEquals(listOf(true, false, false), flow.skillResults.toList())
-        assertEquals("That was tricky!", L11.scoreTitle(flow.skillRight, 3))
-        flow.startReview()
-        assertEquals(Screen.Review(0), flow.screen)
-        assertEquals(Phase.Wrong, flow.phase)
-        flow.tryAgain(); flow.tapTile(4); flow.tapTile(0); assertTrue(flow.check()); flow.next()
-        assertEquals(Screen.Review(1), flow.screen)
-        assertEquals("the learner's own wrong tiles come back", Node(1, 4), flow.slots.move)
+        flow.fixStart()
+        assertEquals(Screen.Demo, flow.screen)
+        assertEquals("Humo replays the first missed problem", "SC2", flow.page!!.id)
+        assertTrue("the board is his while he replays", flow.locked)
         flow.next()
-        assertEquals("the review ends at the end card", Screen.End, flow.screen)
+        assertEquals(Screen.Fix(0), flow.screen)
+        assertEquals("FX1", flow.page!!.id)
+        val m0 = flow.page!!.move
+        flow.tapTile(m0.x); flow.tapTile(m0.y); assertTrue(flow.check()); flow.next()
+        assertEquals(Screen.Fix(1), flow.screen)
+        flow.tapTile(0); flow.tapTile(0); assertFalse(flow.check())
+        flow.next()
+        assertEquals("a miss replays that problem and serves a new pair", Screen.Demo, flow.screen)
+        assertEquals("FX6", flow.page!!.id)
+        flow.next()
+        assertEquals("FX9", flow.page!!.id)
+        for (k in 0..1) { val m = flow.page!!.move; flow.tapTile(m.x); flow.tapTile(m.y); assertTrue(flow.check()); flow.next() }
+        assertEquals(Screen.End, flow.screen)
+        assertTrue("passing through fix-it is the small celebration", flow.small)
+        assertTrue(flow.endLine in L11.fx("fixPass"))
+    }
+
+    @Test fun `a clean 3 of 3 gets the Score and the big end, not fix-it`() {
+        val flow = LessonFlow()
+        flow.startSkill()
+        for (j in 0..2) { val m = flow.page!!.move; flow.tapTile(m.x); flow.tapTile(m.y); assertTrue(flow.check()); flow.nextSkill() }
+        assertEquals(Screen.Score, flow.screen)
+        flow.finish()
+        assertEquals(Screen.End, flow.screen)
+        assertFalse(flow.small)
+    }
+
+    @Test fun `END LESSON ends on a calm goodbye and Back to lesson returns`() {
+        val flow = LessonFlow()
+        flow.goTo(Screen.Page(2))
+        flow.bye()
+        assertEquals(Screen.Bye, flow.screen)
+        flow.resume()
+        assertEquals(Screen.Page(2), flow.screen)
+    }
+
+    @Test fun `the keypad's undo clears the last number and makes its slot active`() {
+        val flow = LessonFlow()
+        flow.goTo(Screen.Page(3))
+        flow.tapTile(2); flow.tapTile(3)
+        flow.undo()
+        assertEquals(2, flow.slots.a); assertNull(flow.slots.b); assertEquals(1, flow.slots.active)
+        flow.undo()
+        assertTrue(flow.slots.empty); assertEquals(0, flow.slots.active)
+    }
+
+    @Test fun `line pools - 8 words at most, and a pool is spent before a line repeats`() {
+        val flow = LessonFlow()
+        val pool = listOf("a", "b")
+        assertEquals(listOf("a", "b", "b", "b"), List(4) { flow.fresh(pool) })
+        for (ex in -3..3) for (ey in -3..3) if (ex != 0 || ey != 0) {
+            val p = com.mcompany.humo.ui.lesson.LessonLines.linePools(ex, ey, "SR-71")
+            for (t in p.xOnly + p.yOnly + p.both + p.swap + p.generic) assertTrue("$t is over 8 words", t.split(' ').size <= 8)
+        }
     }
 
     @Test fun `score titles as Brilliant words them`() {

@@ -243,6 +243,265 @@
    "explain": "Each point needs to move 5 steps right and 2 steps up, so the translation is (5, 2)."
   }
  ],
+ "fixit": [
+  {
+   "id": "FX1",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Each point lands on a target. What is the move?",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     0
+    ]
+   ],
+   "move": [
+    3,
+    2
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX6",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "One move takes them all. Which one?",
+   "points": [
+    [
+     1,
+     3
+    ],
+    [
+     3,
+     1
+    ]
+   ],
+   "move": [
+    3,
+    0
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX9",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "One point, one move. Which move?",
+   "points": [
+    [
+     2,
+     2
+    ]
+   ],
+   "move": [
+    3,
+    1
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX2",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Find the translation that fits.",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     3,
+     2
+    ]
+   ],
+   "move": [
+    2,
+    3
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX7",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Where do they land? Pick the move.",
+   "points": [
+    [
+     2,
+     1
+    ],
+    [
+     5,
+     2
+    ]
+   ],
+   "move": [
+    0,
+    3
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX3",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Each point lands on a target. What is the move?",
+   "points": [
+    [
+     2,
+     3
+    ],
+    [
+     1,
+     0
+    ]
+   ],
+   "move": [
+    3,
+    1
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX10",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "One point, one move. Which move?",
+   "points": [
+    [
+     3,
+     1
+    ]
+   ],
+   "move": [
+    1,
+    4
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX8",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "One move takes them all. Which one?",
+   "points": [
+    [
+     1,
+     3
+    ],
+    [
+     2,
+     0
+    ]
+   ],
+   "move": [
+    5,
+    1
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX4",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Find the translation that fits.",
+   "points": [
+    [
+     4,
+     1
+    ],
+    [
+     2,
+     2
+    ]
+   ],
+   "move": [
+    1,
+    3
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "FX5",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Where do they land? Pick the move.",
+   "points": [
+    [
+     3,
+     0
+    ],
+    [
+     1,
+     2
+    ]
+   ],
+   "move": [
+    2,
+    2
+   ],
+   "skill": false,
+   "explain": null
+  }
+ ],
+ "fx": {
+  "gate": [
+   "Show what you know"
+  ],
+  "fixTitle": [
+   "Almost! Let's fix one."
+  ],
+  "fixGo": [
+   "Fix it with Humo"
+  ],
+  "fixLook": [
+   "Watch the move."
+  ],
+  "fixLook2": [
+   "Here's where it slipped.",
+   "Let me show you.",
+   "Look at the start first.",
+   "Let's trace this one."
+  ],
+  "fixNone": [
+   "No worries. Count with me.",
+   "All good. Follow along.",
+   "It's fine. Watch the move."
+  ],
+  "fixThen": [
+   "That's the move. Try two new.",
+   "There it is. Two fresh ones.",
+   "Got it? Two new ones now."
+  ],
+  "fixNew": [
+   "Two fresh ones. Same idea.",
+   "New pair. You've got this.",
+   "Fresh pair. Take your time.",
+   "Two more. Go for it."
+  ],
+  "fixPass": [
+   "You fixed it. Nice work!",
+   "That's the fix. Well done.",
+   "Got it now. Nice one!",
+   "Fixed it! Real progress."
+  ],
+  "showMe": [
+   "Show me"
+  ]
+ },
  "coach": {
   "P1": "Ok so, let's go. Count the steps, then move it.",
   "P2": "Same move, new starting spot. You've got this.",
@@ -266,8 +525,8 @@
   "Yep, you got it."
  ],
  "nudge": [
-  "Hmm, think about it one more time.",
-  "Lowkey close. What’s another way to look at it?"
+  "Hmm, one more look.",
+  "So close. Try another angle."
  ],
  "voice": {
   "Ok so, let's go. Count the steps, then move it.": "a3cc66bea9a8dce4.mp3",
@@ -280,24 +539,194 @@
   "Nice, that's it!": "99891de188b975b5.mp3",
   "You've got it.": "e3452aa60e65bca3.mp3",
   "Yes! Clean.": "b9032b58fe4beb06.mp3",
-  "Boom, nailed it.": "aec3024e883d301e.mp3",
+  "Boom, nailed it.": "e1f643984203f607.mp3",
   "That's the one.": "45fe178480ba2eb4.mp3",
   "Love it, exactly.": "96e7dce67dda3e99.mp3",
   "Let's go, perfect.": "c7293af7cd775ce6.mp3",
   "Yep, you got it.": "def16eb72b10593b.mp3",
-  "Not all the SR-71s landed on their targets, lowkey close though.": "9dfe27ec639fefce.mp3",
-  "The SR-71 isn't in the right spot yet, no stress.": "133cb5d705070900.mp3",
   "Ok, let's get into it.": "d9b1727095f8070c.mp3",
   "Ok, let's go. What do you need?": "7a871abd2073043e.mp3",
   "Right adds to x, up adds to y. Ready for the next one?": "a9775a2ffe30bbb4.mp3",
-  "Nice. Fix it and try again.": "1f327e87cd436d86.mp3",
+  "Nice. Fix it and try again.": "6227f68523d52fb8.mp3",
   "Sure. Take your time.": "881d762eab444abe.mp3",
   "Check first. Then I will show you why.": "17f9b84220a993ad.mp3",
-  "Say it another way?": "6921c6f2661e5e39.mp3",
-  "Wait, you're so close! Stay a bit?": "ef6ccdbb7b08d94b.mp3",
+  "Say it another way?": "dbf0f331f8cca8d0.mp3",
+  "Leaving so soon? Your spot is saved. Come back when you are ready.": "6120a66dcc3a53d6.mp3",
   "I need to hear you. Tap Allow, please.": "a51d13ffc4cc66cd.mp3",
   "No problem. You can type, or tap one of these.": "7efc6d88fe7b9a41.mp3",
-  "Count the steps right, then up. Then move it there.": "b8e17540c9cc4c8e.mp3",
+  "Right 3 short, up 3 short.": "fb6809531ca8afa5.mp3",
+  "Both are off. Right first.": "f7574d552c34b94b.mp3",
+  "Not yet. Count right, then up.": "0393194886e358f3.mp3",
+  "Both slipped. Try one SR-71 first.": "4144d0bc32b38b2a.mp3",
+  "Count the gap to one ring.": "3be86f8ea675acf1.mp3",
+  "Two to fix. Start with right.": "a0abc2f0c0cb38f8.mp3",
+  "Right first, up second. Swap them.": "be2200d4937633d2.mp3",
+  "Right numbers, wrong order.": "f433edf4eaccfc59.mp3",
+  "Flip those two numbers.": "43f76ce99a0a9bc1.mp3",
+  "Order slip: right goes first.": "e25048af376927b0.mp3",
+  "Not on the rings yet.": "d0507ecb71f96d7e.mp3",
+  "Missed it. Look at the rings.": "b13f0b86e3258ae5.mp3",
+  "Close! Try another pair.": "0e232b084d9d8bf3.mp3",
+  "Off the mark. Count again.": "3dc836effb51b310.mp3",
+  "Rings still empty. Go again.": "3ee9e48db69380d0.mp3",
+  "Hmm, not quite. Recount.": "f76ec47ab99b080b.mp3",
+  "Still short. Try once more.": "95f4674f30191277.mp3",
+  "Nope, not that one. Again?": "d629154e24628e33.mp3",
+  "Right 3 short, up 2 short.": "64ad86b150ba09e0.mp3",
+  "Right 3 short, up 1 short.": "ffa6bf2ddb38a1e6.mp3",
+  "Up's good. Right is 3 short.": "16463e23d2458246.mp3",
+  "So close. Right is 3 short.": "f44a6db36b3583b3.mp3",
+  "Half there! Right is 3 short.": "5644ad076952f62a.mp3",
+  "Right's the slip: 3 short.": "67d325965a59b2ea.mp3",
+  "Up works. Count right again.": "af8db472bc14cad3.mp3",
+  "Nice up. Right needs a recount.": "a2eed2732f4bf68f.mp3",
+  "Right 3 short, up 1 too far.": "673be90430880bb8.mp3",
+  "Right 3 short, up 2 too far.": "5847b9f8fe6a1d4b.mp3",
+  "Right 3 short, up 3 too far.": "bf20654320bf5359.mp3",
+  "Right 2 short, up 3 short.": "b3e0142e6934300f.mp3",
+  "Right 2 short, up 2 short.": "3df85ea62265ad88.mp3",
+  "Right 2 short, up 1 short.": "af61c13e11352d7b.mp3",
+  "Up's good. Right is 2 short.": "077a236d6d9482ba.mp3",
+  "So close. Right is 2 short.": "017448e4cba6e47c.mp3",
+  "Half there! Right is 2 short.": "455340dba935b268.mp3",
+  "Right's the slip: 2 short.": "0158ad228ea5b74f.mp3",
+  "Right 2 short, up 1 too far.": "ccfd1c0d7c35ea7d.mp3",
+  "Right 2 short, up 2 too far.": "293742e8e26c1ec4.mp3",
+  "Right 2 short, up 3 too far.": "882fe85fd4026349.mp3",
+  "Right 1 short, up 3 short.": "ac77d326914f184e.mp3",
+  "Right 1 short, up 2 short.": "e51a80bb40e1b52d.mp3",
+  "Right 1 short, up 1 short.": "fb817cb281f236ab.mp3",
+  "Up's good. Right is 1 short.": "88dc8ea42d437e8a.mp3",
+  "So close. Right is 1 short.": "114410193134c933.mp3",
+  "Half there! Right is 1 short.": "1106d34f4c6e16c7.mp3",
+  "Right's the slip: 1 short.": "a256e7edfe54c2cb.mp3",
+  "Right 1 short, up 1 too far.": "adc63694ece92790.mp3",
+  "Right 1 short, up 2 too far.": "e266a85d0b9cbb32.mp3",
+  "Right 1 short, up 3 too far.": "b3c10dc26b4767c8.mp3",
+  "Right's good. Up is 3 short.": "474bf10033001196.mp3",
+  "So close. Up is 3 short.": "1125accd43e6093c.mp3",
+  "Half there! Up is 3 short.": "1e7be68a00aefccb.mp3",
+  "Up's the slip: 3 short.": "91f30291941e5ee4.mp3",
+  "Right works. Count up again.": "6879bd416cbfb841.mp3",
+  "Nice right. Up needs a recount.": "6328d317f94e78d8.mp3",
+  "Right's good. Up is 2 short.": "056c82eff1fcd70c.mp3",
+  "So close. Up is 2 short.": "1ff19dea7c2b31b7.mp3",
+  "Half there! Up is 2 short.": "cfccd0baafc3cb76.mp3",
+  "Up's the slip: 2 short.": "c4ef3f6334ba4042.mp3",
+  "Right's good. Up is 1 short.": "23bdc2664f6fde2a.mp3",
+  "So close. Up is 1 short.": "55dc5aa9cd447f5d.mp3",
+  "Half there! Up is 1 short.": "ba01ef86b00a0c82.mp3",
+  "Up's the slip: 1 short.": "4d26eee65ff186f9.mp3",
+  "Right's good. Up is 1 too far.": "82998863e9de2bc6.mp3",
+  "So close. Up is 1 too far.": "b7c87e6528d32a47.mp3",
+  "Half there! Up is 1 too far.": "9ba38ed43a043036.mp3",
+  "Up's the slip: 1 too far.": "f49a808af2786af6.mp3",
+  "Right's good. Up is 2 too far.": "b6febd3bf210bbc4.mp3",
+  "So close. Up is 2 too far.": "b319fd413eb0539e.mp3",
+  "Half there! Up is 2 too far.": "2cdbf5d93bb5cf53.mp3",
+  "Up's the slip: 2 too far.": "db70e2fe116d7227.mp3",
+  "Right's good. Up is 3 too far.": "6f7fb361a52ea66e.mp3",
+  "So close. Up is 3 too far.": "d805ed10a92f4a66.mp3",
+  "Half there! Up is 3 too far.": "b73265620cfa966c.mp3",
+  "Up's the slip: 3 too far.": "1a3cf01b5f14f642.mp3",
+  "Right 1 too far, up 3 short.": "e647e9c9efb18f34.mp3",
+  "Right 1 too far, up 2 short.": "0a2abcaa7d599e50.mp3",
+  "Right 1 too far, up 1 short.": "7b034226b299f954.mp3",
+  "Up's good. Right is 1 too far.": "a1ceb0fb661029b0.mp3",
+  "So close. Right is 1 too far.": "c87e1f4182392aae.mp3",
+  "Half there! Right is 1 too far.": "53308769dd9cc8bc.mp3",
+  "Right's the slip: 1 too far.": "7bfe1167b2379119.mp3",
+  "Right 1 too far, up 1 too far.": "14447a7e48e9fe11.mp3",
+  "Right 1 too far, up 2 too far.": "9f8ee92583fee66f.mp3",
+  "Right 1 too far, up 3 too far.": "6252242923c3ef11.mp3",
+  "Right 2 too far, up 3 short.": "2f0b0c52e381efd3.mp3",
+  "Right 2 too far, up 2 short.": "1a1c297078a83fe9.mp3",
+  "Right 2 too far, up 1 short.": "a33623bf39936ed1.mp3",
+  "Up's good. Right is 2 too far.": "053977b469b60997.mp3",
+  "So close. Right is 2 too far.": "5dd43464428ea607.mp3",
+  "Half there! Right is 2 too far.": "78228970569953af.mp3",
+  "Right's the slip: 2 too far.": "c623639173619562.mp3",
+  "Right 2 too far, up 1 too far.": "8d54856bfeb1ab95.mp3",
+  "Right 2 too far, up 2 too far.": "d95f0ed4c11730b4.mp3",
+  "Right 2 too far, up 3 too far.": "0397ddc1d2a2695b.mp3",
+  "Right 3 too far, up 3 short.": "79610a093bc99b7f.mp3",
+  "Right 3 too far, up 2 short.": "f5e2e5155d36f91b.mp3",
+  "Right 3 too far, up 1 short.": "34d2dd16143cad73.mp3",
+  "Up's good. Right is 3 too far.": "9f07cc8297bad4db.mp3",
+  "So close. Right is 3 too far.": "cbc8b620daf8d6fb.mp3",
+  "Half there! Right is 3 too far.": "07c83ddfda1f8171.mp3",
+  "Right's the slip: 3 too far.": "678a527dc0ec89ba.mp3",
+  "Right 3 too far, up 1 too far.": "d4c3c382ecb9dd4c.mp3",
+  "Right 3 too far, up 2 too far.": "f66a53276e05a573.mp3",
+  "Right 3 too far, up 3 too far.": "c3f988c5a338b028.mp3",
+  "You moved 0 right, 0 up.": "40a7ae240f714b29.mp3",
+  "You moved 0 right, 1 up.": "4105d986448bbb76.mp3",
+  "You moved 0 right, 2 up.": "3ac7e6357041e34d.mp3",
+  "You moved 0 right, 3 up.": "6f8713562810c7c2.mp3",
+  "You moved 0 right, 4 up.": "5294f5a97272a643.mp3",
+  "You moved 0 right, 5 up.": "37b21fd9b134e5c2.mp3",
+  "You moved 1 right, 0 up.": "c413c0f6c338b0f6.mp3",
+  "You moved 1 right, 1 up.": "db9edf6403b59828.mp3",
+  "You moved 1 right, 2 up.": "d3a654a5a84cffdb.mp3",
+  "You moved 1 right, 3 up.": "5a4d10ee980d0fcc.mp3",
+  "You moved 1 right, 4 up.": "edca1db2299a4ea7.mp3",
+  "You moved 1 right, 5 up.": "b857204d0bc3bbbf.mp3",
+  "You moved 2 right, 0 up.": "d80bf217ffd84055.mp3",
+  "You moved 2 right, 1 up.": "14d38083c383a4ce.mp3",
+  "You moved 2 right, 2 up.": "d40f42bce8275852.mp3",
+  "You moved 2 right, 3 up.": "5d62a63154826895.mp3",
+  "You moved 2 right, 4 up.": "9efa5b8bc8c9d831.mp3",
+  "You moved 2 right, 5 up.": "f60416c45935356a.mp3",
+  "You moved 3 right, 0 up.": "505b1782f884bb99.mp3",
+  "You moved 3 right, 1 up.": "e89afef304781662.mp3",
+  "You moved 3 right, 2 up.": "593174d42b8d02a9.mp3",
+  "You moved 3 right, 3 up.": "f8786fb5c84aab15.mp3",
+  "You moved 3 right, 4 up.": "28c0afc20a23278a.mp3",
+  "You moved 3 right, 5 up.": "c293a0d083698757.mp3",
+  "You moved 4 right, 0 up.": "bb387d6975dc2ef9.mp3",
+  "You moved 4 right, 1 up.": "3087978c3957264f.mp3",
+  "You moved 4 right, 2 up.": "c0facfea242200f9.mp3",
+  "You moved 4 right, 3 up.": "627a9b23206845a4.mp3",
+  "You moved 4 right, 4 up.": "26516fef9f6d71ce.mp3",
+  "You moved 4 right, 5 up.": "72d4a3e1a056886e.mp3",
+  "You moved 5 right, 0 up.": "c56f510edf6c5bfa.mp3",
+  "You moved 5 right, 1 up.": "99af4cc909646b8f.mp3",
+  "You moved 5 right, 2 up.": "ddfd6b95c790713e.mp3",
+  "You moved 5 right, 3 up.": "bb0fbc3722d35518.mp3",
+  "You moved 5 right, 4 up.": "fc26236a30ccace2.mp3",
+  "You moved 5 right, 5 up.": "d038933ed406b864.mp3",
+  "Right 4, then up 1.": "97112a52cf47523d.mp3",
+  "Right 4. Nothing up.": "e1c5256a37bd9b17.mp3",
+  "Right 5, then up 2.": "09b50f5b8c51effd.mp3",
+  "Right 3, then up 2.": "1e5dec651682f2d2.mp3",
+  "Right 3. Nothing up.": "39ebd83413ed6ca8.mp3",
+  "Right 3, then up 1.": "7538acdf7c4c368a.mp3",
+  "Right 2, then up 3.": "c63ed0081137232c.mp3",
+  "Right 0, then up 3.": "da3f8858bedc0c80.mp3",
+  "Right 1, then up 4.": "afc2051c5d59a4f0.mp3",
+  "Right 5, then up 1.": "fe167017ef60cf9f.mp3",
+  "Right 1, then up 3.": "fc26bd7e0c105ec0.mp3",
+  "Right 2, then up 2.": "0ad6c2034dfd6f3e.mp3",
+  "Here's where it slipped.": "352df820ed08240c.mp3",
+  "Let me show you.": "6eeb60d61498497d.mp3",
+  "Look at the start first.": "7acde5d7774b2e97.mp3",
+  "Let's trace this one.": "b70113acdf1a5f0a.mp3",
+  "No worries. Count with me.": "6f89a4e4e43fb026.mp3",
+  "All good. Follow along.": "3c0b04562800d8b5.mp3",
+  "It's fine. Watch the move.": "da8a92bf36ab14d7.mp3",
+  "That's the move. Try two new.": "399e64c6f5af6d03.mp3",
+  "There it is. Two fresh ones.": "d044f8c3b075cab5.mp3",
+  "Got it? Two new ones now.": "17f10ede53579139.mp3",
+  "Two fresh ones. Same idea.": "d43ea955482ad28e.mp3",
+  "New pair. You've got this.": "7ce0cbbbfb09c86e.mp3",
+  "Fresh pair. Take your time.": "e532fdc78eae07d5.mp3",
+  "Two more. Go for it.": "241314a018c39091.mp3",
+  "You fixed it. Nice work!": "6da7fe6ba398e63f.mp3",
+  "That's the fix. Well done.": "382947e192a1be5d.mp3",
+  "Got it now. Nice one!": "8f8124f26c66100b.mp3",
+  "Fixed it! Real progress.": "54e6c3be1958936e.mp3",
+  "Almost! Let's fix one.": "fc84ae655d6f2f08.mp3",
+  "Count the steps right, then up. Then move it there.": "976a52fa795147ed.mp3",
   "Count the steps right, then up. Then move it there.\n\nDoes that make sense?": "dbbf80d6d5155d54.mp3",
   "Move the SR-71 4 steps to the right and 1 up.": "ab4a32e11ba0d71b.mp3",
   "The SR-71 starts at (1, 2). After moving it 4 steps right and 1 step up, it will be at (5, 3).\n\nDoes that make sense?": "097790e4ea1ceace.mp3",
@@ -325,6 +754,20 @@
   "Translate the SR-71s to the target.": "c894b53b69328b31.mp3",
   "Each SR-71 moves 4 steps right and 1 step up, so the translation is (4, 1). For example, (1, 1) moves to (5, 2).": "99902b9cf9e990ee.mp3",
   "Each SR-71 moves 4 steps right and 0 steps up, so the translation is (4, 0). For example, (2, 2) moves to (6, 2).": "4116330d689076d5.mp3",
-  "Each SR-71 moves 5 steps right and 2 steps up, so the translation is (5, 2). For example, (1, 2) moves to (6, 4).": "bc2bfebdc3507973.mp3"
+  "Each SR-71 moves 5 steps right and 2 steps up, so the translation is (5, 2). For example, (1, 2) moves to (6, 4).": "bc2bfebdc3507973.mp3",
+  "Each point lands on a target. What is the move?": "879cb48ecf8dee1f.mp3",
+  "Each SR-71 moves 3 steps right and 2 steps up, so the translation is (3, 2). For example, (1, 1) moves to (4, 3).": "dde17784c6974265.mp3",
+  "One move takes them all. Which one?": "77a2cd2acae0564d.mp3",
+  "Each SR-71 moves 3 steps right and 0 steps up, so the translation is (3, 0). For example, (1, 3) moves to (4, 3).": "f305ce04eb63db9e.mp3",
+  "One point, one move. Which move?": "1620732366d71780.mp3",
+  "Each SR-71 moves 3 steps right and 1 step up, so the translation is (3, 1). For example, (2, 2) moves to (5, 3).": "00f78d3cfa08539d.mp3",
+  "Find the translation that fits.": "dfc149bd009155df.mp3",
+  "Each SR-71 moves 2 steps right and 3 steps up, so the translation is (2, 3). For example, (1, 1) moves to (3, 4).": "2ff72299624b625e.mp3",
+  "Where do they land? Pick the move.": "c444435c92509918.mp3",
+  "Each SR-71 moves 0 steps right and 3 steps up, so the translation is (0, 3). For example, (2, 1) moves to (2, 4).": "09b8a437b2e70d3e.mp3",
+  "Each SR-71 moves 3 steps right and 1 step up, so the translation is (3, 1). For example, (2, 3) moves to (5, 4).": "0018aef60384e213.mp3",
+  "Each SR-71 moves 1 step right and 4 steps up, so the translation is (1, 4). For example, (3, 1) moves to (4, 5).": "336f63eb8600d5a5.mp3",
+  "Each SR-71 moves 5 steps right and 1 step up, so the translation is (5, 1). For example, (1, 3) moves to (6, 4).": "a98aa3ae752884e5.mp3",
+  "Each SR-71 moves 2 steps right and 2 steps up, so the translation is (2, 2). For example, (3, 0) moves to (5, 2).": "0dd968a762013c04.mp3"
  }
 }

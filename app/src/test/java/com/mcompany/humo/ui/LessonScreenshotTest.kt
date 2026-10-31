@@ -42,6 +42,7 @@ import com.mcompany.humo.ui.lesson.jetAt
 import com.mcompany.humo.ui.path.rememberJetAtlas
 import java.util.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -169,9 +170,9 @@ class LessonScreenshotTest {
     @Test fun tilesFillTheSlotsByTouch() {
         val flow = player(LessonTheme.Plain)
         compose.runOnIdle { flow.goTo(Screen.Page(4)) }
-        compose.onNodeWithContentDescription("Tile 2").performClick()
+        compose.onNodeWithContentDescription("Key 2").performClick()
         compose.onNodeWithContentDescription("Slot 1, 2").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Tile 1").performClick()
+        compose.onNodeWithContentDescription("Key 1").performClick()
         compose.waitForIdle()
         assertEquals(Node(2, 1), flow.slots.move)
         compose.onNodeWithText("CHECK").performClick()
@@ -189,48 +190,72 @@ class LessonScreenshotTest {
         shot("fly-P7-played")
     }
 
-    @Test fun skillCheckScoreAndEnd() {
+    @Test fun skillCheckGateAndFixIt() {
         val flow = player(LessonTheme.Fly)
+        fun wait(ms: Long = 800) { compose.mainClock.advanceTimeBy(ms); compose.waitForIdle() }
+        fun solve() { act { val m = flow.page!!.move; flow.tapTile(m.x); flow.tapTile(m.y); flow.check() }; wait() }
         act { flow.beginSkillSplash() }
-        compose.onNodeWithText("Skill check").assertIsDisplayed()
+        compose.onNodeWithText("Show what you know").assertIsDisplayed()
         shot("skill-splash")
         compose.onNodeWithText("CONTINUE").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Skill(0), flow.screen)
         shot("skill-SC1-start")
-        compose.onNodeWithText("I DON'T KNOW").assertIsDisplayed()
+        compose.onNodeWithText("SHOW ME").assertIsDisplayed()
         act { flow.tapTile(4); flow.tapTile(1) }
         shot("skill-SC1-placed")
         compose.onNodeWithText("CHECK").performClick()
-        compose.mainClock.advanceTimeBy(800)
-        compose.waitForIdle()
+        wait()
         compose.onNodeWithText("Correct!").assertIsDisplayed()
         shot("skill-SC1-right")
         compose.onNodeWithText("CONTINUE").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Skill(1), flow.screen)
-        compose.onNodeWithText("I DON'T KNOW").performClick()
-        compose.mainClock.advanceTimeBy(800)
-        compose.waitForIdle()
+        compose.onNodeWithText("SHOW ME").performClick()
+        wait()
         compose.onNodeWithText("Here's how it goes.").assertIsDisplayed()
-        shot("skill-SC2-idk")
+        shot("skill-SC2-show-me")
         compose.onNodeWithText("CONTINUE").performClick()
         compose.waitForIdle()
         act { flow.tapTile(1); flow.tapTile(4) }
         compose.onNodeWithText("CHECK").performClick()
-        compose.mainClock.advanceTimeBy(800)
-        compose.waitForIdle()
-        compose.onNodeWithText("Not quite.").assertIsDisplayed()
+        wait()
+        compose.onNodeWithText("Incorrect").assertIsDisplayed()
         shot("skill-SC3-wrong")
         compose.onNodeWithText("FINISH").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("That was tricky!").assertIsDisplayed()
-        compose.onNodeWithText("REVIEW WITH HUMO").assertIsDisplayed()
-        shot("skill-score")
-        act { flow.finish() }
+        compose.onNodeWithText("Almost! Let's fix one.").assertIsDisplayed()
+        shot("fix-intro")
+        compose.onNodeWithText("FIX IT WITH HUMO").performClick()
+        wait(300)
+        assertEquals(Screen.Demo, flow.screen)
+        shot("fix-demo-end")
+        compose.onNodeWithText("CONTINUE").performClick()
+        compose.waitForIdle()
+        assertEquals(Screen.Fix(0), flow.screen)
+        shot("fix-1-start")
+        act { flow.tapTile(0); flow.tapTile(0); flow.check() }
+        wait()
+        shot("fix-1-wrong")
+        compose.onNodeWithText("CONTINUE").performClick()
+        compose.waitForIdle()
+        solve()
+        shot("fix-2-right")
+        compose.onNodeWithText("CONTINUE").performClick()
+        wait(300)
+        assertEquals("a miss serves another replay and a new pair", Screen.Demo, flow.screen)
+        compose.onNodeWithText("CONTINUE").performClick()
+        compose.waitForIdle()
+        solve()
+        compose.onNodeWithText("CONTINUE").performClick()
+        compose.waitForIdle()
+        solve()
+        compose.onNodeWithText("CONTINUE").performClick()
+        compose.waitForIdle()
+        assertEquals(Screen.End, flow.screen)
+        assertTrue("through fix-it the end is small: no jet pass", flow.small)
         compose.onNodeWithText("Lesson complete").assertIsDisplayed()
-        compose.onNodeWithText("RESTART LESSON").assertIsDisplayed()
-        shot("end-card")
+        shot("end-card-fixed")
         compose.onNodeWithText("RESTART LESSON").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Page(0), flow.screen)
@@ -329,7 +354,7 @@ class LessonScreenshotTest {
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("quit-sheet").assertIsDisplayed()
-        compose.onNodeWithText("Wait, you're so close! Stay a bit?").assertIsDisplayed()
+        compose.onNodeWithText("Leaving so soon? Your spot is saved. Come back when you are ready.").assertIsDisplayed()
         shot("quit-sheet")
         compose.onNodeWithText("KEEP LEARNING").performClick()
         compose.waitForIdle()
@@ -337,6 +362,10 @@ class LessonScreenshotTest {
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("END LESSON").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("See you soon").assertIsDisplayed()
+        shot("see-you-soon")
+        compose.onNodeWithText("DONE").performClick()
         compose.waitForIdle()
         assertEquals(1, left)
     }

@@ -66,11 +66,11 @@ class LessonPhonesTest {
         fun state(name: String, vararg texts: String, tiles: List<Int> = emptyList(), board: Boolean = true) {
             if (board) inside(name, "the board", compose.onNodeWithTag("board"))
             texts.forEach { inside(name, "\"$it\"", compose.onNodeWithText(it)) }
-            tiles.forEach { inside(name, "tile $it", compose.onNodeWithContentDescription("Tile $it")) }
+            tiles.forEach { inside(name, "tile $it", compose.onNodeWithContentDescription("Key $it")) }
             compose.onRoot().captureRoboImage("build/outputs/roborazzi/phones/$tag-$name.png")
         }
 
-        state("P1-start", "CHECK", "HUMO")
+        state("P1-start", "CHECK")
         act { flow.dropAt(Node(1, 5)); flow.check() }; settle()
         state("P1-wrong", "GET HELP", "TRY AGAIN")
         compose.onNodeWithText("GET HELP").performClick(); compose.waitForIdle(); settle()
@@ -81,23 +81,23 @@ class LessonPhonesTest {
         compose.onNodeWithText("DONE").performClick(); compose.waitForIdle()
 
         act { flow.goTo(Screen.Page(3)) }
-        state("P4-start", "CHECK", "HUMO", tiles = listOf(0, 5))
+        state("P4-start", "CHECK", tiles = listOf(0, 9))
         act { flow.tapTile(1); flow.tapTile(2); flow.check() }; settle()
         state("P4-wrong", "GET HELP", "TRY AGAIN")
         act { flow.goTo(Screen.Page(5)) }
-        state("P6-start", "CHECK", "HUMO", tiles = listOf(0, 5))
+        state("P6-start", "CHECK", tiles = listOf(0, 9))
         act { flow.goTo(Screen.Page(6)) }
-        state("P7-recap", "CONTINUE", "HUMO")
+        state("P7-recap", "CONTINUE")
         act { flow.beginSkillSplash(); flow.startSkill() }
-        state("SC1-start", "CHECK", "I DON'T KNOW", tiles = listOf(0, 5))
+        state("SC1-start", "CHECK", "SHOW ME", tiles = listOf(0, 9))
     }
 
     private fun phoneL12(tag: String, fontScale: Float = 1f) {
         val flow = player(L12, fontScale)
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
-        val tray = compose.onNodeWithContentDescription("Tile -5").fetchSemanticsNode().boundsInRoot
+        val tray = compose.onNodeWithTag("keypad").fetchSemanticsNode().boundsInRoot
         val check = compose.onNodeWithText("CHECK").fetchSemanticsNode().boundsInRoot
-        assertTrue("$tag L1.2: the two-row keypad is cut: $tray in $root", tray.bottom <= root.bottom + 1f && tray.left >= -1f)
+        assertTrue("$tag L1.2: the keypad is cut: $tray in $root", tray.bottom <= root.bottom + 1f && tray.left >= -1f)
         assertTrue("$tag L1.2: CHECK is off screen: $check", check.bottom <= root.bottom + 1f)
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/phones/$tag-L12-P1.png")
         act { flow.goTo(Screen.Page(0)) }

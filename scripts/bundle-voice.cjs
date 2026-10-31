@@ -42,10 +42,25 @@ const how = (p) => {
 const lines = new Set();
 for (const p of data.pages.filter((q) => !q.skill)) if (data.coach[p.id]) lines.add(data.coach[p.id]);
 data.praise.forEach((t) => lines.add(t));
-[`Not all the ${M}s landed on their targets, lowkey close though.`, `The ${M} isn't in the right spot yet, no stress.`, "Ok, let's get into it.", "Ok, let's go. What do you need?",
+["Ok, let's get into it.", "Ok, let's go. What do you need?",
   'Right adds to x, up adds to y. Ready for the next one?', 'Nice. Fix it and try again.', 'Sure. Take your time.',
-  'Check first. Then I will show you why.', 'Say it another way?', "Wait, you're so close! Stay a bit?", 'I need to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
-for (const p of data.pages) {
+  'Check first. Then I will show you why.', 'Say it another way?', 'Leaving so soon? Your spot is saved. Come back when you are ready.', 'I need to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
+// Humo's wrong-try pools (player.js linePools), every slip from 3 short to 3 too far, and what the fix-it replay says
+const linePools = (ex, ey) => {
+  const xs = `${Math.abs(ex)} ${ex > 0 ? 'too far' : 'short'}`, ys = `${Math.abs(ey)} ${ey > 0 ? 'too far' : 'short'}`;
+  return {
+    xOnly: [`Up's good. Right is ${xs}.`, `So close. Right is ${xs}.`, `Half there! Right is ${xs}.`, `Right's the slip: ${xs}.`, `Up works. Count right again.`, `Nice up. Right needs a recount.`],
+    yOnly: [`Right's good. Up is ${ys}.`, `So close. Up is ${ys}.`, `Half there! Up is ${ys}.`, `Up's the slip: ${ys}.`, `Right works. Count up again.`, `Nice right. Up needs a recount.`],
+    both: [`Right ${xs}, up ${ys}.`, `Both are off. Right first.`, `Not yet. Count right, then up.`, `Both slipped. Try one ${M} first.`, `Count the gap to one ring.`, `Two to fix. Start with right.`],
+    swap: [`Right first, up second. Swap them.`, `Right numbers, wrong order.`, `Flip those two numbers.`, `Order slip: right goes first.`],
+    generic: [`Not on the rings yet.`, `Missed it. Look at the rings.`, `Close! Try another pair.`, `Off the mark. Count again.`, `Rings still empty. Go again.`, `Hmm, not quite. Recount.`, `Still short. Try once more.`, `Nope, not that one. Again?`],
+  };
+};
+for (let ex = -3; ex <= 3; ex++) for (let ey = -3; ey <= 3; ey++) if (ex || ey) { const P = linePools(ex, ey); (ex && !ey ? P.xOnly : ey && !ex ? P.yOnly : P.both).forEach((t) => lines.add(t)); P.swap.forEach((t) => lines.add(t)); P.generic.forEach((t) => lines.add(t)); }
+for (let a = 0; a <= 5; a++) for (let b = 0; b <= 5; b++) lines.add(`You moved ${a} right, ${b} up.`);
+for (const m of [...data.pages.filter((q) => q.skill), ...data.fixit]) { const [dx, dy] = m.move; lines.add(dy ? `Right ${dx}, then up ${dy}.` : `Right ${dx}. Nothing up.`); }
+for (const k of ['fixLook2', 'fixNone', 'fixThen', 'fixNew', 'fixPass', 'fixTitle']) data.fx[k].forEach((t) => lines.add(t));
+for (const p of [...data.pages, ...data.fixit]) {
   lines.add(hint(p)); lines.add(hint(p) + SENSE); lines.add(plain(p.prompt));
   if (!p.skill) lines.add(why(p));
   if (graded(p)) { lines.add(look(p)); lines.add(showMe(p)); lines.add(how(p)); }
@@ -55,11 +70,8 @@ for (const p of data.pages) {
 const get = (url) => new Promise((resolve) => require('http').get(url, { headers: { 'Sec-Fetch-Site': 'same-origin' } }, (res) => { res.resume(); res.on('end', () => resolve({ status: res.statusCode })); }).on('error', () => resolve({ status: 0 })));
 // Eleven v4 reads inline audio tags as spoken direction. Used sparingly, never on a task prompt; the app shows and matches the
 // clean line (no brackets), so spoken words = written words.
-const TAGS = {
-  "Nice, that's it!": '[cheerful]', 'Boom, nailed it.': '[laughs softly]', "Let's go, perfect.": '[cheerful]',
-  ['Count the steps right, then up. Then move it there.']: '[curious]',
-  'Nice. Fix it and try again.': '[cheerful]', 'Say it another way?': '[curious]',
-};
+const TAGS = { [data.fx.fixTitle[0]]: '[softly]' };
+data.praise.forEach((t, i) => { if (i % 3 === 0) TAGS[t] = '[cheerful]'; });
 const spoken = (t) => (TAGS[t] ? `${TAGS[t]} ${t}` : t);
 const file = (t) => crypto.createHash('sha1').update(`${VOICE_ID}|${MODEL}|${spoken(t)}`).digest('hex').slice(0, 16) + '.mp3';
 (async () => {

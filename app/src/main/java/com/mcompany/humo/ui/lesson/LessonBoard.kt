@@ -207,6 +207,20 @@ internal fun DrawScope.humoMarks(g: BoardGeo, points: List<Node>) {
     }
 }
 
+/** Humo's counting labels on the board: a thin mint line along the run with one short word under or beside it ("4 steps", "up"), one mark at a time. */
+internal fun DrawScope.humoBraces(g: BoardGeo, braces: List<Brace>, text: TextMeasurer) {
+    val s = g.s
+    val ink = Color(0xFF1C7E69)
+    val style = TextStyle(fontFamily = LessonType.Figtree, fontSize = (14f * s / density).sp / fontScale, color = ink)
+    for (b in braces) {
+        val a = g.px(b.from)
+        val z = g.px(b.to)
+        drawLine(ink, a, z, 3f * s, StrokeCap.Round)
+        val mid = Offset((a.x + z.x) / 2f, (a.y + z.y) / 2f)
+        label(text, b.label, if (b.from.y == b.to.y) Offset(mid.x, mid.y + 20f * s) else Offset(mid.x + 26f * s, mid.y), style)
+    }
+}
+
 internal fun dist(a: Offset, b: Offset) = hypot(a.x - b.x, a.y - b.y)
 
 /**

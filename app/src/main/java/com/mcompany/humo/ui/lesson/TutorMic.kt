@@ -18,6 +18,8 @@ import androidx.compose.runtime.setValue
  */
 internal class TutorMic(private val context: Context) {
     var listening by mutableStateOf(false); private set
+    /** How loud the child is right now, 0..1: the dotted waveform in the input pill moves with it. */
+    var level by androidx.compose.runtime.mutableFloatStateOf(0f); private set
     private var recognizer: SpeechRecognizer? = null
 
     val available: Boolean get() = SpeechRecognizer.isRecognitionAvailable(context)
@@ -34,7 +36,7 @@ internal class TutorMic(private val context: Context) {
             override fun onResults(results: Bundle?) { listening = false; release(); onFinal(best(results)) }
             override fun onError(error: Int) { listening = false; release(); onFinal("") }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onRmsChanged(rmsdB: Float) { level = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f) }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onEvent(eventType: Int, params: Bundle?) {}

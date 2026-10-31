@@ -41,8 +41,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Only goes up (AND-3). 34 = 2.3.0, the last TWA build. 35 = the first native build (NATIVE-BRIEF N0).
-        versionCode = 44
-        versionName = "3.0.0-alpha10"
+        versionCode = 45
+        versionName = "3.0.0-alpha11"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The CI smoke job passes -PsmokeBackend=10.0.2.2:8787 so the app talks to .github/scripts/fake-humo.py. Every
         // other build leaves it empty and the app never looks at it.

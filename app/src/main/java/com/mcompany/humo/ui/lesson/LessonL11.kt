@@ -54,6 +54,8 @@ interface LessonContent {
     val skill: List<LessonPage>
     /** Humo's one teacher line per page (lesson.js `coach`): it adds something new and never repeats the task. */
     val coach: Map<String, String> get() = emptyMap()
+    /** The fix-it pool: fresh problems served in pairs after a skill-check miss (web lesson.js `fixit`). */
+    val fixit: List<LessonPage> get() = L11.fixit
 }
 
 /**
@@ -68,7 +70,7 @@ private class LessonJsonPage(
 
 @Serializable
 private class LessonJson(
-    val title: String, val pages: List<LessonJsonPage>, val coach: Map<String, String>, val praise: List<String>, val nudge: List<String>,
+    val title: String, val pages: List<LessonJsonPage>, val fixit: List<LessonJsonPage> = emptyList(), val fx: Map<String, List<String>> = emptyMap(), val coach: Map<String, String>, val praise: List<String>, val nudge: List<String>,
     /** Humo's scripted line -> the bundled mp3 (assets/voice) that has it in Jessa's voice; a line missing here is silent. */
     val voice: Map<String, String> = emptyMap(),
 )
@@ -98,6 +100,9 @@ object L11 : LessonContent {
     )
 
     private val all = data.pages.map(::page)
+    override val fixit: List<LessonPage> = data.fixit.map(::page)
+    /** One of Humo's fix-it line pools by its web key (`fixLook2`, `fixNone`, `fixThen`, `fixNew`, `fixPass`, `gate`, ...). */
+    fun fx(key: String): List<String> = data.fx.getValue(key)
     override val pages = all.filter { !it.skill }
     override val skill = all.filter { it.skill }
 
