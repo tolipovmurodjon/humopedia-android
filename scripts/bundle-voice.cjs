@@ -5,6 +5,7 @@
 // usage: node scripts/bundle-voice.cjs [lessonFile=l11]
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const VOICE_ID = process.env.HUMO_VOICE_ID || 'oClOrzqamOXmtcB8iqTj'; // Emma (Boss, 2026-10-31); backup id Veda Sky IR4Yywb88oVWHqzWLjAs. The server hashes files with the same id
+const MODEL = process.env.HUMO_TTS_MODEL || 'eleven_v4'; // the server's cache names include the model
 const SERVER = process.env.HUMO_TTS_SERVER || 'http://127.0.0.1:8158';
 const course = process.env.HUMO_COURSE || 'D:/Humopedia/docs/courses/15-coordinate-transformations';
 const lesson = process.argv[2] || 'l11';
@@ -52,14 +53,22 @@ for (const p of data.pages) {
 
 // node's own http (fetch refuses the Sec-Fetch-Site header the local server wants)
 const get = (url) => new Promise((resolve) => require('http').get(url, { headers: { 'Sec-Fetch-Site': 'same-origin' } }, (res) => { res.resume(); res.on('end', () => resolve({ status: res.statusCode })); }).on('error', () => resolve({ status: 0 })));
-const file = (t) => crypto.createHash('sha1').update(`${VOICE_ID}|${t}`).digest('hex').slice(0, 16) + '.mp3';
+// Eleven v4 reads inline audio tags as spoken direction. Used sparingly, never on a task prompt; the app shows and matches the
+// clean line (no brackets), so spoken words = written words.
+const TAGS = {
+  "Nice, that's it!": '[cheerful]', 'Boom, nailed it.': '[laughs softly]', "Let's go, perfect.": '[cheerful]',
+  [`Start at the ${M}. Count the steps to the right along the grid first, then count the steps up. Then move it there.`]: '[curious]',
+  'Great. Fix it and try again.': '[cheerful]', 'Say it another way?': '[curious]',
+};
+const spoken = (t) => (TAGS[t] ? `${TAGS[t]} ${t}` : t);
+const file = (t) => crypto.createHash('sha1').update(`${VOICE_ID}|${MODEL}|${spoken(t)}`).digest('hex').slice(0, 16) + '.mp3';
 (async () => {
   const voice = {}, failed = [];
   let fetched = 0;
   for (const t of lines) {
     const f = file(t), cached = path.join(cacheDir, f);
     if (!fs.existsSync(cached)) {
-      const r = await get(`${SERVER}/tts?text=${encodeURIComponent(t)}`);
+      const r = await get(`${SERVER}/tts?text=${encodeURIComponent(spoken(t))}`);
       if (r.status === 429) { console.log('server cap reached (150 new lines an hour): run again later'); failed.push(t); continue; }
       if (r.status !== 200) { failed.push(t); console.log(`no clip (${r.status}): ${t.slice(0, 60)}`); continue; }
       fetched++;
