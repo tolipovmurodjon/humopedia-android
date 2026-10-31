@@ -24,6 +24,12 @@ jobs:
           distribution: zulu
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      # Brilliant's sounds are debug-only: the release build must hold none of them (Boss, 2026-10-31).
+      - name: Release assets hold no Brilliant sounds
+        run: |
+          ./gradlew mergeReleaseAssets mergeDebugAssets
+          if [ -n "$(find app/build/intermediates -path '*assets*' -path '*elease*' -path '*sounds*' -name '*.mp3')" ]; then echo "release build contains assets/sounds"; exit 1; fi
+          [ -n "$(find app/build/intermediates -path '*assets*' -path '*ebug*' -path '*sounds*' -name 'correct.mp3')" ] || { echo "debug build lost its sounds"; exit 1; }
       # roborazzi.test.record: the screenshot tests save their PNGs (app/build/outputs/roborazzi) for the artifact.
       - name: Unit tests, screenshot tests and debug build
         run: ./gradlew testDebugUnitTest assembleDebug -Proborazzi.test.record=true

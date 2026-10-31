@@ -180,7 +180,7 @@ internal fun DrawScope.explainer(g: BoardGeo, page: LessonPage, text: TextMeasur
         label(text, "b", mb, legStyle)
         drawCircle(BoardColors.Start, 5f * s, a)
         if (atlas == null) drawCircle(colour, 5f * s, b)
-        else jetAt(atlas, b, atan2(b.y - a.y, b.x - a.x), g.cell * 0.9f, flames = 0f, t = 0f, motion = false)
+        else jetAt(atlas, b, atan2(b.y - a.y, b.x - a.x), minOf(jetLength(page.points, g.cell), g.cell * 0.9f), flames = 0f, t = 0f, motion = false)
     }
 }
 
@@ -208,6 +208,19 @@ internal fun DrawScope.humoMarks(g: BoardGeo, points: List<Node>) {
 }
 
 internal fun dist(a: Offset, b: Offset) = hypot(a.x - b.x, a.y - b.y)
+
+/**
+ * The jet's nose-to-tail length for a page: 1.45 cells, shrunk so that two jets side by side never overlap (a page with
+ * points one cell apart gets a 0.95 cell jet), never below 0.8 cell so the machine stays readable.
+ */
+internal fun jetLength(points: List<Node>, cell: Float): Float {
+    var nearest = Float.MAX_VALUE
+    for (i in points.indices) for (j in i + 1 until points.size) {
+        nearest = minOf(nearest, hypot((points[i].x - points[j].x).toFloat(), (points[i].y - points[j].y).toFloat()))
+    }
+    val cells = if (nearest == Float.MAX_VALUE) 1.45f else (nearest * 0.95f).coerceIn(0.8f, 1.45f)
+    return cell * cells
+}
 
 /**
  * Brilliant's lesson face: Figtree (SIL OFL 1.1, docs/assets/fonts/Figtree-OFL.txt), the face their lesson text uses,

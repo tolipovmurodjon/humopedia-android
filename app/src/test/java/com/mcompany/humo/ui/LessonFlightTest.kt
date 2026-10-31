@@ -82,21 +82,23 @@ class LessonFlightTest {
         assertEquals("A translation by (*a*, 0) moves the SR-71 to the right.", Words.machine("A translation by (*a*, 0) moves a point to the right."))
     }
 
-    @Test fun `the Mach 3 pass crosses the screen from below to the top right in 2_3 seconds at 28 degrees`() {
+    @Test fun `the Mach 3 pass crosses the whole screen from the bottom left corner and out past the top in 3_3 seconds`() {
         val a = MachPassRoute.at(0f, 390f, 844f)
         val b = MachPassRoute.at(1f, 390f, 844f)
-        assertTrue("it starts below the screen, was $a", a.y > 844f && a.x in 0f..390f)
-        assertTrue("it ends beyond the top right, was $b", b.x > 390f && b.y < 0f)
-        assertEquals(28.125f, MachPassRoute.DEG, 0f)
-        assertEquals(2300L, MachPassRoute.MS)
-        assertEquals(0.42f * 390f, MachPassRoute.size(390f), 0.01f)
+        assertTrue("it starts below and left of the screen, was $a", a.y > 844f && a.x < 0f)
+        val mid = MachPassRoute.at(0.5f, 390f, 844f)
+        assertTrue("half way it is on the screen, was $mid", mid.x in 0f..390f && mid.y in 0f..844f)
+        assertTrue("it ends past the top edge, was $b", b.y < -MachPassRoute.size(390f))
+        assertEquals(22.5f, MachPassRoute.DEG, 0f)
+        assertEquals(3300L, MachPassRoute.MS)
+        assertEquals(0.5f * 390f, MachPassRoute.size(390f), 0.01f)
         assertEquals("slow at both ends, quickest in the middle", 0.5f, MachPassRoute.ease(0.5f), 0f)
     }
 
     @Test fun `a checked board is locked while the machines fly`() {
         val flow = LessonFlow(L11)
         flow.goTo(com.mcompany.humo.ui.lesson.Screen.Page(3))
-        flow.tapTile(2); flow.tapTile(1)
+        flow.tapTile(1); flow.tapTile(3)
         assertTrue(flow.canCheck)
         flow.flying = true
         assertFalse(flow.canCheck)
@@ -105,7 +107,7 @@ class LessonFlightTest {
         assertTrue(flow.check())
         assertTrue(flow.answered)
         assertNotNull(flow.verdict)
-        assertEquals(Node(2, 1), flow.slots.move)
+        assertEquals(Node(1, 3), flow.slots.move)
         assertEquals("L1.2 uses the same machine words", "SR-71", Words.MACHINE)
         assertEquals(7, L12.pages.size)
     }

@@ -37,22 +37,22 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * The end-of-lesson pass's route (player.js `machPass`, phone layout): the SR-71 enters below the screen at a fifth of its
- * width, flies at 28 degrees from straight up toward the top right, 0.42 of the screen's width tall, in 2.3 s, easing in
- * and out. Pure numbers so the JVM tests can check the route.
+ * The end-of-lesson pass's route (Boss, 2026-10-31: "too short, I could not see it"): the SR-71, half the screen's width
+ * long, enters at the bottom left corner and flies one long diagonal (22.5 degrees from straight up) across the whole
+ * screen and out past the top edge in 3.3 s, easing in and out. Pure numbers so the JVM tests can check the route.
  */
 internal object MachPassRoute {
-    const val MS = 2300L
+    const val MS = 3300L
     /** The 64-frame atlas turns in 5.625 degree steps; 5 steps is the 28 degrees the web uses. */
-    const val DEG = 28.125f
-    const val SIZE_OF_WIDTH = 0.42f
+    const val DEG = 22.5f
+    const val SIZE_OF_WIDTH = 0.5f
 
     fun ease(u: Float) = if (u < 0.5f) 2f * u * u else 1f - (-2f * u + 2f).pow(2) / 2f
 
     fun size(w: Float) = w * SIZE_OF_WIDTH
     fun bannerW(s: Float) = s * 1.5f
     fun rope(s: Float) = s * 0.22f
-    fun start(w: Float, h: Float) = Offset(w * 0.2f, h + size(w) * 0.6f)
+    fun start(w: Float, h: Float) = Offset(-w * 0.1f, h + size(w) * 0.35f)
     fun distance(w: Float, h: Float): Float { val s = size(w); return hypot(w, h) + s * 1.2f + bannerW(s) + rope(s) }
     private fun fwd(): Offset { val d = Math.toRadians(DEG.toDouble()); return Offset(sin(d).toFloat(), -cos(d).toFloat()) }
 

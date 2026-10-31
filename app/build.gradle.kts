@@ -41,8 +41,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Only goes up (AND-3). 34 = 2.3.0, the last TWA build. 35 = the first native build (NATIVE-BRIEF N0).
-        versionCode = 43
-        versionName = "3.0.0-alpha09"
+        versionCode = 44
+        versionName = "3.0.0-alpha10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

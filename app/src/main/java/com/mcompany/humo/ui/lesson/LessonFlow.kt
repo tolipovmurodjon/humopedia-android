@@ -83,6 +83,8 @@ class LessonFlow(val lesson: LessonContent = L11) {
     var machineName = "point"
     /** Humo's one conversation for the whole lesson (the chat sheet and the bubble share it). */
     val chat = HumoChatState()
+    /** The worked-explanation card under the board ("Show me how"), open until the page changes or Try again. */
+    var showHow by mutableStateOf(false)
     /** Teal squares Humo draws round points on the board when he looks at a wrong try with the learner. */
     var marks by mutableStateOf<List<Node>>(emptyList())
     /** Humo's teacher line for this page (shown in the bubble until a verdict replaces it). */
@@ -99,8 +101,6 @@ class LessonFlow(val lesson: LessonContent = L11) {
     val skillResults = mutableStateListOf<Boolean?>().apply { repeat(skill.size) { add(null) } }
     private val skillAnswers = arrayOfNulls<Slots>(skill.size)
     private var reviewQueue = emptyList<Int>()
-
-    init { coach?.let { chat.hear(it) } }
 
     val page: LessonPage? get() = when (val s = screen) {
         is Screen.Page -> pages[s.i]
@@ -191,7 +191,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     /** Try again clears the verdict, Humo's marks and (on a translate page) both numbers, so the machines fly home. */
     fun tryAgain() {
-        phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList()
+        phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList(); showHow = false
         val p = page
         if (p?.kind == PageKind.Translate) slots = Slots.start(p)
     }
@@ -249,15 +249,16 @@ class LessonFlow(val lesson: LessonContent = L11) {
         verdict = null
         bubble = null
         gain = false
+        showHow = false
         marks = emptyList()
         dragAt = null
         slots = page?.let { Slots.start(it) } ?: Slots()
-        coach?.let { chat.hear(it) }
         if (s is Screen.Review) {
             // The missed item comes back as the learner left it, in its wrong colours, until Try again.
             val j = reviewQueue[s.k]
             slots = (skillAnswers[j] ?: Slots.start(skill[j])).copy(active = null).let { if (it.empty) Slots.start(skill[j]) else it }
             phase = Phase.Wrong
+            verdict = LessonLines.REVIEW
         }
     }
 }

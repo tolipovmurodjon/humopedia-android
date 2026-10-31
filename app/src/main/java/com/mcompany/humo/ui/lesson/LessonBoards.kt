@@ -148,7 +148,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                 withFrameMillis { now ->
                     val dt = if (last < 0) 16.7f else (now - last).toFloat().coerceIn(1f, 64f)
                     last = now
-                    val moving = Flying.glue(craft, handle.value, dt, now, g.cell, len / 0.857f, 5f * density.density, steering = dragging || busy, flying = busy, rnd = rnd)
+                    val moving = Flying.glue(craft, handle.value, dt, now, g.cell, len / 0.857f, 5f * density.density, steering = dragging || busy, flying = busy || dragging, rnd = rnd)
                     live = moving || dragging || busy || armed
                     flow.look(if (busy) humoLookAt(craft.pos.x, craft.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) else null)
                     tick.longValue = now
@@ -223,7 +223,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                     var lastNode = g.snapPx(handle.value)
                     val grabOffset = handle.value - down.position
                     drag(down.id) { change ->
-                        if (!dragged && dist(change.position, down.position) > viewConfiguration.touchSlop) { dragged = true; dragging = true; armed = false }
+                        if (!dragged && dist(change.position, down.position) > viewConfiguration.touchSlop) { dragged = true; dragging = true; armed = false; LessonSounds.play(Cue.DragStart) }
                         if (dragged) {
                             val (cx, cy) = g.cells(change.position + grabOffset)
                             val p = g.px(cx.coerceIn(-0.3f, page.graph.xMax + 0.3f), cy.coerceIn(-0.3f, page.graph.yMax + 0.3f))
@@ -239,7 +239,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         val n = g.snapPx(handle.value)
                         scope.launch { if (motion) handle.animateTo(g.px(n), tween(90, easing = GlideEase)) else handle.snapTo(g.px(n)) }
                         land(n)
-                        LessonSounds.play(Cue.Tick)
+                        LessonSounds.play(Cue.DragEnd)
                     } else if (fly) {
                         armed = !armed
                         wake.intValue++
@@ -271,7 +271,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                 val u = sinceBurst / 650f
                 drawCircle(Brush.radialGradient(0f to Color(0xFFFFF6D6), 0.4f to Color(0xFFFFB347), 1f to Color.Transparent, center = at, radius = g.cell * 0.9f * (0.3f + u)), g.cell * 0.9f * (0.3f + u), at, alpha = 0.95f * (1f - u))
             }
-            val flames = if (motion && busy && craft.speed > 0.02f) max(craft.speed, 0.3f) else 0f
+            val flames = if (motion && (busy || dragging) && craft.speed > 0.02f) max(craft.speed, 0.3f) else 0f
             jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion)
             if (armed && !busy) armedRing(at, len * 0.62f, s)
             if (ok || bad) badge(Offset(at.x, at.y - len * 0.55f - 12f * s), ok, s)
@@ -286,12 +286,16 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
 /** P3's still figure. */
 @Composable
 internal fun FigureBoard(page: LessonPage, fly: Boolean, width: Dp) {
-    val wPx = with(LocalDensity.current) { width.toPx() }
+    // The figure is drawn 12 % smaller and centred, so the jets at its right end are never cut by the canvas edge.
+    val inner = width * 0.88f
+    val wPx = with(LocalDensity.current) { inner.toPx() }
     val g = remember(page, wPx) { BoardGeo(page.graph, wPx / page.graph.boxW) }
     val text = rememberTextMeasurer()
     val atlas = if (fly) rememberJetAtlas() else null
-    Canvas(Modifier.width(width).height(width * (page.graph.boxH / page.graph.boxW)).semantics { contentDescription = "Two points, each moved a steps right and b steps up." }) {
-        explainer(g, page, text, atlas)
+    Box(Modifier.width(width), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.width(inner).height(inner * (page.graph.boxH / page.graph.boxW)).testTag("board").semantics { contentDescription = "Two points, each moved a steps right and b steps up." }) {
+            explainer(g, page, text, atlas)
+        }
     }
 }
 
@@ -332,7 +336,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
     val wake = remember(page) { mutableIntStateOf(0) }
     val tick = remember { mutableLongStateOf(0L) }
     val rnd = remember { Random(5) }
-    val len = g.cell * 1.45f
+    val len = jetLength(page.points, g.cell)
 
     // One machine per point. A board opened already checked (review, state restore) has them landed; otherwise they wait
     // at their start. The recap's ride the points exactly.
@@ -410,7 +414,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
 
     val frameH = u * (12f + page.graph.boxH)
     Column(Modifier.width(width), horizontalAlignment = Alignment.CenterHorizontally) {
-        Column(Modifier.width(width).border(1.5.dp * (u / 1.dp), Color(0xFFE5E5E5), RoundedCornerShape(6.dp * (u / 1.dp)))) {
+        Column(Modifier.width(width)) {
             val described = buildString {
                 append("Graph. Points at ")
                 append(page.points.joinToString(", ") { (it + (shown ?: Node(0, 0))).toString() })
@@ -423,7 +427,6 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                     humoMarks(g, flow.marks)
                     val now = tick.longValue
                     val run = disp.value
-                    if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
                     page.points.forEach { start ->
                         val a = g.px(start)
                         val b = g.px(start.x + run.x, start.y + run.y)
@@ -443,9 +446,10 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         }
                         if (phase != Phase.Idle) badge(Offset(c.pos.x + g.cell * 0.42f, c.pos.y - g.cell * 0.42f), phase == Phase.Correct, s)
                     }
+                    // the rings go on top: a machine on its target never hides it
+                    if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
                 }
             }
-            Box(Modifier.fillMaxWidth().height(1.5.dp * (u / 1.dp)).background(Color(0xFFE5E5E5)))
             ActionRow(page, flow, recap, u)
         }
         if (recap) {
@@ -582,17 +586,5 @@ private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
         contentAlignment = Alignment.Center,
     ) {
         if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, color = Color.Black)
-    }
-}
-
-/** The ↻ glyph of Start over, drawn: an open circle with an arrow head at its top-left end. */
-@Composable
-internal fun RestartIcon(color: Color, size: Dp) {
-    Canvas(Modifier.size(size)) {
-        val r = this.size.minDimension * 0.36f
-        val c = center
-        drawArc(color, -200f, 300f, false, topLeft = c - Offset(r, r), size = androidx.compose.ui.geometry.Size(2 * r, 2 * r), style = Stroke(this.size.minDimension * 0.11f, cap = StrokeCap.Round))
-        val tip = Offset(c.x - r * 0.94f, c.y - r * 0.34f)
-        drawPath(Path().apply { moveTo(tip.x - r * 0.42f, tip.y - r * 0.5f); lineTo(tip.x + r * 0.08f, tip.y + r * 0.3f); lineTo(tip.x + r * 0.55f, tip.y - r * 0.38f); close() }, color)
     }
 }

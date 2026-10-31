@@ -105,6 +105,39 @@ grep -q "Process: $PKG, PID" "$OUT/logcat-launch.txt" && fail "crash at launch (
 grep -q "ANR in $PKG" "$OUT/logcat-launch.txt" && fail "ANR at launch"
 log "ok: running, no crash, no ANR"
 
+
+# ---- cold start and the lesson's first frame (Boss: "slow load"). Two cold runs of the same build: warm-up OFF (the old path,
+# everything decoded on the first tap) and ON (what ships). The numbers come from the app's own HumoPerf log line and am start -W.
+COLD_LIMIT_MS=9000
+LESSON_LIMIT_MS=1500
+perf_cold() {
+  local mode=$1
+  $T adb shell am force-stop "$PKG"
+  if [ "$mode" = nowarm ]; then $T adb shell run-as "$PKG" touch files/no-warmup; else $T adb shell run-as "$PKG" rm -f files/no-warmup; fi
+  $T adb logcat -c
+  $T adb shell am start -W -n "$PKG/.MainActivity" > "$OUT/am-start-$mode.txt"
+  wait_glass
+  sleep 5
+  tap "Lesson 1.1, Translating Points, current"
+  waitfor "Move the SR-71 4 steps to the right and 1 up\." 20
+  sleep 1
+  local total lesson
+  total=$(grep -o 'TotalTime: [0-9]*' "$OUT/am-start-$mode.txt" | grep -o '[0-9]*$')
+  lesson=$($T adb logcat -d -s HumoPerf:I | grep -o 'lesson-first-frame ms=[0-9]*' | tail -1 | grep -o '[0-9]*$')
+  log "PERF $mode: cold start (am start -W TotalTime) = ${total:-?} ms; tap on the island to the lesson's first drawn frame = ${lesson:-?} ms"
+  echo "$mode $total $lesson" >> "$OUT/perf.txt"
+  $T adb shell input keyevent 4; sleep 1; tap Leave; sleep 1
+}
+perf_cold nowarm
+perf_cold warm
+read -r _ WARM_TOTAL WARM_LESSON < <(grep '^warm ' "$OUT/perf.txt")
+log "PERF limits: cold start <= ${COLD_LIMIT_MS} ms, lesson first frame <= ${LESSON_LIMIT_MS} ms (warm-up on)"
+[ -n "${WARM_TOTAL:-}" ] && [ "$WARM_TOTAL" -le "$COLD_LIMIT_MS" ] || fail "cold start ${WARM_TOTAL:-?} ms is over the ${COLD_LIMIT_MS} ms limit"
+[ -n "${WARM_LESSON:-}" ] && [ "$WARM_LESSON" -le "$LESSON_LIMIT_MS" ] || fail "lesson first frame ${WARM_LESSON:-?} ms is over the ${LESSON_LIMIT_MS} ms limit"
+$T adb shell am force-stop "$PKG"
+$T adb shell am start -W -n "$PKG/.MainActivity" > /dev/null
+wait_glass
+
 $T adb shell dumpsys gfxinfo "$PKG" reset > /dev/null
 shot home
 has "Path"
@@ -159,55 +192,58 @@ press() { tap "$1"; sleep "${2:-0.8}"; }
 
 tapnode() { board; local a; a=$(npx "$1" "$2"); $T adb shell input tap $a; }
 shot P1-start; has "Move the SR-71 4 steps to the right and 1 up."
-drag 1 2 2 5; press Check; shot P1-wrong 1.3
+has "HUMO"
+drag 1 2 2 5; press CHECK; shot P1-wrong 1.3
 has "The SR-71 isn.t in the right spot yet, no stress\."
-press "Get help" 1.5; shot P1-help; has "Why was my answer wrong\?"
-press "Close chat" 1
-press "Try again"; drag 2 5 5 3; press Check; shot P1-correct 1.3
+press "GET HELP" 2.5; shot P1-tutor; has "DONE"; has "Show me"
+press "Show me" 2.5; shot P1-tutor-show-me
+press DONE 1
+press "TRY AGAIN"; drag 2 5 5 3; press CHECK; shot P1-correct 1.3
 has "Nice, that.s it!"
-press "Why\?"; shot P1-why; has "Why is this the answer\?"; press Yes; press "Continue lesson"
+press "SHOW ME HOW"; shot P1-show-me-how; has "CONTINUE LESSON"; press "CONTINUE LESSON"
 shot P2-start
 log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
 tapnode 2 4; snap P2-armed 0.5
 board; shoot_after $(npx 6 0) P2-tapfly-a 0.5 P2-tapfly-b 0.7
 sleep 5; shot P2-landed 0.5
-press Check; shot P2-wrong 1.3
+press CHECK; shot P2-wrong 1.3
 has "The SR-71 isn.t in the right spot yet, no stress\."
-press "Try again"; drag 6 0 6 5; press Check; shot P2-correct 1.3
-has "Continue"; press Continue
-shot P3; press Continue
-for P in "P4 1 2 2 1" "P5 1 3 3 2" "P6 3 2 2 3"; do
+press "TRY AGAIN"; drag 6 0 6 5; press CHECK; shot P2-correct 1.3
+has "CONTINUE"; press CONTINUE
+shot P3; press "HUMO" 2.5; shot P3-tutor; press "Give me a hint" 2.5; shot P3-tutor-hint; press DONE 1; press CONTINUE
+for P in "P4 1 2 1 3" "P5 3 2 2 1" "P6 3 2 4 2"; do
   set -- $P
   shot "$1-start" 0.5
-  press "Tile $2" 0.4; press "Tile $3"; tapsnap Check "$1-flight" 0.9
-  waitfor "Try again" 15; shot "$1-wrong" 1.3
+  press "Tile $2" 0.4; press "Tile $3"; tapsnap CHECK "$1-flight" 0.9
+  waitfor "TRY AGAIN" 15; shot "$1-wrong" 1.3
   has "Not all the SR-71s landed on their targets, lowkey close though\."
-  press "Get help" 1.5; shot "$1-help"; press "Close chat" 1
-  press "Try again"; scrolldown; press "Start over"; sleep 1.5
-  press "Tile $4" 0.4; press "Tile $5"; tapsnap Check "$1-flight-2" 0.9
-  waitfor "Continue" 15; shot "$1-correct"
-  press Continue
+  press "GET HELP" 2.5; shot "$1-tutor"; press DONE 1
+  press "TRY AGAIN" 1
+  press "Tile $4" 0.4; press "Tile $5"; tapsnap CHECK "$1-flight-2" 0.9
+  waitfor "CONTINUE" 15; shot "$1-correct"
+  press CONTINUE
 done
-shot P7; press Play 1.5; press Continue
-# The splash waits for Continue (as the web player does); then the first item shows. The skill check has no Humo and no
-# bar: a wrong item, an "I don't know" item and a right one, each with its corner verdict.
-shot skill-splash 0.3; has "Let.s see if it all clicked\."; press Continue 1.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
-scrolldown; press "Tile 3" 0.4; press "Tile 1"; tapsnap Check skill-SC1-flight 0.9
+shot P7; press Play 1.5; press CONTINUE
+# The splash waits for CONTINUE (as the web player does); then the first item shows. The skill check has no Humo and no
+# tutor: a wrong item, an "I don't know" item and a right one, each with its feedback panel.
+shot skill-splash 0.3; has "Let.s see if it all clicked\."; press CONTINUE 1.5; shot skill-SC1 0.5; has "I DON(&apos;|.)T KNOW"
+press "Tile 3" 0.4; press "Tile 1"; tapsnap CHECK skill-SC1-flight 0.9
 waitfor "Not quite\." 15; shot skill-SC1-wrong 1.0
-press Continue 1.5
-press "I don(&apos;|.)t know" 1.5; waitfor "Here(&apos;|.)s how it goes\." 15; shot skill-SC2-idk 3.0
-press Continue 1.5
-scrolldown; press "Tile 5" 0.4; press "Tile 2"; tapsnap Check skill-SC3-flight 0.9
+press CONTINUE 1.5
+press "I DON(&apos;|.)T KNOW" 1.5; waitfor "Here(&apos;|.)s how it goes\." 15; shot skill-SC2-idk 3.0
+press CONTINUE 1.5
+press "Tile 5" 0.4; press "Tile 2"; tapsnap CHECK skill-SC3-flight 0.9
 waitfor "Correct!" 15; shot skill-SC3-right 1.0
-has "Finish"; press Finish 1.5
-waitfor "That was tricky!" 20; shot skill-score; has "Review with Humo"; has "Skip review"
-press "Review with Humo" 2.5; shot review-1; has "Try again"
-press "Try again"; scrolldown; press "Tile 1" 0.4; press "Tile 3"; tapsnap Check review-1-flight 0.9
-waitfor "Continue" 15; shot review-1-right; press Continue 2.5
-shot review-2; press "Try again"; scrolldown; press "Tile 4" 0.4; press "Tile 0"; tapsnap Check review-2-flight 0.9
-waitfor "Continue" 15
-tapsnap Continue mach3-a 1.3 mach3-b 1.2
-sleep 3; shot lesson-end; has "Lesson complete"; has "90 sparks earned."; has "Restart lesson"
+has "FINISH"; press FINISH 1.5
+waitfor "That was tricky!" 20; shot skill-score; has "REVIEW WITH HUMO"; has "SKIP REVIEW"
+press "REVIEW WITH HUMO" 2.5; shot review-1; has "TRY AGAIN"
+press "GET HELP" 2.5; shot review-1-tutor; press DONE 1
+press "TRY AGAIN"; press "Tile 4" 0.4; press "Tile 1"; tapsnap CHECK review-1-flight 0.9
+waitfor "CONTINUE" 15; shot review-1-right; press CONTINUE 2.5
+shot review-2; press "TRY AGAIN"; press "Tile 4" 0.4; press "Tile 0"; tapsnap CHECK review-2-flight 0.9
+waitfor "CONTINUE" 15
+tapsnap CONTINUE mach3-a 1.3 mach3-b 1.2
+sleep 4; shot lesson-end; has "Lesson complete"; has "90 sparks earned."; has "RESTART LESSON"; has "+90"
 press "Exit lesson" 2; shot back-from-lesson
 has "Lesson 1.1, Translating Points, done"
 has "Lesson 1.2, Negative Translations, current"
@@ -219,20 +255,20 @@ tap "Lesson 1.2, Negative Translations, current"; shot l12-lesson
 has "Complete the translation to send the SR-71s to the targets."
 for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
   set -- $P
-  if [ $# -eq 1 ]; then shot "l12-$1"; press Play 1.5; press Continue; continue; fi
-  press "Tile $2"; tapsnap Check "l12-$1-flight" 0.9
-  waitfor "Try again" 15; shot "l12-$1-wrong"
-  press "Try again"; scrolldown; press "Start over"; sleep 1.5
-  press "Tile $3"; press Check 0.1
-  waitfor "Continue" 15; shot "l12-$1-correct"
-  press Continue
+  if [ $# -eq 1 ]; then shot "l12-$1"; press Play 1.5; press CONTINUE; continue; fi
+  press "Tile $2"; tapsnap CHECK "l12-$1-flight" 0.9
+  waitfor "TRY AGAIN" 15; shot "l12-$1-wrong"
+  press "TRY AGAIN" 1.5
+  press "Tile $3"; press CHECK 0.1
+  waitfor "CONTINUE" 15; shot "l12-$1-correct"
+  press CONTINUE
 done
-press Continue 1.5; shot l12-SC1; has "I don(&apos;|.)t know"
-scrolldown; press "Tile -2"; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
-scrolldown; press "Tile 3"; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
-scrolldown; press "Tile -2" 0.4; press "Tile 0"; press Check 0.1; waitfor "Correct!" 15; press Finish 1.5
+press CONTINUE 1.5; shot l12-SC1; has "I DON(&apos;|.)T KNOW"
+press "Tile -2"; press CHECK 0.1; waitfor "Correct!" 15; press CONTINUE 1.5
+press "Tile 3"; press CHECK 0.1; waitfor "Correct!" 15; press CONTINUE 1.5
+press "Tile -2" 0.4; press "Tile 0"; press CHECK 0.1; waitfor "Correct!" 15; press FINISH 1.5
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
-tapsnap Continue l12-mach3 1.6; sleep 2; shot l12-end; has "Lesson complete"; has "120 sparks earned."
+tapsnap CONTINUE l12-mach3 1.6; sleep 4; shot l12-end; has "Lesson complete"; has "120 sparks earned."
 press "Exit lesson" 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
@@ -295,8 +331,8 @@ log "-- best effort, never fails the run: L1.2 replayed with animations ON, as o
   tap "Lesson 1.2, Negative Translations, done"; sleep 2
   tap "Takrorlash"; sleep 4
   press "Tile -5" 0.4
-  tapsnap Check motion-L12-P1-takeoff 0.6 motion-L12-P1-cruise 1.0
-  waitfor "Try again" 25
+  tapsnap CHECK motion-L12-P1-takeoff 0.6 motion-L12-P1-cruise 1.0
+  waitfor "TRY AGAIN" 25
   shot motion-L12-P1-landed
 ) || log "motion phase did not finish (the run goes on)"
 ANIM 0

@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
         // The glass bar draws under the navigation bar; Android must not paint its own scrim over it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         GlassStage.coldStart()
+        com.mcompany.humo.ui.lesson.LessonWarmup.start(this)
         setContent { GlassTheme { AppShell() } }
         if (savedInstanceState == null) afterFirstFrame()
         // Debug builds only: the CI smoke forces a crash to prove CrashRecorder writes it down.

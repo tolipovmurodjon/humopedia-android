@@ -126,7 +126,7 @@ class LessonScreenshotTest {
 
     @Test fun dragThePointWithAFinger() {
         val flow = player(LessonTheme.Plain)
-        compose.onNodeWithText("Check").assertIsNotEnabled()
+        compose.onNodeWithText("CHECK").assertIsNotEnabled()
         compose.onNodeWithTag("board").performTouchInput {
             val s = width / 350f
             fun at(x: Int, y: Int) = Offset((48f + x * 42.67f) * s, (308f - y * 42.67f) * s)
@@ -134,15 +134,15 @@ class LessonScreenshotTest {
         }
         compose.waitForIdle()
         assertEquals("snapped to the nearest node", Node(5, 3), flow.dragAt)
-        compose.onNodeWithText("Check").assertIsEnabled().performClick()
+        compose.onNodeWithText("CHECK").assertIsEnabled().performClick()
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         compose.onNodeWithText("Nice, that's it!").assertIsDisplayed()
-        compose.onNodeWithText("Why?").performClick()
+        compose.onNodeWithText("SHOW ME HOW").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Why is this the answer?").assertIsDisplayed()
-        shot("plain-P1-why")
+        compose.onNodeWithTag("how-card").assertIsDisplayed()
+        shot("plain-P1-show-me-how")
     }
 
     @Test fun theJetFliesByTapThenTap() {
@@ -171,11 +171,11 @@ class LessonScreenshotTest {
         compose.onNodeWithContentDescription("Tile 2").performClick()
         compose.waitForIdle()
         assertEquals(Node(3, 2), flow.slots.move)
-        compose.onNodeWithText("Check").performClick()
+        compose.onNodeWithText("CHECK").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Why?").performClick()
+        compose.onNodeWithText("SHOW ME HOW").performClick()
         compose.waitForIdle()
-        shot("plain-P5-why")
+        shot("plain-P5-show-me-how")
     }
 
     @Test fun recapPlay() {
@@ -191,44 +191,44 @@ class LessonScreenshotTest {
         act { flow.beginSkillSplash() }
         compose.onNodeWithText("Skill check").assertIsDisplayed()
         shot("skill-splash")
-        compose.onNodeWithText("Continue").performClick()
+        compose.onNodeWithText("CONTINUE").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Skill(0), flow.screen)
         shot("skill-SC1-start")
-        compose.onNodeWithText("I don't know").assertIsDisplayed()
-        act { flow.tapTile(1); flow.tapTile(3) }
+        compose.onNodeWithText("I DON'T KNOW").assertIsDisplayed()
+        act { flow.tapTile(4); flow.tapTile(1) }
         shot("skill-SC1-placed")
-        compose.onNodeWithText("Check").performClick()
+        compose.onNodeWithText("CHECK").performClick()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         compose.onNodeWithText("Correct!").assertIsDisplayed()
         shot("skill-SC1-right")
-        compose.onNodeWithText("Continue").performClick()
+        compose.onNodeWithText("CONTINUE").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Skill(1), flow.screen)
-        compose.onNodeWithText("I don't know").performClick()
+        compose.onNodeWithText("I DON'T KNOW").performClick()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         compose.onNodeWithText("Here's how it goes.").assertIsDisplayed()
         shot("skill-SC2-idk")
-        compose.onNodeWithText("Continue").performClick()
+        compose.onNodeWithText("CONTINUE").performClick()
         compose.waitForIdle()
         act { flow.tapTile(1); flow.tapTile(4) }
-        compose.onNodeWithText("Check").performClick()
+        compose.onNodeWithText("CHECK").performClick()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         compose.onNodeWithText("Not quite.").assertIsDisplayed()
         shot("skill-SC3-wrong")
-        compose.onNodeWithText("Finish").performClick()
+        compose.onNodeWithText("FINISH").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("That was tricky!").assertIsDisplayed()
-        compose.onNodeWithText("Review with Humo").assertIsDisplayed()
+        compose.onNodeWithText("REVIEW WITH HUMO").assertIsDisplayed()
         shot("skill-score")
         act { flow.finish() }
         compose.onNodeWithText("Lesson complete").assertIsDisplayed()
-        compose.onNodeWithText("Restart lesson").assertIsDisplayed()
+        compose.onNodeWithText("RESTART LESSON").assertIsDisplayed()
         shot("end-card")
-        compose.onNodeWithText("Restart lesson").performClick()
+        compose.onNodeWithText("RESTART LESSON").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Page(0), flow.screen)
         assertEquals(0, flow.sparks)
@@ -272,10 +272,10 @@ class LessonScreenshotTest {
     @Test fun tileFlightInTheAir() {
         val flow = player(LessonTheme.Fly, motion = true)
         act { flow.goTo(Screen.Page(3)) }
-        act { flow.tapTile(2) }
+        act { flow.tapTile(1) }
         shot("motion-P4-one-number-waiting")
         compose.mainClock.autoAdvance = false
-        compose.runOnUiThread { flow.tapTile(1) }
+        compose.runOnUiThread { flow.tapTile(3) }
         compose.mainClock.advanceTimeBy(700)
         shot("motion-P4-takeoff")
         compose.mainClock.advanceTimeBy(900)
@@ -283,9 +283,9 @@ class LessonScreenshotTest {
         compose.mainClock.advanceTimeBy(4500)
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        compose.onNodeWithText("Check").performClick()
+        compose.onNodeWithText("CHECK").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Continue").assertIsDisplayed()
+        compose.onNodeWithText("CONTINUE").assertIsDisplayed()
         shot("motion-P4-landed")
     }
 

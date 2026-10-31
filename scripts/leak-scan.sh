@@ -9,6 +9,8 @@ for f in $files; do
   case "$f" in
     *.env|.env*|*secret*|*token*|*credential*|*google-services.json|*.jks|*.keystore|keystore.properties|*.p12) echo "LEAK name: $f"; bad=1; continue;; esac
   case "$f" in *brilliant*/*|*Brilliant*) echo "LEAK brilliant asset: $f"; bad=1; continue;; esac
+  # Sounds: only our own voice clips (assets/voice) and the debug-only sound folder (Boss's decision, 2026-10-31) may sit under app/src.
+  case "$f" in app/src/*.mp3|app/src/*.ogg|app/src/*.wav|app/src/*.m4a) case "$f" in app/src/main/assets/voice/*|app/src/debug/assets/sounds/*) ;; *) echo "LEAK sound file outside assets/voice: $f"; bad=1; continue;; esac;; esac
   case "$f" in *.png|*.jpg|*.webp|*.mp3|*.ttf|*.jar|*.apk|*.gif|*.ico) continue;; esac
   [ "$f" = scripts/leak-scan.sh ] && continue
   [ -f "$f" ] || continue

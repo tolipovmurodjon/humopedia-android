@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Only while a child taps the mic in Humo's tutor; nothing is recorded or stored. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+    </queries>
 
     <application
         android:name=".HumoApp"

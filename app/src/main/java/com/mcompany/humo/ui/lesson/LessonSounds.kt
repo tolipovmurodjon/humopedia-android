@@ -14,7 +14,7 @@ import kotlin.math.sin
  * a public repo). Each matches the character of Brilliant's cue as measured (docs/qa/l11-spec.md §9): length, pitch
  * direction and a soft envelope. Clean tones only, no noise, no buzz (Boss: "I hate buzzy sounds").
  */
-enum class Cue { Correct, Incorrect, Tick, Toggle, Start, Complete, Whoosh, Boom }
+enum class Cue { Correct, Incorrect, Tick, Toggle, Start, Complete, Whoosh, Boom, DragStart, DragEnd, Continue, Skip, Failed, XpStart, XpStop }
 
 object LessonSounds {
     private const val RATE = 44_100
@@ -35,6 +35,11 @@ object LessonSounds {
         Cue.Toggle -> listOf(Note(180.0, 0.0, 0.05, 0.6, rise = 0.002, to = 120.0))
         Cue.Start -> listOf(523.3, 659.3, 784.0, 1046.5).mapIndexed { i, f -> Note(f, i * 0.1, 0.3, 0.8) }
         Cue.Complete -> listOf(523.3, 659.3, 784.0, 1046.5, 1318.5).mapIndexed { i, f -> Note(f, i * 0.11, if (i == 4) 0.9 else 0.35, 0.8) }
+        Cue.DragStart -> listOf(Note(1500.0, 0.0, 0.03, 0.3, rise = 0.001))
+        Cue.DragEnd -> listOf(Note(900.0, 0.0, 0.04, 0.35, rise = 0.001))
+        Cue.Continue, Cue.Skip -> listOf(Note(1800.0, 0.0, 0.04, 0.35, rise = 0.001))
+        Cue.Failed -> listOf(Note(261.6, 0.0, 0.2, 0.5), Note(220.0, 0.14, 0.24, 0.5), Note(196.0, 0.3, 0.3, 0.5))
+        Cue.XpStart, Cue.XpStop -> listOf(Note(1318.5, 0.0, 0.05, 0.3, rise = 0.001))
         Cue.Whoosh, Cue.Boom -> emptyList()
     }
 
@@ -103,21 +108,57 @@ object LessonSounds {
         return ShortArray(out.size) { (out[it] / peak * 0.9 * loud * Short.MAX_VALUE).toInt().toShort() }
     }
 
+    // Brilliant's real sounds ride in the DEBUG source set only (app/src/debug/assets/sounds, Boss's decision 2026-10-31); a cue
+    // whose file is in the build plays from a preloaded SoundPool. The release build has no such files and plays our synth.
+    private var pool: android.media.SoundPool? = null
+    private val packIds = HashMap<Cue, Int>()
+    private val packReady = HashSet<Int>()
+
+    internal fun packName(cue: Cue): String? = when (cue) {
+        Cue.Correct -> "correct"; Cue.Incorrect -> "incorrect"; Cue.Tick -> "lightweight-choice"; Cue.Toggle -> "toggle-on"
+        Cue.DragStart -> "drag-started"; Cue.DragEnd -> "drag-released"; Cue.Continue -> "continue"; Cue.Skip -> "skip"
+        Cue.Failed -> "lesson-failed"; Cue.XpStart -> "tutor-xp-countup-start"; Cue.XpStop -> "tutor-xp-countup-stop"
+        Cue.Start, Cue.Complete, Cue.Whoosh, Cue.Boom -> null
+    }
+
+    /** Preloads whichever of those files this build holds, once at start; call it off the main thread. */
+    @Synchronized
+    fun loadLocalPack(context: android.content.Context) {
+        if (pool != null) return
+        val have = context.assets.list("sounds")?.toSet().orEmpty()
+        val found = Cue.entries.mapNotNull { c -> packName(c)?.takeIf { "$it.mp3" in have }?.let { c to it } }
+        if (found.isEmpty()) return
+        val sp = android.media.SoundPool.Builder().setMaxStreams(4).setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build()
+        sp.setOnLoadCompleteListener { _, id, status -> if (status == 0) synchronized(this) { packReady.add(id) } }
+        found.forEach { (c, n) -> context.assets.openFd("sounds/$n.mp3").use { packIds[c] = sp.load(it, 1) } }
+        pool = sp
+    }
+
+    /** Builds the cue's track now (its PCM and AudioTrack), so the first tap in a lesson does not. */
+    @Synchronized
+    internal fun prepare(cue: Cue) {
+        if (packIds.containsKey(cue) || tracks.containsKey(cue)) return
+        runCatching { track(cue) }
+    }
+
+    private fun track(cue: Cue): AudioTrack = tracks[cue] ?: run {
+        val data = if (cue == Cue.Whoosh) whooshPcm(false) else if (cue == Cue.Boom) whooshPcm(true) else pcm(cue)
+        AudioTrack.Builder()
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .setBufferSizeInBytes(data.size * 2)
+            .build()
+            .also { it.write(data, 0, data.size); it.setVolume(0.4f); tracks[cue] = it }
+    }
+
     /** A missing audio device never blocks a lesson: the picture and the haptic still answer. */
     @Synchronized
     fun play(cue: Cue) {
         if (muted) return
+        packIds[cue]?.takeIf { it in packReady }?.let { id -> pool?.play(id, 1f, 1f, 1, 0, 1f); return }
         runCatching {
-            val t = tracks[cue] ?: run {
-                val data = if (cue == Cue.Whoosh) whooshPcm(false) else if (cue == Cue.Boom) whooshPcm(true) else pcm(cue)
-                AudioTrack.Builder()
-                    .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                    .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                    .setTransferMode(AudioTrack.MODE_STATIC)
-                    .setBufferSizeInBytes(data.size * 2)
-                    .build()
-                    .also { it.write(data, 0, data.size); it.setVolume(0.4f); tracks[cue] = it }
-            }
+            val t = track(cue)
             if (t.playState == AudioTrack.PLAYSTATE_PLAYING) t.stop()
             t.reloadStaticData()
             t.play()

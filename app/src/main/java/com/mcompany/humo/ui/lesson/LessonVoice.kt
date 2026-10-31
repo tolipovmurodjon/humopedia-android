@@ -62,6 +62,3 @@ internal fun rememberHumoVoice(): HumoVoice {
     DisposableEffect(voice) { onDispose { voice.stop() } }
     return voice
 }
-
-/** The lesson's one voice, handed down to the speaker button without threading it through every screen. */
-internal val LocalHumoVoice = androidx.compose.runtime.staticCompositionLocalOf<HumoVoice?> { null }

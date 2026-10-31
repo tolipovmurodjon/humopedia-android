@@ -156,7 +156,7 @@ internal object Jet {
 
 /** The one sprite atlas, decoded once per composition. */
 @androidx.compose.runtime.Composable
-internal fun rememberJetAtlas(): ImageBitmap = ImageBitmap.imageResource(R.drawable.sr71_atlas64)
+internal fun rememberJetAtlas(): ImageBitmap = com.mcompany.humo.ui.lesson.LessonWarmup.atlas ?: ImageBitmap.imageResource(R.drawable.sr71_atlas64)
 
 /**
  * The jet's heading as a spring (Boss on alpha05: "turning sharp, not smooth"): each frame it moves a share of the way
