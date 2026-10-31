@@ -63,6 +63,11 @@ class LessonPhonesTest {
             val r = n.fetchSemanticsNode().boundsInRoot
             assertTrue("$tag $state: $what is cut or off screen: $r in $root", r.left >= root.left - 1f && r.right <= root.right + 1f && r.top >= root.top - 1f && r.bottom <= root.bottom + 1f)
         }
+        fun panelClearsBoard(name: String) {
+            val bd = compose.onNodeWithTag("board").fetchSemanticsNode().boundsInRoot
+            val pn = compose.onNodeWithTag("feedback-panel").fetchSemanticsNode().boundsInRoot
+            assertTrue("$tag $name: the verdict panel ($pn) sits on the board ($bd)", bd.bottom <= pn.top + 1f)
+        }
         fun state(name: String, vararg texts: String, tiles: List<Int> = emptyList(), board: Boolean = true) {
             if (board) inside(name, "the board", compose.onNodeWithTag("board"))
             texts.forEach { inside(name, "\"$it\"", compose.onNodeWithText(it)) }
@@ -73,6 +78,7 @@ class LessonPhonesTest {
         state("P1-start", "CHECK")
         act { flow.dropAt(Node(1, 5)); flow.check() }; settle()
         state("P1-wrong", "GET HELP", "TRY AGAIN")
+        panelClearsBoard("P1-wrong")
         compose.onNodeWithText("GET HELP").performClick(); compose.waitForIdle(); settle()
         val board = compose.onNodeWithTag("board").fetchSemanticsNode().boundsInRoot
         val sheet = compose.onNodeWithTag("tutor-sheet").fetchSemanticsNode().boundsInRoot
@@ -84,6 +90,7 @@ class LessonPhonesTest {
         state("P4-start", "CHECK", tiles = listOf(0, 9))
         act { flow.tapTile(1); flow.tapTile(2); flow.check() }; settle()
         state("P4-wrong", "GET HELP", "TRY AGAIN")
+        panelClearsBoard("P4-wrong")
         act { flow.goTo(Screen.Page(5)) }
         state("P6-start", "CHECK", tiles = listOf(0, 9))
         act { flow.goTo(Screen.Page(6)) }
