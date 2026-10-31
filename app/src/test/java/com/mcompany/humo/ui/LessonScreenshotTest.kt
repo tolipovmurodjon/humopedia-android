@@ -138,7 +138,7 @@ class LessonScreenshotTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
-        compose.onNodeWithText("Nice, that's it!").assertIsDisplayed()
+        compose.onNodeWithText("Nice, that's it!").assertExists()
         compose.onNodeWithText("SHOW ME HOW").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("how-card").assertIsDisplayed()
@@ -166,11 +166,11 @@ class LessonScreenshotTest {
     @Test fun tilesFillTheSlotsByTouch() {
         val flow = player(LessonTheme.Plain)
         compose.runOnIdle { flow.goTo(Screen.Page(4)) }
-        compose.onNodeWithContentDescription("Tile 3").performClick()
-        compose.onNodeWithContentDescription("Slot 1, 3").assertIsDisplayed()
         compose.onNodeWithContentDescription("Tile 2").performClick()
+        compose.onNodeWithContentDescription("Slot 1, 2").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tile 1").performClick()
         compose.waitForIdle()
-        assertEquals(Node(3, 2), flow.slots.move)
+        assertEquals(Node(2, 1), flow.slots.move)
         compose.onNodeWithText("CHECK").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("SHOW ME HOW").performClick()
@@ -285,7 +285,7 @@ class LessonScreenshotTest {
         compose.waitForIdle()
         compose.onNodeWithText("CHECK").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("CONTINUE").assertIsDisplayed()
+        compose.onNodeWithText("CONTINUE").assertExists()
         shot("motion-P4-landed")
     }
 

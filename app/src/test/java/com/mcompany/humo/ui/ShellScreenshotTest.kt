@@ -109,7 +109,7 @@ class ShellScreenshotTest {
         shot("03b-lesson")
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Leave").performClick()
+        compose.onNodeWithText("END LESSON").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Lesson 1.2, Negative Translations, current").assertIsDisplayed()
         shot("03c-back-from-lesson")

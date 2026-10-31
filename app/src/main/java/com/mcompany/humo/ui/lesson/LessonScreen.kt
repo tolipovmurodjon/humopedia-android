@@ -313,10 +313,11 @@ internal fun Chunky(
         kind == Kind.Warn -> Triple(Chrome.Yellow, Chrome.YellowEdge, Color(0xFF4A3600))
         else -> Triple(Color.White, Chrome.Line, Chrome.MintInk)
     }
-    Box(modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)) {
+    // propagateMinConstraints: a button given an exact width (a weight, fillMaxWidth) fills it; otherwise it wraps its label.
+    Box(modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick), propagateMinConstraints = true) {
         if (enabled) Box(Modifier.matchParentSize().padding(top = 4.dp).clip(shape).background(edge))
         Box(
-            Modifier.fillMaxWidth().height(48.dp).offset(y = if (!enabled || pressed) 4.dp else 0.dp).clip(shape).background(face)
+            Modifier.height(48.dp).offset(y = if (!enabled || pressed) 4.dp else 0.dp).clip(shape).background(face)
                 .then(if (kind == Kind.Secondary && enabled) Modifier.border(2.dp, edge, shape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
@@ -339,7 +340,8 @@ private fun FitColumn(fit: Boolean, avail: Int, content: @Composable () -> Unit)
         val k = if (fit && p.height > avail && p.height > 0) avail / p.height.toFloat() else 1f
         val h = if (fit) avail else maxOf(p.height, avail)
         layout(c.maxWidth, h) {
-            p.placeWithLayer((c.maxWidth - p.width) / 2, ((h - p.height * k) / 2f).toInt()) {
+            // a little above the middle: the title and the board read as one block, the gap goes under the board
+            p.placeWithLayer((c.maxWidth - p.width) / 2, ((h - p.height * k) * 0.3f).toInt()) {
                 scaleX = k; scaleY = k; transformOrigin = TransformOrigin(0.5f, 0f)
             }
         }
@@ -414,6 +416,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                         FitColumn(true, avail) {
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                // room above the board for a jet that sits on the top row (the scroll box would clip it)
+                                Spacer(Modifier.height(24.dp))
                                 when (page.kind) {
                                     PageKind.Drag -> DragBoard(page, flow, fly, motion, boardW)
                                     PageKind.Explainer -> FigureBoard(page, fly, boardW)
