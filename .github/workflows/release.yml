@@ -53,6 +53,10 @@ jobs:
           { grep -v '^storeFile' <<< "$KEYSTORE_PROPERTIES"; echo "storeFile=$RUNNER_TEMP/release.keystore"; } > keystore.properties
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > serviceAccount-play.json
+      - name: Release assets hold no Brilliant sounds
+        run: |
+          ./gradlew mergeReleaseAssets
+          if [ -n "$(find app/build/intermediates -path '*assets*' -path '*elease*' -path '*sounds*' -name '*.mp3')" ]; then echo "release build contains assets/sounds"; exit 1; fi
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
       - name: Build and publish to Play

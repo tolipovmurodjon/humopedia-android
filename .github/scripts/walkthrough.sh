@@ -126,7 +126,7 @@ perf_cold() {
   lesson=$($T adb logcat -d -s HumoPerf:I | grep -o 'lesson-first-frame ms=[0-9]*' | tail -1 | grep -o '[0-9]*$')
   log "PERF $mode: cold start (am start -W TotalTime) = ${total:-?} ms; tap on the island to the lesson's first drawn frame = ${lesson:-?} ms"
   echo "$mode $total $lesson" >> "$OUT/perf.txt"
-  $T adb shell input keyevent 4; sleep 1; tap Leave; sleep 1
+  $T adb shell input keyevent 4; sleep 1; tap "END LESSON"; sleep 1
 }
 perf_cold nowarm
 perf_cold warm
@@ -179,8 +179,8 @@ ANIM() { $T adb shell settings put global animator_duration_scale "$1"; }
 tap "Lesson 1.1, Translating Points, current"; shot lesson
 has "Move the SR-71 4 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
-has "Leave the lesson\?"
-tap "Keep going"; sleep 1
+has "Wait, you.re so close!"
+tap "KEEP LEARNING"; sleep 1
 
 log "-- play L1.1 to the end like a child: one wrong try on every graded page"
 # The board's corners from the UI tree; Brilliant's graph geometry (docs/qa/l11-spec.md §3): origin (48, 308), cell

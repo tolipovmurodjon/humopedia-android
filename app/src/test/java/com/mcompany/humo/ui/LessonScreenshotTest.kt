@@ -61,11 +61,11 @@ class LessonScreenshotTest {
 
     private fun shot(name: String) = compose.onRoot().captureRoboImage("build/outputs/roborazzi/lesson/$name.png")
 
-    private fun player(theme: LessonTheme, flow: LessonFlow = LessonFlow(), fontScale: Float = 1f, finished: (Int) -> Unit = {}, motion: Boolean = false): LessonFlow {
+    private fun player(theme: LessonTheme, flow: LessonFlow = LessonFlow(), fontScale: Float = 1f, finished: (Int) -> Unit = {}, motion: Boolean = false, onExit: () -> Unit = {}): LessonFlow {
         compose.setContent {
             val d = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = motion, humoAlive = false) }
+                GlassTheme { LessonPlayer(PaddingValues(), onExit = onExit, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = motion, humoAlive = false) }
             }
         }
         compose.waitForIdle()
@@ -321,10 +321,20 @@ class LessonScreenshotTest {
     }
 
     @Test fun leavingAsksFirst() {
-        player(LessonTheme.Fly)
+        var left = 0
+        player(LessonTheme.Fly, onExit = { left++ })
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Leave the lesson?").assertIsDisplayed()
-        shot("exit-dialog")
+        compose.onNodeWithTag("quit-sheet").assertIsDisplayed()
+        compose.onNodeWithText("Wait, you're so close! Stay a little longer?").assertIsDisplayed()
+        shot("quit-sheet")
+        compose.onNodeWithText("KEEP LEARNING").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("quit-sheet").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Exit lesson").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("END LESSON").performClick()
+        compose.waitForIdle()
+        assertEquals(1, left)
     }
 }

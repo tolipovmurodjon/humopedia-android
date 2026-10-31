@@ -24,15 +24,16 @@ jobs:
           distribution: zulu
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      # Brilliant's sounds are debug-only: the release build must hold none of them (Boss, 2026-10-31).
-      - name: Release assets hold no Brilliant sounds
-        run: |
-          ./gradlew mergeReleaseAssets mergeDebugAssets
-          if [ -n "$(find app/build/intermediates -path '*assets*' -path '*elease*' -path '*sounds*' -name '*.mp3')" ]; then echo "release build contains assets/sounds"; exit 1; fi
-          [ -n "$(find app/build/intermediates -path '*assets*' -path '*ebug*' -path '*sounds*' -name 'correct.mp3')" ] || { echo "debug build lost its sounds"; exit 1; }
       # roborazzi.test.record: the screenshot tests save their PNGs (app/build/outputs/roborazzi) for the artifact.
       - name: Unit tests, screenshot tests and debug build
         run: ./gradlew testDebugUnitTest assembleDebug -Proborazzi.test.record=true
+      # Brilliant's sounds are debug-only (Boss, 2026-10-31): only the debug source set may hold them, the debug APK has them,
+      # and the release workflow checks its own merged assets (a release build here would need the Firebase file).
+      - name: Sounds ship in the debug build only
+        run: |
+          stray=$(find app/src -type f \( -name '*.mp3' -o -name '*.ogg' -o -name '*.wav' \) -not -path 'app/src/debug/assets/sounds/*' -not -path 'app/src/main/assets/voice/*')
+          [ -z "$stray" ] || { echo "sound files outside the allowed folders: $stray"; exit 1; }
+          unzip -l app/build/outputs/apk/debug/*.apk | grep -q 'assets/sounds/correct.mp3' || { echo "the debug APK lost its sounds"; exit 1; }
       - name: Keep the screenshots and test reports
         if: always()
         uses: actions/upload-artifact@v4

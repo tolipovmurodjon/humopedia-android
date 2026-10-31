@@ -42,6 +42,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -143,6 +144,7 @@ fun LessonPlayer(
     val atEnd = flow.screen is Screen.End
     val close: () -> Unit = { if (atEnd) onFinish(flow.sparks) else { leaving = true } }
     BackHandler(enabled = !leaving) { close() }
+    BackHandler(enabled = leaving) { leaving = false }
     BackHandler(enabled = flow.chat.open && !leaving) { flow.chat.open = false }
     val humo = rememberHumo(humoAlive)
     flow.machineName = if (theme == LessonTheme.Fly) Words.MACHINE else "point"
@@ -169,14 +171,43 @@ fun LessonPlayer(
             LessonBody(flow, theme == LessonTheme.Fly, motion, humo, voice, bottomInset)
         }
         if (theme == LessonTheme.Fly && motion && atEnd) MachPass(taps, flow.skillRight == flow.skill.size)
+        if (leaving) QuitSheet(humo, voice, bottomInset, onKeep = { leaving = false }, onEnd = { leaving = false; onExit() })
     }
-    if (leaving) {
-        AlertDialog(
-            onDismissRequest = { leaving = false },
-            title = { Text("Leave the lesson?") },
-            text = { Text("You will start this lesson over next time.") },
-            confirmButton = { TextButton(onClick = { leaving = false; onExit() }) { Text("Leave") } },
-            dismissButton = { TextButton(onClick = { leaving = false }) { Text("Keep going") } },
+}
+
+/**
+ * The ✕ asks first (Duolingo's quit sheet): the page dims, Humo looks up sadly (never crying) and says one gentle line in his
+ * voice, KEEP LEARNING is the big button and END LESSON a quiet text. The back gesture opens the same sheet.
+ */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.QuitSheet(humo: HumoState, voice: HumoVoice, bottomInset: Dp, onKeep: () -> Unit, onEnd: () -> Unit) {
+    DisposableEffect(Unit) {
+        humo.face = HumoFace.Sad
+        onDispose { humo.face = HumoFace.Rest; humo.talking = false; voice.stop() }
+    }
+    LaunchedEffect(Unit) {
+        if (!humo.alive || !voice.on) return@LaunchedEffect
+        humo.talking = true
+        voice.say(LessonLines.QUIT)
+        humo.talking = false
+        humo.face = HumoFace.Sad
+    }
+    Box(Modifier.matchParentSize().background(Chrome.Scrim).pointerInput(Unit) { detectTapGestures { } })
+    Column(
+        Modifier.align(Alignment.BottomCenter).fillMaxWidth().testTag("quit-sheet").clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(Color.White)
+            .padding(top = 20.dp, bottom = 12.dp + bottomInset),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Humo(humo, Modifier.size(110.dp))
+            Spacer(Modifier.width(14.dp))
+            Speech(LessonLines.QUIT, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(16.dp))
+        Chunky("Keep learning", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 20.dp), onClick = onKeep)
+        Text(
+            "END LESSON", Modifier.clickable(role = Role.Button, onClick = onEnd).padding(horizontal = 24.dp, vertical = 14.dp),
+            fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, letterSpacing = 0.8.sp, color = Chrome.Muted,
         )
     }
 }

@@ -44,7 +44,7 @@ for (const p of data.pages.filter((q) => !q.skill)) if (data.coach[p.id]) lines.
 data.praise.forEach((t) => lines.add(t));
 [`Not all the ${M}s landed on their targets, lowkey close though.`, `The ${M} isn't in the right spot yet, no stress.`, "Ok, let's get into it.", "Ok, let's go. What do you need?",
   'Great, that is the whole idea: right adds to x, up adds to y.\n\nReady for the next one?', 'Great. Fix it and try again.', 'Sure. Take your time.',
-  'Check your answer first. Then I can show you why it works.', 'Say it another way?', 'I need your microphone to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
+  'Check your answer first. Then I can show you why it works.', 'Say it another way?', "Wait, you're so close! Stay a little longer?", 'I need your microphone to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
 for (const p of data.pages) {
   lines.add(hint(p)); lines.add(hint(p) + SENSE); lines.add(plain(p.prompt));
   if (!p.skill) lines.add(why(p));

@@ -16,6 +16,7 @@ internal object LessonLines {
     const val STAY = "Sure. Take your time."
     const val REVIEW = "Ok, let's get into it."
     const val OPEN_FALLBACK = "Ok, let's go. What do you need?"
+    const val QUIT = "Wait, you're so close! Stay a little longer?"
     const val AGAIN = "Say it another way?"
     const val MIC_ASK = "I need your microphone to hear you. Tap Allow, please."
     const val MIC_DENIED = "No problem. You can type, or tap one of these."
@@ -78,7 +79,7 @@ internal object LessonLines {
             lesson.pages.forEach { p -> lesson.coach[p.id]?.let(::add) }
             addAll(praise)
             add(wrongTranslate(machine)); add(wrongDrag(machine)); add(REVIEW); add(OPEN_FALLBACK)
-            add(YES); add(SEE_IT); add(STAY); add(CHECK_FIRST); add(AGAIN); add(MIC_ASK); add(MIC_DENIED)
+            add(YES); add(SEE_IT); add(STAY); add(CHECK_FIRST); add(QUIT); add(AGAIN); add(MIC_ASK); add(MIC_DENIED)
             (lesson.pages + lesson.skill).forEach { addAll(tutor(it, fly, machine)) }
         }
     }

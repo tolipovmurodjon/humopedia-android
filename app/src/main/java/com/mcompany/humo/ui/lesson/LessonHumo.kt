@@ -37,7 +37,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** What Humo's face shows (humo-live.js FACES: the ones the lesson uses). */
-enum class HumoFace { Rest, Happy, Thinking, Cheer, Laugh, Proud, Talk }
+enum class HumoFace { Rest, Happy, Thinking, Cheer, Laugh, Proud, Talk, Sad }
 
 /** The one-shot moves (humo-live.js MOVES). */
 enum class HumoMove { Jump, Celebrate, Nod }
@@ -69,7 +69,7 @@ class HumoState(val alive: Boolean) {
 
     fun play(m: HumoMove) { move = m; moveSerial++ }
 
-    internal enum class Ch { Squash, Hop, Tilt, Sway, LookX, LookY, Happy, Brow, BrowL, TiltR }
+    internal enum class Ch { Squash, Hop, Tilt, Sway, LookX, LookY, Happy, Brow, BrowL, TiltR, Sad }
 
     internal fun settleStill() {
         val t = targets(face)
@@ -87,6 +87,8 @@ class HumoState(val alive: Boolean) {
             HumoFace.Cheer -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.25f); set(Ch.Tilt, 3f) }
             HumoFace.Proud -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.22f); set(Ch.Tilt, -4f) }
             HumoFace.Thinking -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.32f); set(Ch.TiltR, 6f); set(Ch.LookX, -0.7f); set(Ch.LookY, -0.9f); set(Ch.Tilt, -5f); set(Ch.Sway, -4f) }
+            // A child whose parent is leaving: big eyes looking up, brows tilted up in the middle, a small frown, a slight droop. No tears.
+            HumoFace.Sad -> { set(Ch.Brow, 1f); set(Ch.Sad, 1f); set(Ch.LookY, -1f); set(Ch.Tilt, -3f); set(Ch.Squash, 0.03f) }
             else -> Unit
         }
         return t
@@ -96,6 +98,7 @@ class HumoState(val alive: Boolean) {
         HumoFace.Happy, HumoFace.Laugh, HumoFace.Cheer -> "big"
         HumoFace.Thinking -> "smirk"
         HumoFace.Proud -> "smile"
+        HumoFace.Sad -> "sad"
         else -> "smile"
     }
 }
@@ -243,11 +246,12 @@ private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean, layers: HumoLayer
     val lookX = h.x[HumoState.Ch.LookX.ordinal]
     val lookY = h.x[HumoState.Ch.LookY.ordinal]
     val brow = h.x[HumoState.Ch.Brow.ordinal].coerceIn(0f, 1f)
+    val sad = h.x[HumoState.Ch.Sad.ordinal].coerceIn(0f, 1f)
     val bw = 0.55f * e.rx
     val byy = e.cy - 1.32f * e.ry
     if (brow > 0.01f) {
-        val dy = (if (left) h.x[HumoState.Ch.BrowL.ordinal] else 0f) * e.ry
-        val tilt = if (left) 0f else h.x[HumoState.Ch.TiltR.ordinal]
+        val dy = ((if (left) h.x[HumoState.Ch.BrowL.ordinal] else 0f) + 0.25f * sad) * e.ry
+        val tilt = (if (left) 0f else h.x[HumoState.Ch.TiltR.ordinal]) + (if (left) -16f else 16f) * sad
         withTransform({ translate(0f, dy); rotate(tilt, Offset(e.cx, byy)) }) {
             val p = Path().apply { moveTo(e.cx - bw, byy + 0.1f * e.ry); quadraticTo(e.cx, byy - 0.12f * e.ry, e.cx + bw, byy + 0.1f * e.ry) }
             drawPath(p, Ink.copy(alpha = brow), style = Stroke(0.14f * e.ry, cap = StrokeCap.Round))
@@ -293,6 +297,7 @@ private fun DrawScope.mouth(kind: String) {
             cubicTo(sm.left + 1.02f * mw, sm.top + 2.1f * mh, sm.left - .02f * mw, sm.top + 2.1f * mh, sm.left - .06f * mw, sm.top + .1f * mh)
             close()
         }, Ink)
+        "sad" -> drawPath(Path().apply { moveTo(mcx - .3f * mw, sm.top + .95f * mh); quadraticTo(mcx, sm.top - .35f * mh, mcx + .3f * mw, sm.top + .95f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
         "o" -> drawOval(Ink, Offset(509.4f - 23.2f, 685.5f - 30.1f), Size(46.4f, 60.2f))
         "small" -> drawPath(Path().apply { moveTo(mcx - .26f * mw, sm.top + .3f * mh); quadraticTo(mcx, sm.top + .9f * mh, mcx + .26f * mw, sm.top + .3f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
         "smirk" -> drawPath(Path().apply { moveTo(mcx - .34f * mw, sm.top + .55f * mh); quadraticTo(mcx + .1f * mw, sm.top + .75f * mh, mcx + .4f * mw, sm.top + .05f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))

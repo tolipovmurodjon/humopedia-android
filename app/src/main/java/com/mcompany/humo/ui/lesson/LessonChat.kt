@@ -238,7 +238,7 @@ internal fun TutorSheet(
 
 /** Humo's line in an outlined bubble with a tail pointing at him (the tail covers the border where it joins). */
 @Composable
-private fun Speech(text: String, modifier: Modifier) {
+internal fun Speech(text: String, modifier: Modifier) {
     val line = Color(0xFFE5E5E5)
     Box(
         modifier.heightIn(min = 104.dp)
