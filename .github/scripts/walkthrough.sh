@@ -176,7 +176,7 @@ has "The SR-71 isn.t in the right spot yet, no stress\."
 press "Try again"; drag 6 0 6 5; press Check; shot P2-correct 1.3
 has "Continue"; press Continue
 shot P3; press Continue
-for P in "P4 1 2 2 1" "P5 3 1 1 2" "P6 2 3 3 2"; do
+for P in "P4 1 2 2 1" "P5 1 3 3 2" "P6 3 2 2 3"; do
   set -- $P
   shot "$1-start" 0.5
   press "Tile $2" 0.4; press "Tile $3"; tapsnap Check "$1-flight" 0.9
