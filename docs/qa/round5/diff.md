@@ -13,7 +13,8 @@ Our own pictures only: Duolingo's stay on the laptop (this repo is public).
 | 4 | L1.2 | No Emma clips for L1.2's own lines (the voice map is L1.1's). L1.2 is silent apart from shared lines. | 0 clips | `LessonL11.kt` `L12`, `LessonVoice.kt` |
 | 5 | Talk to Humo (mic) | Intent matching is unit-tested (45 phrasings); the recogniser and the permission flow could not be run (no microphone on the CI emulator). | untested on a phone | `TutorMic.kt`, `LessonChat.kt` |
 | 6 | Boss's real sounds | In the debug source set only; nobody has heard them on a phone yet. | 11 files | `app/src/debug/assets/sounds/`, `LessonSounds.kt` |
-| 7 | Skill check | Panel lines ("Correct!", "Not quite.") are silent on purpose (no Humo in the skill check). | | `LessonScreen.kt` |
+| 7 | Fire while dragging | The mid-drag Roborazzi frame (`round5/motion-P1-mid-drag.png`) shows the soft smoke but no nozzle fire: the test clock moves the finger in one step, so the jet's speed is near zero at the frame. The code now lights the nozzles while dragging (`LessonBoards.kt` `flames`); a real drag on a phone is the proof. The end pass (`lesson/motion-end-mach3-a.png`) shows fire, smoke and banner. | unproven on a phone | `LessonBoards.kt` |
+| 8 | Skill check | Panel lines ("Correct!", "Not quite.") are silent on purpose (no Humo in the skill check). | | `LessonScreen.kt` |
 
 Fixed in this round after Boss's shots (checked in the pictures): overlapping jets (jet length now shrinks with the nearest pair, `jetLength`), rings drawn over the jets, empty gap under the board (content sits in the upper third), bold skill-check title (every prompt is the same 22 sp bold), explainer jet cut by the edge (figure drawn at 88 %), HUMO button taking the whole bar on a 320 dp phone (found in `phones/320x568-P4-start.png`, fixed), top jet clipped by the scroll box while the tutor is open (24 dp room above the board).
 
