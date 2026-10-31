@@ -162,7 +162,7 @@ shot P1-start; has "Move the SR-71 4 steps to the right and 1 up."
 drag 1 2 2 5; press Check; shot P1-wrong 1.3
 has "The SR-71 isn.t in the right spot yet, no stress\."
 press "Get help" 1.5; shot P1-help; has "Why was my answer wrong\?"
-$T adb shell input keyevent 4; sleep 1
+press "Close chat" 1
 press "Try again"; drag 2 5 5 3; press Check; shot P1-correct 1.3
 has "Nice, that.s it!"
 press "Why\?"; shot P1-why; has "Why is this the answer\?"; press Yes; press "Continue lesson"
@@ -182,7 +182,7 @@ for P in "P4 1 2 2 1" "P5 3 1 1 2" "P6 2 3 3 2"; do
   press "Tile $2" 0.4; press "Tile $3"; tapsnap Check "$1-flight" 0.9
   waitfor "Try again" 15; shot "$1-wrong" 1.3
   has "Not all the SR-71s landed on their targets, lowkey close though\."
-  press "Get help" 1.5; shot "$1-help"; $T adb shell input keyevent 4; sleep 1
+  press "Get help" 1.5; shot "$1-help"; press "Close chat" 1
   press "Try again"; scrolldown; press "Start over"; sleep 1.5
   press "Tile $4" 0.4; press "Tile $5"; tapsnap Check "$1-flight-2" 0.9
   waitfor "Continue" 15; shot "$1-correct"
