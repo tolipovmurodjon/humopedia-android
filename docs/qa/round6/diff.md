@@ -1,8 +1,8 @@
 # Round 6 diff: Boss's picked mobile design, built on the phone (alpha11)
 
 Pictures are CI's own, from our own rendering only (Duolingo's and Brilliant's stay on the laptop; this repo is public):
-- final build 41235070800 (all tests green; Roborazzi at 360x800, 390x844, 412x915, 360x800 at 1.5x font, the five-phone check, the matrix), small copies in `lesson-pictures-small`, APK in `D:\Humopediandroiduild-ciĊ35070800pkpp-debug.apk` (alpha11, versionCode 45);
-- final smoke 41235070743 (emulator walkthrough, 103 steps, passed, evidence in `D:\Humopediandroiduild-ciĊ35070743\evidence`);
+- final build 41235070800 (all tests green; Roborazzi at 360x800, 390x844, 412x915, 360x800 at 1.5x font, the five-phone check, the matrix), small copies in `lesson-pictures-small`, APK in `D:/Humopedia/android/build-ci/41235070800/apk/app-debug.apk` (alpha11, versionCode 45);
+- final smoke 41235070743 (emulator walkthrough, 103 steps, passed, evidence in `D:/Humopedia/android/build-ci/41235070743/evidence`);
 - the red runs on the way: 41223952465 (two test expectations the new flow had changed), 41233708472 (the new panel-clears-the-graph check caught a drag page on 320x568 and 360x640; fixed), and the audit runs 41226663477, 41228415784, 41230160775, 41232241880.
 
 The loop: shots opened, compared with the design page (`D:\Humopedia\docs\design\2026-10-31-mobile-teaching-audit\index.html` rendered at 390 wide: Classic screen, glass sheet and bar, Boost track), problems fixed, pushed, shots opened again.
