@@ -22,16 +22,16 @@ const steps = (n, way) => `${Math.abs(n)} step${Math.abs(n) === 1 ? '' : 's'} ${
 const SENSE = '\n\nDoes that make sense?';
 const graded = (p) => p.kind === 'Drag' || p.kind === 'Translate';
 const hint = (p) => p.skill ? 'This one is yours. Take your time, you can do it.'
-  : p.kind === 'Drag' ? `Start at the ${M}. Count the steps to the right along the grid first, then count the steps up. Then move it there.`
-  : p.kind === 'Translate' ? `Pick one ${M} and its empty circle. Count the steps right, then the steps up. Every ${M} moves the same way.`
-  : `Watch one ${M}: it moves some steps right and some steps up. The other one moves exactly the same.`;
-const why = (p) => p.explain ? plain(p.explain) + SENSE : 'Check your answer first. Then I can show you why it works.';
+  : p.kind === 'Drag' ? 'Count the steps right, then up. Then move it there.'
+  : p.kind === 'Translate' ? `Pick one ${M} and its ring. Count right, then up.`
+  : `Watch one ${M} move. The others move the same.`;
+const why = (p) => p.explain ? plain(p.explain) + SENSE : 'Check first. Then I will show you why.';
 const look = (p) => p.kind === 'Translate'
-  ? `Let's look together. The teal squares show where your ${M}s landed and where the targets are. What do you notice?`
-  : `Let's look together. The teal squares show where your ${M} started and where it is now. Count the steps between them. What do you notice?`;
+  ? 'Look at the teal squares. What do you notice?'
+  : 'Look at the teal squares. What do you notice?';
 const showMe = (p) => p.kind === 'Translate'
-  ? `Check each ${M} against its ring. Count the steps right, then the steps up, and change your numbers by exactly the difference. Then try again.`
-  : `Compare the two teal squares with the task. Count the steps right, then the steps up, and move your ${M} by exactly that much. Then try again.`;
+  ? `Compare each ${M} with its ring. Fix the difference, then try again.`
+  : `Compare the two squares. Move it the difference, then try again.`;
 const how = (p) => {
   const [mx, my] = p.move, [fx, fy] = p.points[0];
   return p.kind === 'Drag'
@@ -43,8 +43,8 @@ const lines = new Set();
 for (const p of data.pages.filter((q) => !q.skill)) if (data.coach[p.id]) lines.add(data.coach[p.id]);
 data.praise.forEach((t) => lines.add(t));
 [`Not all the ${M}s landed on their targets, lowkey close though.`, `The ${M} isn't in the right spot yet, no stress.`, "Ok, let's get into it.", "Ok, let's go. What do you need?",
-  'Great, that is the whole idea: right adds to x, up adds to y.\n\nReady for the next one?', 'Great. Fix it and try again.', 'Sure. Take your time.',
-  'Check your answer first. Then I can show you why it works.', 'Say it another way?', "Wait, you're so close! Stay a little longer?", 'I need your microphone to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
+  'Right adds to x, up adds to y. Ready for the next one?', 'Nice. Fix it and try again.', 'Sure. Take your time.',
+  'Check first. Then I will show you why.', 'Say it another way?', "Wait, you're so close! Stay a bit?", 'I need to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
 for (const p of data.pages) {
   lines.add(hint(p)); lines.add(hint(p) + SENSE); lines.add(plain(p.prompt));
   if (!p.skill) lines.add(why(p));
@@ -57,8 +57,8 @@ const get = (url) => new Promise((resolve) => require('http').get(url, { headers
 // clean line (no brackets), so spoken words = written words.
 const TAGS = {
   "Nice, that's it!": '[cheerful]', 'Boom, nailed it.': '[laughs softly]', "Let's go, perfect.": '[cheerful]',
-  [`Start at the ${M}. Count the steps to the right along the grid first, then count the steps up. Then move it there.`]: '[curious]',
-  'Great. Fix it and try again.': '[cheerful]', 'Say it another way?': '[curious]',
+  ['Count the steps right, then up. Then move it there.']: '[curious]',
+  'Nice. Fix it and try again.': '[cheerful]', 'Say it another way?': '[curious]',
 };
 const spoken = (t) => (TAGS[t] ? `${TAGS[t]} ${t}` : t);
 const file = (t) => crypto.createHash('sha1').update(`${VOICE_ID}|${MODEL}|${spoken(t)}`).digest('hex').slice(0, 16) + '.mp3';

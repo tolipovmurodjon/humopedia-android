@@ -10,15 +10,15 @@ import kotlin.math.abs
  */
 internal object LessonLines {
     const val SENSE = "\n\nDoes that make sense?"
-    const val CHECK_FIRST = "Check your answer first. Then I can show you why it works."
-    const val YES = "Great, that is the whole idea: right adds to x, up adds to y.\n\nReady for the next one?"
-    const val SEE_IT = "Great. Fix it and try again."
+    const val CHECK_FIRST = "Check first. Then I will show you why."
+    const val YES = "Right adds to x, up adds to y. Ready for the next one?"
+    const val SEE_IT = "Nice. Fix it and try again."
     const val STAY = "Sure. Take your time."
     const val REVIEW = "Ok, let's get into it."
     const val OPEN_FALLBACK = "Ok, let's go. What do you need?"
-    const val QUIT = "Wait, you're so close! Stay a little longer?"
+    const val QUIT = "Wait, you're so close! Stay a bit?"
     const val AGAIN = "Say it another way?"
-    const val MIC_ASK = "I need your microphone to hear you. Tap Allow, please."
+    const val MIC_ASK = "I need to hear you. Tap Allow, please."
     const val MIC_DENIED = "No problem. You can type, or tap one of these."
     const val SKILL_YOURS = "This one is yours. Take your time, you can do it."
 
@@ -29,21 +29,21 @@ internal object LessonLines {
     /** How to count, never the answer (player.js `hintFor`). */
     fun hint(page: LessonPage, machine: String): String = when {
         page.skill -> SKILL_YOURS
-        page.kind == PageKind.Drag -> "Start at the $machine. Count the steps to the right along the grid first, then count the steps up. Then move it there."
-        page.kind == PageKind.Translate -> "Pick one $machine and its empty circle. Count the steps right, then the steps up. Every $machine moves the same way."
-        else -> "Watch one $machine: it moves some steps right and some steps up. The other one moves exactly the same."
+        page.kind == PageKind.Drag -> "Count the steps right, then up. Then move it there."
+        page.kind == PageKind.Translate -> "Pick one $machine and its ring. Count right, then up."
+        else -> "Watch one $machine move. The others move the same."
     }
 
     fun why(page: LessonPage, fly: Boolean): String = page.explain?.let { plain(it, fly) + SENSE } ?: CHECK_FIRST
 
     /** After a wrong try: Humo marks the points with teal squares and asks what the learner notices. */
     fun look(page: LessonPage, machine: String): String =
-        if (page.kind == PageKind.Translate) "Let's look together. The teal squares show where your ${machine}s landed and where the targets are. What do you notice?"
-        else "Let's look together. The teal squares show where your $machine started and where it is now. Count the steps between them. What do you notice?"
+        if (page.kind == PageKind.Translate) "Look at the teal squares. What do you notice?"
+        else "Look at the teal squares. What do you notice?"
 
     fun showMe(page: LessonPage, machine: String): String =
-        if (page.kind == PageKind.Translate) "Check each $machine against its ring. Count the steps right, then the steps up, and change your numbers by exactly the difference. Then try again."
-        else "Compare the two teal squares with the task. Count the steps right, then the steps up, and move your $machine by exactly that much. Then try again."
+        if (page.kind == PageKind.Translate) "Compare each $machine with its ring. Fix the difference, then try again."
+        else "Compare the two squares. Move it the difference, then try again."
 
     /** The worked-explanation card (Show me how): the move written out with this page's own numbers. */
     fun how(page: LessonPage, machine: String): String {
