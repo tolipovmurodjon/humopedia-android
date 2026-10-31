@@ -50,7 +50,7 @@ object DailyPush {
      * walkthrough can prove that this one request is all the app sends.
      */
     fun onLaunchAgainstFakeServer(app: Application, hostAndPort: String, appVersion: String) {
-        val options = FirebaseOptions.Builder().setApplicationId("1:1:android:ci").setApiKey("ci-key").setProjectId("humo-ci").build()
+        val options = FirebaseOptions.Builder().setApplicationId("1:1234567890:android:abcdef1234567890").setApiKey("AIzaSyCiFakeKeyCiFakeKeyCiFakeKeyCiFak0").setProjectId("humo-ci").build()
         val smokeApp = FirebaseApp.getApps(app).firstOrNull { it.name == "smoke" } ?: FirebaseApp.initializeApp(app, options, "smoke")
         val functions = Firebase.functions(smokeApp, REGION)
         functions.useEmulator(hostAndPort.substringBefore(':'), hostAndPort.substringAfter(':').toInt())
