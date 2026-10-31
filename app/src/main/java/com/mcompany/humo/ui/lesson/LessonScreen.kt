@@ -463,7 +463,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val compact = screenH < 700
     val keyHeight = when { screenH < 640 -> 34.dp; screenH < 760 -> 40.dp; else -> 46.dp }
     // a drag page has no keypad under the board, so the verdict panel (taller than the bar) would sit on the graph: keep its room
-    val panelRoom = if (page.kind == PageKind.Drag) 66.dp + 80.dp * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f) else 0.dp
+    val panelRoom = if (page.kind == PageKind.Drag) 80.dp + 80.dp * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f) else 0.dp
     val dockRoom = (if (compact) 78.dp else 84.dp) + bottomInset + panelRoom
 
     Box(Modifier.fillMaxSize()) {
