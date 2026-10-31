@@ -1,25 +1,24 @@
 name: release
 
-# One button (or `gh workflow run release.yml`) builds the signed bundle and sends it to Google Play, so a release no
-# longer needs the laptop: the Oracle server is ARM and Android's build tools run only on x86 (2026-10-04).
-# Boss's keys live only in GitHub Secrets (AND-2); this file never holds or prints them.
+# A tag `app-v*` builds the signed Play bundle and sends it to the Play INTERNAL track only, and builds the signed test
+# APK (the debug build, which updates itself) and attaches it with latest.json to a GitHub Release. Production stays a
+# manual run on Boss's word. Boss's keys live only in GitHub Secrets (AND-2); this file never holds or prints them.
+# Nothing here runs on an ordinary push: a release on every push once installed itself while a tester was using the app.
 on:
+  push:
+    tags: ["app-v*"]
   workflow_dispatch:
     inputs:
       track:
         description: Play track (internal, alpha, beta, production)
-        default: production
+        default: internal
         required: true
       publish:
-        description: Send to Play (off = build and check the signature only)
-        type: boolean
-        default: true
-      listing:
-        description: Also send the store page (texts, icon, screenshots in app/src/main/play)
+        description: Send to Play (off = build, check the signature and the Play-build proof only)
         type: boolean
         default: false
-      test_apk:
-        description: Also build a test APK (download it, then firebase appdistribution:distribute)
+      listing:
+        description: Also send the store page (texts, icon, screenshots in app/src/main/play)
         type: boolean
         default: false
 
@@ -27,10 +26,18 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
+env:
+  # A tag run always goes to internal; only a hand-started run may name another track.
+  TRACK: ${{ github.event_name == 'push' && 'internal' || inputs.track }}
+  PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -55,27 +62,61 @@ jobs:
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > serviceAccount-play.json
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
-      - name: Build and publish to Play
-        if: inputs.publish
-        run: ./gradlew publishBundle --track "${{ inputs.track }}"
-      - name: Send the store page to Play
-        if: inputs.listing
-        run: ./gradlew publishListing
-      - name: Build the test APK
-        if: inputs.test_apk
-        run: ./gradlew assembleRelease
-      - uses: actions/upload-artifact@v4
-        if: inputs.test_apk
-        with:
-          name: app-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-          retention-days: 7
-      - name: Build only and show the signing key
-        if: ${{ !inputs.publish }}
-        # The fingerprint is public (it sits in assetlinks.json); upload key 3F:C6... means the right key signed it.
+      - name: Build the Play build and the signed test APK
+        run: ./gradlew assembleRelease assembleDebug bundleRelease -PsignDebugWithRelease=true
+      # Google Play forbids a Play app from updating itself outside Play, so the Play build must hold no self-update code
+      # and no REQUEST_INSTALL_PACKAGES. The test APK is the positive control: the same greps must find them there.
+      - name: Prove the Play build has no self-update
         run: |
-          ./gradlew bundleRelease
+          ANALYZER=$(find "$ANDROID_HOME" -name apkanalyzer -type f | head -1)
+          [ -n "$ANALYZER" ] || { echo "apkanalyzer not found"; exit 1; }
+          REL=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          DBG=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          probe() {
+            "$ANALYZER" manifest permissions "$1" | grep -c REQUEST_INSTALL_PACKAGES || true
+            "$ANALYZER" manifest print "$1" | grep -c -E 'InstallTapActivity|InstallResultReceiver|UpdateStartup' || true
+            "$ANALYZER" dex packages --defined-only "$1" | grep -c 'com.mcompany.humo.update' || true
+          }
+          echo "test APK ($DBG): permission / manifest entries / dex classes"; probe "$DBG" | tee "$RUNNER_TEMP/dbg.txt"
+          echo "Play build ($REL): permission / manifest entries / dex classes"; probe "$REL" | tee "$RUNNER_TEMP/rel.txt"
+          [ "$(awk '{s+=$1} END{print s+0}' "$RUNNER_TEMP/rel.txt")" = 0 ] || { echo "SELF-UPDATE CODE IS IN THE PLAY BUILD"; exit 1; }
+          [ "$(sed -n 1p "$RUNNER_TEMP/dbg.txt")" -ge 1 ] && [ "$(sed -n 2p "$RUNNER_TEMP/dbg.txt")" -ge 1 ] || { echo "the control found nothing in the test APK, the check is blind"; exit 1; }
+      - name: Check the signing keys
+        run: |
+          # The fingerprints are public (they sit in assetlinks.json): upload key 3F:C6... means the right key signed it.
           keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab | grep SHA256
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/*.apk | grep 'certificate SHA-256 digest' | head -1
+      - name: Name the test APK and write latest.json
+        run: |
+          ANALYZER=$(find "$ANDROID_HOME" -name apkanalyzer -type f | head -1)
+          DBG=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          CODE=$("$ANALYZER" manifest version-code "$DBG")
+          NAME=$("$ANALYZER" manifest version-name "$DBG")
+          mkdir -p dist && cp "$DBG" "dist/humopedia-$CODE.apk"
+          SHA=$(sha256sum "dist/humopedia-$CODE.apk" | cut -d' ' -f1)
+          NOTES=$(git log -1 --format=%s | sed 's/"/\\"/g')
+          printf '{"versionCode":%s,"versionName":"%s","apk":"humopedia-%s.apk","sha256":"%s","builtAt":"%s","notes":"%s"}\n' \
+            "$CODE" "$NAME" "$CODE" "$SHA" "$(date -u +%FT%TZ)" "$NOTES" > dist/latest.json
+          cat dist/latest.json
+      - name: Publish to Play
+        if: env.PUBLISH == 'true'
+        run: ./gradlew publishBundle --track "$TRACK"
+      - name: Send the store page to Play
+        if: github.event_name == 'workflow_dispatch' && inputs.listing
+        run: ./gradlew publishListing
+      - name: GitHub Release with the test APK and latest.json
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/humopedia-*.apk dist/latest.json \
+            --title "Humopedia $GITHUB_REF_NAME" --notes "$(git log -1 --format=%s)" --target "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/
+          retention-days: 7
       - name: Remove the keys
         if: always()
         run: rm -f keystore.properties app/google-services.json serviceAccount-play.json "$RUNNER_TEMP/release.keystore"

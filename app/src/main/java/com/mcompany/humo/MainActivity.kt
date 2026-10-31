@@ -11,6 +11,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.mcompany.humo.playupdate.PlayUpdateModel
+import com.mcompany.humo.playupdate.PlayUpdateSourceImpl
+import com.mcompany.humo.playupdate.UpdatePill
 import com.mcompany.humo.ui.glass.GlassStage
 import com.mcompany.humo.ui.glass.GlassTheme
 import com.mcompany.humo.ui.shell.AppShell
@@ -24,6 +27,9 @@ import kotlinx.coroutines.withContext
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    // Play In-App Updates serve the Play build; the debug test build updates itself (src/debug/.../update).
+    private val playUpdate by lazy { PlayUpdateModel(PlayUpdateSourceImpl(this)) }
+
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,12 +38,17 @@ class MainActivity : ComponentActivity() {
         // The glass bar draws under the navigation bar; Android must not paint its own scrim over it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         GlassStage.coldStart()
-        setContent { GlassTheme { AppShell() } }
+        setContent { GlassTheme { AppShell(onTopOverlay = { UpdatePill(playUpdate) }) } }
         if (savedInstanceState == null) afterFirstFrame()
         // Debug builds only: the CI smoke forces a crash to prove CrashRecorder writes it down.
         if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_TEST_CRASH, false) == true) {
             lifecycleScope.launch { delay(500); throw IllegalStateException("Humo test crash") }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!BuildConfig.DEBUG) playUpdate.refresh()
     }
 
     /** Push registration and the one-time notification question, never on the first frame. */

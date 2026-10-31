@@ -61,6 +61,11 @@ android {
     }
 
     buildTypes {
+        // The test channel (the debug build) updates itself from the GitHub Release, so Android only accepts an update
+        // signed with the same key every time. release.yml passes -PsignDebugWithRelease=true; a laptop build never does.
+        debug {
+            if (findProperty("signDebugWithRelease") == "true") signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
@@ -135,7 +140,9 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.functions)
     implementation(libs.firebase.installations)
+    implementation(libs.play.app.update)
     debugImplementation(libs.firebase.appcheck.debug)
+    debugImplementation(libs.androidx.work.runtime)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

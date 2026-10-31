@@ -65,6 +65,8 @@ fun AppShell(
     path: @Composable (PaddingValues, (Lesson) -> Unit) -> Unit = { padding, open -> PathScreenRoute(padding, onOpenLevel = open) },
     /** A level's lesson; tests pass the player without the Hilt ViewModel. */
     lesson: @Composable (Int, PaddingValues, () -> Unit) -> Unit = { level, padding, close -> LessonEntry(level, padding, close) },
+    /** Drawn under the status bar on the tab roots only, never over a lesson (the quiet "Yangilanish tayyor" pill). */
+    onTopOverlay: @Composable () -> Unit = {},
 ) {
     val backdrop = rememberLayerBackdrop()
     var selected by rememberSaveable { mutableStateOf(startTab) }
@@ -111,6 +113,7 @@ fun AppShell(
             }
         }
         if (onTop) {
+            Box(Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars).padding(top = 6.dp)) { onTopOverlay() }
             LiquidBottomTabs(
                 selectedTabIndex = { selected },
                 onTabSelected = { selected = it },
