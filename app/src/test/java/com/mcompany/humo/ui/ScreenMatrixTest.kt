@@ -83,31 +83,25 @@ abstract class ScreenMatrix(private val width: Int) {
         compose.waitForIdle()
     }
 
-    private fun shellScreens(font: Float) {
+    /** One scenario per test: the shell keeps its sheet open between calls, so a scenario never shares a test. */
+    private fun shellScenario(font: Float, name: String, steps: () -> Unit) {
+        begin(font)
+        shell(0, font)
+        steps()
+        shot("shell-$name")
+    }
+
+    private fun click(description: String) {
+        compose.onNodeWithContentDescription(description).performClick()
+        compose.waitForIdle()
+    }
+
+    private fun everyTab(font: Float) {
         begin(font)
         Tab.entries.forEachIndexed { i, t ->
             shell(i, font)
-            shot("shell-${i + 1}-${t.name.lowercase()}")
+            shot("shell-tab-${i + 1}-${t.name.lowercase()}")
         }
-        shell(0, font)
-        compose.onNodeWithContentDescription("Lesson 1.1, Translating Points, done").performClick()
-        compose.waitForIdle()
-        shot("shell-sheet-done")
-        shell(0, font)
-        compose.onNodeWithContentDescription("Lesson 1.3, Translating Shapes, locked").performClick()
-        compose.waitForIdle()
-        shot("shell-sheet-locked")
-        shell(0, font)
-        compose.onNodeWithContentDescription("Kurs: Coordinate Transformations").performClick()
-        compose.waitForIdle()
-        shot("shell-course-list")
-        shell(0, font)
-        compose.onNodeWithContentDescription("Lesson 1.2, Negative Translations, current").performClick()
-        compose.waitForIdle()
-        shot("shell-lesson-opened")
-        compose.onNodeWithContentDescription("Exit lesson").performClick()
-        compose.waitForIdle()
-        shot("shell-leave-dialog")
     }
 
     private fun player(flow: LessonFlow, font: Float) {
@@ -179,8 +173,18 @@ abstract class ScreenMatrix(private val width: Int) {
         shot("$tag-end-card")
     }
 
-    @Test fun shellFont100() = shellScreens(1f)
-    @Test fun shellFont150() = shellScreens(1.5f)
+    @Test fun tabsFont100() = everyTab(1f)
+    @Test fun tabsFont150() = everyTab(1.5f)
+    @Test fun pathFont100() = shellScenario(1f, "path") {}
+    @Test fun pathFont150() = shellScenario(1.5f, "path") {}
+    @Test fun doneSheetFont100() = shellScenario(1f, "sheet-done") { click("Lesson 1.1, Translating Points, done") }
+    @Test fun doneSheetFont150() = shellScenario(1.5f, "sheet-done") { click("Lesson 1.1, Translating Points, done") }
+    @Test fun lockedSheetFont100() = shellScenario(1f, "sheet-locked") { click("Lesson 1.3, Translating Shapes, locked") }
+    @Test fun lockedSheetFont150() = shellScenario(1.5f, "sheet-locked") { click("Lesson 1.3, Translating Shapes, locked") }
+    @Test fun courseListFont100() = shellScenario(1f, "course-list") { click("Kurs: Coordinate Transformations") }
+    @Test fun courseListFont150() = shellScenario(1.5f, "course-list") { click("Kurs: Coordinate Transformations") }
+    @Test fun leaveDialogFont100() = shellScenario(1f, "leave-dialog") { click("Lesson 1.2, Negative Translations, current"); click("Exit lesson") }
+    @Test fun leaveDialogFont150() = shellScenario(1.5f, "leave-dialog") { click("Lesson 1.2, Negative Translations, current"); click("Exit lesson") }
     @Test fun l11PagesFont100() = lessonPages(1f, "l11", L11)
     @Test fun l11PagesFont150() = lessonPages(1.5f, "l11", L11)
     @Test fun l12PagesFont100() = lessonPages(1f, "l12", L12)

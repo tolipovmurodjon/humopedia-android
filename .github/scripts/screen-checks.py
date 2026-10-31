@@ -15,8 +15,9 @@ import sys
 import numpy as np
 from PIL import Image
 
-shots = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "app/build/outputs/roborazzi")
-source = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else "app/src/main")
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+shots = pathlib.Path(args[0] if args else "app/build/outputs/roborazzi")
+source = pathlib.Path(args[1] if len(args) > 1 else "app/src/main")
 EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️]")
 MIN_CLUSTER = 40
 findings = []
@@ -57,6 +58,21 @@ def red_clusters(path):
         sizes.append(n)
     return sizes
 
+
+def self_test():
+    """The control: a check that finds nothing must be shown able to find something (a red square, a mint square)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        for name, colour in (("red", (220, 30, 40)), ("pink-ink", (230, 120, 130)), ("mint", (28, 126, 105)), ("orange", (255, 140, 0))):
+            Image.new("RGB", (20, 20), colour).save(f"{d}/{name}.png")
+        found = {n: bool([x for x in red_clusters(f"{d}/{n}.png") if x >= MIN_CLUSTER]) for n in ("red", "pink-ink", "mint", "orange")}
+    assert found == {"red": True, "pink-ink": False, "mint": False, "orange": False}, found
+    print("screen-checks: self-test ok (red found; mint, orange and pink ignored)")
+
+
+if "--self-test" in sys.argv:
+    self_test()
+    sys.exit(0)
 
 pngs = sorted(shots.rglob("*.png"))
 for png in pngs:

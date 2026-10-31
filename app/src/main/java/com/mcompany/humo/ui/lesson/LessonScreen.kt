@@ -78,6 +78,7 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -547,8 +548,24 @@ private fun ButtonsRow(buttons: List<BtnSpec>, motion: Boolean, key: String, mod
         transitionSpec = { (fadeIn(tween(if (motion) 200 else 0)) + slideInVertically(tween(if (motion) 200 else 0)) { rise }).togetherWith(fadeOut(tween(0))) },
         label = "buttons",
     ) { (_, list) ->
-        Row(Modifier.fillMaxWidth().height(51.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            list.forEach { b -> LButton(b.label, b.kind, b.enabled, Modifier.weight(b.weight), b.onClick) }
+        // A grey pill beside the main one keeps its weight's share, but never less than its own label needs: "I don't
+        // know" and "Get help" were cut at every width (CI cut-text check, 2026-10-31); the main button gives way.
+        BoxWithConstraints(Modifier.fillMaxWidth().height(51.dp)) {
+            val measurer = rememberTextMeasurer()
+            val density = LocalDensity.current
+            val gaps = 12.dp * (list.size - 1)
+            val totalWeight = list.sumOf { it.weight.toDouble() }.toFloat()
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                list.forEach { b ->
+                    if (b.weight >= 1f) {
+                        LButton(b.label, b.kind, b.enabled, Modifier.weight(1f), b.onClick)
+                    } else {
+                        val label = measurer.measure(b.label, TextStyle(fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 17.sp))
+                        val needed = with(density) { label.size.width.toDp() } + 32.dp
+                        LButton(b.label, b.kind, b.enabled, Modifier.width(maxOf((maxWidth - gaps) * (b.weight / totalWeight), needed)), b.onClick)
+                    }
+                }
+            }
         }
     }
 }
