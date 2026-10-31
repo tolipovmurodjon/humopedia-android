@@ -562,7 +562,7 @@ private fun ButtonsRow(buttons: List<BtnSpec>, motion: Boolean, key: String, mod
                     } else {
                         val label = measurer.measure(b.label, TextStyle(fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 17.sp))
                         val needed = with(density) { label.size.width.toDp() } + 32.dp
-                        LButton(b.label, b.kind, b.enabled, Modifier.width(maxOf(room * (b.weight / totalWeight), needed)), b.onClick)
+                        LButton(b.label, b.kind, b.enabled, Modifier.width(maxOf(room * (b.weight / totalWeight), minOf(needed, room * 0.6f))), b.onClick)
                     }
                 }
             }
@@ -598,7 +598,7 @@ private fun LButton(label: String, kind: Kind, enabled: Boolean, modifier: Modif
                 val weight = if (enabled) FontWeight.SemiBold else FontWeight.Normal
                 val wanted = measurer.measure(label, TextStyle(fontFamily = LessonType.Figtree, fontWeight = weight, fontSize = 17.sp)).size.width
                 val room = with(LocalDensity.current) { (maxWidth - 16.dp).toPx() }
-                val size = if (wanted <= room) 17f else (17f * room / wanted).coerceAtLeast(11f)
+                val size = if (wanted <= room) 17f else (17f * room / wanted).coerceAtLeast(8f)
                 Text(label, fontFamily = LessonType.Figtree, fontWeight = weight, fontSize = size.sp, color = ink, maxLines = 1)
             }
         }
