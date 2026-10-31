@@ -177,7 +177,7 @@ fun LessonPlayer(
 }
 
 /**
- * The ✕ asks first (Duolingo's quit sheet): the page dims, Humo looks up sadly (never crying) and says one gentle line in his
+ * The close cross asks first (Duolingo's quit sheet): the page dims, Humo looks up sadly (never crying) and says one gentle line in his
  * voice, KEEP LEARNING is the big button and END LESSON a quiet text. The back gesture opens the same sheet.
  */
 @Composable
