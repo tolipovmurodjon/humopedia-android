@@ -28,8 +28,8 @@ class LessonFlowTest {
         assertEquals(listOf(Node(5, 3)), L11.pages[0].targets)
         assertEquals(listOf(Node(6, 5)), L11.pages[1].targets)
         assertEquals(listOf(Node(4, 2), Node(4, 3)), L11.pages[3].targets)
-        assertEquals(listOf(Node(2, 3), Node(3, 5), Node(5, 4)), L11.pages[4].targets)
-        assertEquals(listOf(Node(4, 3), Node(4, 4), Node(5, 3), Node(5, 4)), L11.pages[5].targets)
+        assertEquals(listOf(Node(4, 3), Node(5, 5), Node(7, 4)), L11.pages[4].targets)
+        assertEquals(listOf(Node(3, 4), Node(3, 5), Node(4, 4), Node(4, 5)), L11.pages[5].targets)
         assertEquals(listOf(Node(1, 3), Node(4, 0), Node(5, 2)), L11.skill.map { it.move })
         assertEquals(listOf(Node(3, 4), Node(4, 5)), L11.skill[0].targets)
     }

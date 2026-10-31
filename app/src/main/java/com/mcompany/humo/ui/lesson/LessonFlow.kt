@@ -193,7 +193,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
     fun tryAgain() {
         phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList()
         val p = page
-        if (p?.kind == PageKind.Translate && screen !is Screen.Review) slots = Slots.start(p)
+        if (p?.kind == PageKind.Translate) slots = Slots.start(p)
     }
 
     /** "I don't know": counts as missed and the machines fly the right move (no shame, no tint). */

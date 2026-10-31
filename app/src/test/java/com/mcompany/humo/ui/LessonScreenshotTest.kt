@@ -166,11 +166,11 @@ class LessonScreenshotTest {
     @Test fun tilesFillTheSlotsByTouch() {
         val flow = player(LessonTheme.Plain)
         compose.runOnIdle { flow.goTo(Screen.Page(4)) }
-        compose.onNodeWithContentDescription("Tile 1").performClick()
-        compose.onNodeWithContentDescription("Slot 1, 1").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tile 3").performClick()
+        compose.onNodeWithContentDescription("Slot 1, 3").assertIsDisplayed()
         compose.onNodeWithContentDescription("Tile 2").performClick()
         compose.waitForIdle()
-        assertEquals(Node(1, 2), flow.slots.move)
+        assertEquals(Node(3, 2), flow.slots.move)
         compose.onNodeWithText("Check").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Why?").performClick()
