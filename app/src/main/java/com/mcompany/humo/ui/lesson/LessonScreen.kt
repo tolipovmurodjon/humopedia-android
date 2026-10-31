@@ -58,6 +58,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -92,35 +96,46 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.input.pointer.pointerInput
 
-/** Brilliant's lesson chrome colours (spec §1-2). */
+/** The lesson chrome's colours, measured on the web player (engine/play.html) that this screen copies 1:1. */
 private object Chrome {
     val Ink = Color(0xFF111111)
     val Line = Color(0xFFE2E2E2)
     val Green = Color(0xFF3FCE69)
     val Yellow = Color(0xFFF6D545)
     val Track = Color(0xFFE6E6E6)
-    val Fill = Color(0xFF29CC57)
+    val Fill = Color(0xFF2ECC5F)
+    val DotWrong = Color(0xFF3D3D3D)
+    val DotNow = Color(0xFFBDBDBD)
+    val Bolt = Color(0xFFB6CF0E)
+    val StarOff = Color(0xFF9A9A9A)
     val Dark = Color(0xFF2B2B2B)
     val DarkEdge = Color(0xFF111111)
-    val Off = Color(0xFFF2F2F2)
-    val OffText = Color(0xFF9E9E9E)
+    val Off = Color(0xFFF4F4F4)
+    val OffText = Color(0xFFB0B0B0)
     val Gray = Color(0xFFEBEBEB)
     val GrayEdge = Color(0xFFCFCFCF)
     val Teal = Color(0xFF2CBFA7)
     val TealEdge = Color(0xFF1F9784)
-    val GoodBubble = Color(0xFFBDF0C9)
+    val GoodBubble = Color(0xFFC9F0D4)
     val BadBubble = Color(0xFFFBE8A4)
-    val Muted = Color(0xFF6B6B6B)
-    val Icon = Color(0xFF9A9A9A)
+    val SayBubble = Color(0xFFEEF3F8)
+    val SayEdge = Color(0xFFCDDAE6)
+    val PageGood = Color(0xFFF1FBF4)
+    val PageBad = Color(0xFFFEFBEC)
+    val Muted = Color(0xFF6B7079)
+    val Icon = Color(0xFFA3A3A3)
+    val Close = Color(0xFF5A5F68)
+    val Medal = Color(0xFF6170EC)
 }
 
 enum class LessonTheme { Plain, Fly }
 
 /**
- * A Brilliant lesson (L1.1 "Translating Points", L1.2 "Negative Translations"), rebuilt natively 1:1: the same pages, texts,
- * numbers, grading, Check / Why? / Try again / Start over / Continue, the skill check, the score and the end card, laid
- * out to the numbers in docs/qa/l11-spec.md. On [LessonTheme.Fly] every point is Boss's SR-71 (fly-layer.js).
- * [onFinish] gets the sparks earned; [onExit] leaves without finishing.
+ * A Brilliant lesson (L1.1 "Translating Points", L1.2 "Negative Translations"), rebuilt natively and dressed like our web
+ * player (engine/play.html): Figtree, the progress bar, skill dots and sparks on top, the card with its verdict glow, Humo
+ * bottom left with what Humo says above the buttons, the bare medal screens, the Mach 3 pass. On [LessonTheme.Fly]
+ * every point is Boss's SR-71. [onFinish] gets the sparks earned; [onExit] leaves without finishing.
+ * [humoAlive] runs Humo's springs and blinks (off in the screenshot tests, which want a still pose).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -132,30 +147,36 @@ fun LessonPlayer(
     lesson: LessonContent = L11,
     flow: LessonFlow = remember(lesson) { LessonFlow(lesson) },
     motion: Boolean = rememberSystemMotion(),
+    humoAlive: Boolean = motion,
 ) {
     var leaving by rememberSaveable { mutableStateOf(false) }
-    var muted by remember { mutableStateOf(LessonSounds.muted) }
-    BackHandler(enabled = !leaving) { leaving = true }
-    val tint by animateColorAsState(
-        when { flow.phase == Phase.Correct && !flow.inSkill -> Color(0x213FCE69); flow.phase == Phase.Wrong && flow.screen !is Screen.Review -> Color(0x2EF6D545); else -> Color.Transparent },
-        tween(350), label = "tint",
+    val atEnd = flow.screen is Screen.End
+    val close: () -> Unit = { if (atEnd) onFinish(flow.sparks) else { leaving = true } }
+    BackHandler(enabled = !leaving) { close() }
+    val page by animateColorAsState(
+        when {
+            flow.phase == Phase.Correct && !flow.inSkill -> Chrome.PageGood
+            flow.phase == Phase.Wrong && flow.screen !is Screen.Review && !flow.inSkill -> Chrome.PageBad
+            else -> Color.White
+        },
+        tween(250), label = "page",
     )
-    // A tap anywhere boosts the Mach 3 pass at the end; the root only counts it (the Initial pass), the buttons still get it.
+    val humo = rememberHumo(humoAlive)
+    HumoMoods(flow, humo)
+    // A tap anywhere asks the Mach 3 pass for another run; the root only counts it (the Initial pass), the buttons still get it.
     val taps = remember { mutableIntStateOf(0) }
     Box(
-        Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }.pointerInput(Unit) {
+        Modifier.fillMaxSize().background(page).semantics { testTagsAsResourceId = true }.pointerInput(Unit) {
             awaitPointerEventScope {
                 while (true) { if (awaitPointerEvent(PointerEventPass.Initial).changes.any { it.changedToDown() }) taps.intValue++ }
             }
         },
     ) {
-        // The faint page tint on a verdict: only the edges, so nothing reflows (spec §1).
-        Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(0.55f to Color.Transparent, 1f to tint, center = center, radius = size.maxDimension * 0.75f)) })
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
-            TopBar(flow, onClose = { leaving = true })
-            LessonCard(flow, theme == LessonTheme.Fly, motion, muted, onMute = { muted = !muted; LessonSounds.muted = muted }, onFinish = onFinish)
+            TopBar(flow, onClose = close)
+            LessonCard(flow, theme == LessonTheme.Fly, motion, humo, onFinish = onFinish)
         }
-        if (theme == LessonTheme.Fly && motion && flow.screen is Screen.End) MachPass(taps)
+        if (theme == LessonTheme.Fly && motion && atEnd) MachPass(taps, flow.skillRight == flow.skill.size)
         WhySheet(flow, theme == LessonTheme.Fly, Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()))
     }
     if (leaving) {
@@ -169,61 +190,87 @@ fun LessonPlayer(
     }
 }
 
-/** Close, back, the progress bar, the skill check's three dots and the sparks (spec §1, 48 dp tall, slots reserved). */
+/** What Humo feels on each screen (player.js `react`): glad and a hop on right, thinking on wrong, cheering on the bare screens. */
+@Composable
+private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
+    val screen = flow.screen
+    val perfect = flow.skillRight == flow.skill.size
+    LaunchedEffect(flow.phase, screen, flow.inSkill) {
+        when {
+            screen is Screen.End -> { humo.face = HumoFace.Happy; humo.play(HumoMove.Celebrate) }
+            screen is Screen.SkillSplash -> { humo.face = HumoFace.Cheer; humo.play(HumoMove.Jump); if (humo.alive) { delay(2200); humo.face = HumoFace.Rest } }
+            screen is Screen.Score && perfect -> { humo.face = HumoFace.Laugh; humo.play(HumoMove.Celebrate); if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
+            screen is Screen.Score -> { humo.face = HumoFace.Proud; humo.play(HumoMove.Nod); if (humo.alive) { delay(2200); humo.face = HumoFace.Rest } }
+            flow.phase == Phase.Correct && !flow.inSkill -> { humo.face = HumoFace.Happy; humo.play(HumoMove.Jump); if (humo.alive) { delay(1800); humo.face = HumoFace.Rest } }
+            flow.phase == Phase.Wrong && !flow.inSkill -> { humo.face = HumoFace.Thinking; if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
+            else -> humo.face = HumoFace.Rest
+        }
+    }
+    LaunchedEffect(flow.lookOn) {
+        humo.lookSource = { flow.humoLook }
+        humo.tracking = flow.lookOn
+    }
+}
+
+/** Close, back, the progress bar, the skill check's three dots and the sparks (play.html `.top`, 64 dp tall, slots reserved). */
 @Composable
 private fun TopBar(flow: LessonFlow, onClose: () -> Unit) {
-    val p by animateFloatAsState(flow.progress.coerceAtLeast(0.03f), tween(550, easing = BrilliantEase), label = "progress")
-    Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton("Exit lesson", onClose) { c ->
+    val p by animateFloatAsState(flow.progress.coerceAtLeast(0.03f), tween(400, easing = BrilliantEase), label = "progress")
+    Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton("Exit lesson", onClose, tint = Chrome.Close) { c ->
             drawLine(c, Offset(size.width * 0.3f, size.height * 0.3f), Offset(size.width * 0.7f, size.height * 0.7f), 2.dp.toPx(), StrokeCap.Round)
             drawLine(c, Offset(size.width * 0.7f, size.height * 0.3f), Offset(size.width * 0.3f, size.height * 0.7f), 2.dp.toPx(), StrokeCap.Round)
         }
+        Spacer(Modifier.width(4.dp))
         // The back arrow keeps its slot on page 1 too, so the bar never moves.
         Box(Modifier.size(36.dp)) {
-            if (flow.canGoBack) IconButton("Previous page", { LessonSounds.play(Cue.Tick); flow.back() }, tint = Color(0xFF888888)) { c ->
+            if (flow.canGoBack) IconButton("Previous page", { LessonSounds.play(Cue.Tick); flow.back() }, tint = Chrome.Close) { c ->
                 val y = size.height / 2f
                 drawLine(c, Offset(size.width * 0.25f, y), Offset(size.width * 0.78f, y), 2.dp.toPx(), StrokeCap.Round)
                 drawLine(c, Offset(size.width * 0.25f, y), Offset(size.width * 0.48f, y - size.height * 0.22f), 2.dp.toPx(), StrokeCap.Round)
                 drawLine(c, Offset(size.width * 0.25f, y), Offset(size.width * 0.48f, y + size.height * 0.22f), 2.dp.toPx(), StrokeCap.Round)
             }
         }
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Box(
-            Modifier.weight(1f).height(12.dp).clip(CircleShape).background(Chrome.Track)
+            Modifier.weight(1f).height(10.dp).clip(CircleShape).background(Chrome.Track)
                 .semantics { contentDescription = "Lesson progress ${(flow.progress * 100).toInt()} %" },
         ) {
-            Box(Modifier.fillMaxWidth(p).height(12.dp).clip(CircleShape).background(Chrome.Fill))
+            Box(Modifier.fillMaxWidth(p).height(10.dp).clip(CircleShape).background(Chrome.Fill))
         }
         Spacer(Modifier.width(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             flow.skill.indices.forEach { j ->
                 val r = flow.skillResults[j]
                 val now = (flow.screen as? Screen.Skill)?.j == j
-                Box(Modifier.size(8.dp).clip(CircleShape).background(when { r == true -> Chrome.Fill; r == false -> Color(0xFF4A4A4A); now -> Color(0xFFA3A3A3); else -> Chrome.Track }))
+                Box(Modifier.size(9.dp).clip(CircleShape).background(when { r == true -> Chrome.Fill; r == false -> Chrome.DotWrong; now -> Chrome.DotNow; else -> Chrome.Track }))
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Row(Modifier.widthIn(min = 52.dp).semantics(mergeDescendants = true) { contentDescription = "${flow.sparks} sparks" }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
-            Text("${flow.sparks}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = if (flow.sparks > 0) Chrome.Ink else Color(0xFF9B9B9B))
-            Spacer(Modifier.width(4.dp))
-            Spark(flow.sparks > 0, 20.dp)
+        Spacer(Modifier.width(8.dp))
+        Row(Modifier.padding(end = 6.dp).semantics(mergeDescendants = true) { contentDescription = "${flow.sparks} sparks" }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+            Text("${flow.sparks}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = Chrome.Ink)
+            Spacer(Modifier.width(6.dp))
+            Spark(if (flow.sparks > 0) Chrome.Green else Chrome.StarOff, 20.dp)
+            Spacer(Modifier.width(6.dp))
+            Bolt()
         }
     }
 }
 
-/** Brilliant's four-point spark: grey outline at 0, filled green once earned. */
+private val SparkPath: Path by lazy { PathParser().parsePathString("M12 1.5l2.4 7.4 7.6 3.1-7.6 3.1L12 22.5l-2.4-7.4L2 12l7.6-3.1z").toPath() }
+private val BoltPath: Path by lazy { PathParser().parsePathString("M10.5 0L0 12.6h6.2L4.6 22 16 8.7H9.6z").toPath() }
+private val FlagPath: Path by lazy { PathParser().parsePathString("M5 2h2v20H5zM8 3h11l-2.5 4.5L19 12H8z").toPath() }
+
+/** The four-point spark of the sparks counter: green once earned, grey before (play.html `#star`). */
 @Composable
-private fun Spark(on: Boolean, size: androidx.compose.ui.unit.Dp) {
-    Canvas(Modifier.size(size)) {
-        val c = center
-        val r = this.size.minDimension * 0.46f
-        val w = r * 0.28f
-        val path = Path().apply {
-            moveTo(c.x, c.y - r); quadraticTo(c.x + w * 0.4f, c.y - w * 0.4f, c.x + r, c.y); quadraticTo(c.x + w * 0.4f, c.y + w * 0.4f, c.x, c.y + r)
-            quadraticTo(c.x - w * 0.4f, c.y + w * 0.4f, c.x - r, c.y); quadraticTo(c.x - w * 0.4f, c.y - w * 0.4f, c.x, c.y - r); close()
-        }
-        if (on) drawPath(path, Chrome.Fill) else drawPath(path, Color(0xFF9B9B9B), style = Stroke(1.8.dp.toPx()))
-    }
+private fun Spark(color: Color, size: androidx.compose.ui.unit.Dp) {
+    Canvas(Modifier.size(size)) { withTransform({ scale(this.size.width / 24f, this.size.height / 24f, Offset.Zero) }) { drawPath(SparkPath, color) } }
+}
+
+/** The lime bolt next to the sparks (play.html `.bolt`, 16 x 22). */
+@Composable
+private fun Bolt() {
+    Canvas(Modifier.size(width = 14.dp, height = 20.dp)) { withTransform({ scale(this.size.width / 16f, this.size.height / 22f, Offset.Zero) }) { drawPath(BoltPath, Chrome.Bolt) } }
 }
 
 @Composable
@@ -237,38 +284,48 @@ private fun IconButton(label: String, onClick: () -> Unit, tint: Color = Color(0
     ) { Canvas(Modifier.size(22.dp)) { draw(tint) } }
 }
 
-/** The lesson card (spec §1): the page, its verdict border, the bubble and the buttons. */
+/** The lesson card (play.html `.card`): the page, its verdict border and glow; the bare screens have none. */
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: LessonFlow, fly: Boolean, motion: Boolean, muted: Boolean, onMute: () -> Unit, onFinish: (Int) -> Unit) {
-    val skillQuiet = flow.inSkill
+private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: HumoState, onFinish: (Int) -> Unit) {
+    val bare = flow.screen.let { it is Screen.SkillSplash || it is Screen.Score || it is Screen.Retry || it is Screen.End }
+    val verdictOn = !flow.inSkill && !bare
     val border by animateColorAsState(
-        when { skillQuiet -> Chrome.Line; flow.phase == Phase.Correct -> Chrome.Green; flow.phase == Phase.Wrong && flow.screen is Screen.Review -> Chrome.Teal; flow.phase == Phase.Wrong -> Chrome.Yellow; else -> Chrome.Line },
+        when {
+            bare -> Color.Transparent
+            !verdictOn -> Chrome.Line
+            flow.phase == Phase.Correct -> Chrome.Green
+            flow.phase == Phase.Wrong && flow.screen is Screen.Review -> Chrome.Teal
+            flow.phase == Phase.Wrong -> Chrome.Yellow
+            else -> Chrome.Line
+        },
         tween(250), label = "border",
     )
+    val glowOn = verdictOn && flow.phase != Phase.Idle
     Box(
         Modifier.weight(1f).fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
             .drawBehind {
-                if (border != Chrome.Line) drawRoundRect(border.copy(alpha = 0.14f), Offset(-4.dp.toPx(), -4.dp.toPx()), androidx.compose.ui.geometry.Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()), CornerRadius(22.dp.toPx()))
+                if (glowOn) drawRoundRect(border.copy(alpha = 0.16f), Offset(-4.dp.toPx(), -4.dp.toPx()), androidx.compose.ui.geometry.Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()), CornerRadius(22.dp.toPx()))
             }
-            .clip(RoundedCornerShape(18.dp)).background(Color.White).border(1.dp, border, RoundedCornerShape(18.dp)),
+            .clip(RoundedCornerShape(18.dp)).background(if (bare) Color.Transparent else Color.White).border(1.dp, border, RoundedCornerShape(18.dp)),
     ) {
+        val slide = with(LocalDensity.current) { 28.dp.roundToPx() }
         AnimatedContent(
             targetState = flow.screen,
             transitionSpec = {
-                (fadeIn(tween(if (motion) 320 else 0, easing = BrilliantEase)) + slideInHorizontally(tween(if (motion) 320 else 0, easing = BrilliantEase)) { (it * 0.07f).toInt() })
+                (fadeIn(tween(if (motion) 320 else 0, easing = BrilliantEase)) + slideInHorizontally(tween(if (motion) 320 else 0, easing = BrilliantEase)) { slide })
                     .togetherWith(fadeOut(tween(0)))
             },
             label = "screen",
         ) { screen ->
             when (screen) {
-                is Screen.Page, is Screen.Skill, is Screen.Review -> PageView(flow, fly, motion, muted, onMute)
-                Screen.SkillSplash -> SkillSplash(flow)
-                Screen.Score -> ScoreView(flow)
-                Screen.Retry -> CenterScreen(null, "Skill check", null, listOf(
+                is Screen.Page, is Screen.Skill, is Screen.Review -> PageView(flow, fly, motion, humo)
+                Screen.SkillSplash -> SkillSplash(flow, humo)
+                Screen.Score -> ScoreView(flow, humo)
+                Screen.Retry -> CenterScreen(humo, null, "Skill check", null, listOf(
                     BtnSpec("Retry skill check", Kind.Dark) { flow.beginSkillSplash() },
-                    BtnSpec("Skip retry", Kind.Outline) { flow.finish() },
+                    BtnSpec("Continue", Kind.Outline) { flow.finish() },
                 ))
-                Screen.End -> EndView(flow, onFinish)
+                Screen.End -> EndView(flow, humo)
             }
         }
     }
@@ -277,11 +334,36 @@ private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: Less
 private data class BtnSpec(val label: String, val kind: Kind, val enabled: Boolean = true, val weight: Float = 1f, val onClick: () -> Unit)
 private enum class Kind { Dark, Gray, Outline, Teal }
 
-/** One page: the prompt and its board, centred in the card, with the bubble and the buttons at the bottom. */
+/** Reads a prompt aloud with the phone's own voice (Android TextToSpeech), made on the first tap and released on exit. */
 @Composable
-private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, muted: Boolean, onMute: () -> Unit) {
+private fun rememberReader(): (String) -> Unit {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val engine = remember { arrayOfNulls<android.speech.tts.TextToSpeech>(1) }
+    val ready = remember { booleanArrayOf(false) }
+    val waiting = remember { arrayOfNulls<String>(1) }
+    DisposableEffect(Unit) { onDispose { engine[0]?.shutdown(); engine[0] = null } }
+    return { text ->
+        val tts = engine[0]
+        if (tts == null) {
+            waiting[0] = text
+            engine[0] = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    engine[0]?.language = java.util.Locale.US
+                    ready[0] = true
+                    waiting[0]?.let { engine[0]?.speak(it, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "prompt") }
+                }
+            }
+        } else if (ready[0]) tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "prompt")
+    }
+}
+
+/** One page: the prompt and its board at the top, the tools top right, Humo and the buttons in one row at the foot, what Humo says above it. */
+@Composable
+private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: HumoState) {
     val page = flow.page ?: return
     val haptics = LocalHapticFeedback.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val read = rememberReader()
     var advancing by remember(flow.screen) { mutableStateOf(false) }
     // A skill item moves on by itself half a second after Check (Brilliant: no verdict per item).
     LaunchedEffect(advancing) { if (advancing) { delay(500); flow.nextSkill() } }
@@ -305,7 +387,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, muted: Boo
     val buttons: List<BtnSpec> = when {
         advancing -> emptyList()
         flow.inSkill -> listOf(
-            BtnSpec("I don't know", Kind.Outline, enabled = !flow.flying) { LessonSounds.play(Cue.Tick); flow.dontKnow(); advancing = true },
+            BtnSpec("I don't know", Kind.Outline, enabled = !flow.flying, weight = 0.55f) { LessonSounds.play(Cue.Tick); flow.dontKnow(); advancing = true },
             BtnSpec("Check", Kind.Dark, enabled = flow.canCheck) { check() },
         )
         page.kind == PageKind.Explainer || page.kind == PageKind.Recap -> listOf(BtnSpec("Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.next() })
@@ -313,48 +395,65 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, muted: Boo
             BtnSpec("Why?", Kind.Gray, weight = 0.42f) { LessonSounds.play(Cue.Tick); flow.whyOpen = true },
             BtnSpec("Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.next() },
         )
-        flow.phase == Phase.Wrong -> listOf(BtnSpec("Try again", if (review) Kind.Teal else Kind.Dark) { LessonSounds.play(Cue.Tick); flow.tryAgain() })
+        flow.phase == Phase.Wrong -> listOf(
+            BtnSpec("Get help", Kind.Gray, weight = 0.55f) { LessonSounds.play(Cue.Tick); flow.whyOpen = true },
+            BtnSpec("Try again", if (review) Kind.Teal else Kind.Dark) { LessonSounds.play(Cue.Tick); flow.tryAgain() },
+        )
         else -> listOf(BtnSpec("Check", Kind.Dark, enabled = flow.canCheck) { check() })
     }
 
-    Column(Modifier.fillMaxSize()) {
-        // The card's own tools: the +15 chip (when earned) and sound on/off.
-        Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.weight(1f))
-            SparkChip(flow.sparkBurst)
-            IconButton(if (muted) "Sound off" else "Sound on", onMute, tint = Chrome.Icon) { c ->
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val boardW = (maxWidth - 32.dp).coerceAtMost(420.dp)
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(horizontal = 16.dp).padding(top = 64.dp, bottom = 96.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Prompt(if (fly) Words.machine(page.prompt) else page.prompt, bold = page.skill, modifier = Modifier.width(boardW))
+                    Spacer(Modifier.height(24.dp))
+                    when (page.kind) {
+                        PageKind.Drag -> DragBoard(page, flow, fly, motion, boardW)
+                        PageKind.Explainer -> FigureBoard(page, fly, boardW)
+                        PageKind.Translate, PageKind.Recap -> WorkspaceBoard(page, flow, fly, motion, boardW, deck)
+                    }
+                    if (page.graded && !page.skill) StartOver(flow, Modifier.width(boardW))
+                }
+            }
+            FootRow(humo, buttons, motion, key = "${flow.screen}-${flow.phase}-$advancing")
+        }
+        // The tools (play.html `.tools`): the "+ 15" chip after a first right answer, report a problem, read aloud.
+        Row(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GainChip(flow.gain)
+            IconButton("Report a problem", { reportPage(context, flow) }, tint = Chrome.Icon) { c ->
+                withTransform({ scale(size.width / 24f, size.height / 24f, Offset.Zero) }) { drawPath(FlagPath, c) }
+            }
+            IconButton("Read aloud", { read((if (fly) Words.machine(page.prompt) else page.prompt).replace("*", "")) }, tint = Chrome.Icon) { c ->
                 val h = size.height
                 drawPath(Path().apply { moveTo(size.width * 0.12f, h * 0.38f); lineTo(size.width * 0.3f, h * 0.38f); lineTo(size.width * 0.52f, h * 0.18f); lineTo(size.width * 0.52f, h * 0.82f); lineTo(size.width * 0.3f, h * 0.62f); lineTo(size.width * 0.12f, h * 0.62f); close() }, c)
-                if (!muted) {
-                    drawArc(c, -50f, 100f, false, topLeft = Offset(size.width * 0.42f, h * 0.3f), size = androidx.compose.ui.geometry.Size(size.width * 0.3f, h * 0.4f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
-                    drawArc(c, -50f, 100f, false, topLeft = Offset(size.width * 0.42f, h * 0.16f), size = androidx.compose.ui.geometry.Size(size.width * 0.5f, h * 0.68f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
-                } else drawLine(c, Offset(size.width * 0.66f, h * 0.36f), Offset(size.width * 0.9f, h * 0.64f), 1.8.dp.toPx(), StrokeCap.Round)
+                drawArc(c, -50f, 100f, false, topLeft = Offset(size.width * 0.42f, h * 0.3f), size = androidx.compose.ui.geometry.Size(size.width * 0.3f, h * 0.4f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
+                drawArc(c, -50f, 100f, false, topLeft = Offset(size.width * 0.42f, h * 0.16f), size = androidx.compose.ui.geometry.Size(size.width * 0.5f, h * 0.68f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
             }
         }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val boardW = (maxWidth - 24.dp).coerceAtMost(420.dp)
-            Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(horizontal = 12.dp).padding(bottom = 8.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Prompt(if (fly) Words.machine(page.prompt) else page.prompt, bold = page.skill, modifier = Modifier.width(boardW))
-                Spacer(Modifier.height(if (page.kind == PageKind.Drag || page.kind == PageKind.Explainer) 30.dp else 26.dp))
-                when (page.kind) {
-                    PageKind.Drag -> DragBoard(page, flow, fly, motion, boardW)
-                    PageKind.Explainer -> FigureBoard(page, fly, boardW)
-                    PageKind.Translate, PageKind.Recap -> WorkspaceBoard(page, flow, fly, motion, boardW, deck)
-                }
-                if (page.graded && !page.skill) StartOver(flow, Modifier.width(boardW))
-            }
-        }
-        // The verdict's own row, two lines tall at any font size, kept even when empty: it never covers the board or
-        // Start over, and nothing moves when it appears (RULES: no layout jumps).
-        val bubbleRow = with(LocalDensity.current) { (21.75.sp * 2).toDp() } + 26.dp
-        Box(Modifier.fillMaxWidth().height(bubbleRow).padding(horizontal = 12.dp), contentAlignment = Alignment.BottomStart) {
-            Bubble(flow.verdict, flow.phase == Phase.Correct, Modifier)
-        }
-        ButtonsRow(buttons, motion, key = "${flow.screen}-${flow.phase}-$advancing")
+        // What Humo says: it floats over the board's foot, just above the buttons (play.html `.bubble`, left 12, bottom 74).
+        Bubble(flow.verdict, flow.phase, flow.inSkill, Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 74.dp))
+    }
+}
+
+/** Report a problem: a local log line per tap (lesson, page, time), and Humo says thanks in the bubble. */
+private fun reportPage(context: android.content.Context, flow: LessonFlow) {
+    val prefs = context.getSharedPreferences("humo-flags", android.content.Context.MODE_PRIVATE)
+    val line = "${flow.lesson.code}|${flow.screen}|${System.currentTimeMillis()}"
+    prefs.edit().putStringSet("flags", (prefs.getStringSet("flags", emptySet()).orEmpty() + line)).apply()
+    flow.say("Thanks. We will look at this page.")
+}
+
+/** The foot: Humo (58 dp) and the buttons in one row; each new set of buttons rises 6 dp and fades in over 200 ms. */
+@Composable
+private fun FootRow(humo: HumoState, buttons: List<BtnSpec>, motion: Boolean, key: String) {
+    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 10.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Humo(humo, Modifier.size(58.dp))
+        ButtonsRow(buttons, motion, key, Modifier.weight(1f))
     }
 }
 
@@ -397,52 +496,52 @@ private fun StartOver(flow: LessonFlow, modifier: Modifier) {
     }
 }
 
-/** Koji's verdict line in its bubble (spec §1): green on right, yellow on wrong; it fades in over the board's foot. */
+/** What Humo says (play.html `.bubble`): praise on a green bubble, a nudge on a yellow one, a plain remark on a pale one. */
 @Composable
-private fun Bubble(text: String?, good: Boolean, modifier: Modifier) {
+private fun Bubble(text: String?, phase: Phase, inSkill: Boolean, modifier: Modifier) {
     var last by remember { mutableStateOf("") }
     if (text != null) last = text
+    val face = when { inSkill || phase == Phase.Idle -> Chrome.SayBubble; phase == Phase.Correct -> Chrome.GoodBubble; else -> Chrome.BadBubble }
+    val edge = if (face == Chrome.SayBubble) Chrome.SayEdge else face
     AnimatedVisibility(text != null, modifier, enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 4 }, exit = fadeOut(tween(120))) {
         Text(
-            last, Modifier.widthIn(max = 300.dp).clip(RoundedCornerShape(12.dp)).background(if (good) Chrome.GoodBubble else Chrome.BadBubble).padding(horizontal = 16.dp, vertical = 12.dp),
-            fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
+            last, Modifier.widthIn(max = 250.dp).clip(RoundedCornerShape(12.dp)).background(face).border(1.dp, edge, RoundedCornerShape(12.dp)).padding(horizontal = 17.dp, vertical = 12.dp),
+            fontFamily = LessonType.Figtree, fontWeight = if (face == Chrome.SayBubble) FontWeight.Normal else FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
             maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }
 
-/** "+15 ✦": the sparks a first right answer earns, shown for 1.4 s at the card's top right. */
+/** "+ 15 star": the sparks a first right answer earns, at the card's top right until the page changes (play.html `.gain`). */
 @Composable
-private fun SparkChip(burst: Int) {
-    var shown by remember { mutableStateOf(false) }
-    // Only a new burst shows it: a page opened after one (the chip is rebuilt per page) starts with it already seen.
-    val seen = remember { intArrayOf(burst) }
-    LaunchedEffect(burst) { if (burst > seen[0]) { seen[0] = burst; shown = true; delay(1400); shown = false } }
-    AnimatedVisibility(shown, enter = fadeIn(tween(160)) + scaleIn(tween(220, easing = EaseOutStrong), initialScale = 0.7f), exit = fadeOut(tween(300))) {
-        Row(Modifier.padding(end = 6.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDDF6E4)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("+${L11.SPARKS_PER_PAGE}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF15803D))
-            Spacer(Modifier.width(3.dp))
-            Spark(true, 14.dp)
+private fun GainChip(shown: Boolean) {
+    AnimatedVisibility(shown, enter = fadeIn(tween(160)) + scaleIn(tween(300, easing = EaseOutStrong), initialScale = 0.4f), exit = fadeOut(tween(120))) {
+        Row(Modifier.height(30.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDCF6E4)).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("+ ${L11.SPARKS_PER_PAGE}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF19A14A))
+            Spacer(Modifier.width(4.dp))
+            Spark(Color(0xFF19A14A), 14.dp)
         }
     }
 }
 
-/** The buttons: one primary, or a grey pill beside it (spec §2); each new set rises 6 dp and fades in over 200 ms. */
+/** The buttons: one primary, or a grey pill beside it; each new set rises 6 dp and fades in over 200 ms. */
 @Composable
-private fun ButtonsRow(buttons: List<BtnSpec>, motion: Boolean, key: String) {
+private fun ButtonsRow(buttons: List<BtnSpec>, motion: Boolean, key: String, modifier: Modifier = Modifier) {
+    val rise = with(LocalDensity.current) { 6.dp.roundToPx() }
     AnimatedContent(
         targetState = key to buttons,
         contentKey = { it.first },
-        transitionSpec = { (fadeIn(tween(if (motion) 200 else 0)) + slideInVertically(tween(if (motion) 200 else 0)) { 6 * it / 48 }).togetherWith(fadeOut(tween(0))) },
+        modifier = modifier,
+        transitionSpec = { (fadeIn(tween(if (motion) 200 else 0)) + slideInVertically(tween(if (motion) 200 else 0)) { rise }).togetherWith(fadeOut(tween(0))) },
         label = "buttons",
     ) { (_, list) ->
-        Row(Modifier.fillMaxWidth().height(72.dp).padding(start = 12.dp, end = 12.dp, bottom = 16.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().height(51.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             list.forEach { b -> LButton(b.label, b.kind, b.enabled, Modifier.weight(b.weight), b.onClick) }
         }
     }
 }
 
-/** Brilliant's button: 48 dp, pill, a 3 dp darker edge under it; disabled = flat light grey. */
+/** The pill (play.html `#main`): 48 dp, a 3 dp darker edge under it; disabled = flat light grey with a lighter weight. */
 @Composable
 private fun LButton(label: String, kind: Kind, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -462,71 +561,81 @@ private fun LButton(label: String, kind: Kind, enabled: Boolean, modifier: Modif
                 .then(if (kind == Kind.Outline && enabled) Modifier.border(1.dp, Chrome.GrayEdge, RoundedCornerShape(24.dp)) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = if (kind == Kind.Dark || kind == Kind.Teal) 16.sp else 17.sp, color = ink, maxLines = 1)
+            Text(label, fontFamily = LessonType.Figtree, fontWeight = if (enabled) FontWeight.SemiBold else FontWeight.Normal, fontSize = 17.sp, color = ink, maxLines = 1)
         }
     }
 }
 
-/** A centred screen inside the card: a badge, a big title, a line, stacked 290 dp buttons (spec §8). */
+/**
+ * A bare screen (play.html `.center`): Humo beside the blue check medal, a big title, a line, stacked 290 dp pills. [big]
+ * replaces the medal pair (the score's number sits under it).
+ */
 @Composable
-private fun CenterScreen(big: (@Composable () -> Unit)?, title: String, line: String?, buttons: List<BtnSpec>) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (big == null) CheckBadge()
-        else big()
-        Spacer(Modifier.height(28.dp))
-        Text(title, fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, lineHeight = 38.sp, color = Chrome.Ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-        if (line != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(line, fontFamily = LessonType.Figtree, fontSize = 16.sp, color = Color(0xFF6B6B6B), textAlign = TextAlign.Center)
+private fun CenterScreen(humo: HumoState, big: (@Composable () -> Unit)?, title: String, line: String?, buttons: List<BtnSpec>, foot: BtnSpec? = null) {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(width = 150.dp, height = 128.dp)) {
+                Medal(Modifier.align(Alignment.BottomStart).padding(start = 6.dp, bottom = 6.dp))
+                Humo(humo, Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-10).dp).size(104.dp))
+            }
+            if (big != null) { Spacer(Modifier.height(18.dp)); big() }
+            Spacer(Modifier.height(14.dp))
+            Text(title, fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, lineHeight = 38.sp, color = Chrome.Ink, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+            if (line != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(line, fontFamily = LessonType.Figtree, fontSize = 16.sp, color = Chrome.Muted, textAlign = TextAlign.Center)
+            }
+            if (buttons.isNotEmpty()) Spacer(Modifier.height(34.dp))
+            buttons.forEachIndexed { i, b ->
+                if (i > 0) Spacer(Modifier.height(14.dp))
+                LButton(b.label, b.kind, b.enabled, Modifier.widthIn(max = 290.dp).fillMaxWidth()) { LessonSounds.play(Cue.Tick); b.onClick() }
+            }
         }
-        Spacer(Modifier.height(36.dp))
-        buttons.forEachIndexed { i, b ->
-            if (i > 0) Spacer(Modifier.height(14.dp))
-            LButton(b.label, b.kind, b.enabled, Modifier.widthIn(max = 290.dp).fillMaxWidth()) { LessonSounds.play(Cue.Tick); b.onClick() }
-        }
+        if (foot != null) Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) { LButton(foot.label, foot.kind, true, Modifier.fillMaxWidth()) { LessonSounds.play(Cue.Tick); foot.onClick() } }
     }
 }
 
-/** The skill check's mark: a periwinkle disc with a white tick (Brilliant's #7A8CFF shade, drawn, not their art). */
+/** The skill check's blue medal with a white tick (play.html `.medal`), drawn, not anyone's art. */
 @Composable
-private fun CheckBadge() {
-    Canvas(Modifier.size(64.dp)) {
-        drawCircle(Color(0xFF7A8CFF), size.minDimension / 2f)
-        drawCircle(Color(0xFF6274F0), size.minDimension / 2f, style = Stroke(3.dp.toPx()))
-        drawPath(Path().apply { moveTo(size.width * 0.3f, size.height * 0.52f); lineTo(size.width * 0.44f, size.height * 0.66f); lineTo(size.width * 0.71f, size.height * 0.36f) }, Color.White, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
+private fun Medal(modifier: Modifier) {
+    Canvas(modifier.size(64.dp)) {
+        drawCircle(Brush.radialGradient(0f to Color(0xFF8D9BFF), 0.7f to Chrome.Medal, center = Offset(size.width * 0.35f, size.height * 0.3f), radius = size.minDimension * 0.9f), size.minDimension / 2f)
+        drawCircle(Color(0x47FFFFFF), size.minDimension / 2f - 2.dp.toPx(), style = Stroke(4.dp.toPx()))
+        drawPath(Path().apply { moveTo(size.width * 0.3f, size.height * 0.52f); lineTo(size.width * 0.44f, size.height * 0.66f); lineTo(size.width * 0.71f, size.height * 0.36f) }, Color.White, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 
 @Composable
-private fun SkillSplash(flow: LessonFlow) {
-    LaunchedEffect(Unit) { LessonSounds.play(Cue.Start); delay(1700); flow.startSkill() }
-    CenterScreen(null, "Skill check", null, emptyList())
+private fun SkillSplash(flow: LessonFlow, humo: HumoState) {
+    LaunchedEffect(Unit) { LessonSounds.play(Cue.Start) }
+    CenterScreen(humo, null, "Skill check", null, emptyList(), foot = BtnSpec("Continue", Kind.Dark) { flow.startSkill() })
 }
 
 @Composable
-private fun ScoreView(flow: LessonFlow) {
+private fun ScoreView(flow: LessonFlow, humo: HumoState) {
     val n = flow.skillRight
     val total = flow.skill.size
     LaunchedEffect(Unit) { LessonSounds.play(Cue.Start) }
     CenterScreen(
+        humo,
         big = {
-            Row(verticalAlignment = Alignment.Top, modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$n out of $total" }) {
-                Text("$n", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 72.sp, lineHeight = 72.sp, color = Chrome.Ink)
-                Text("/$total", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF9B9B9B), modifier = Modifier.offset { IntOffset(0, 8) })
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$n out of $total" }) {
+                Text("$n", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 84.sp, lineHeight = 84.sp, color = Chrome.Ink)
+                Text("/$total", fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, color = Chrome.StarOff, modifier = Modifier.offset(y = 6.dp))
             }
         },
         title = L11.scoreTitle(n, total),
         line = null,
         buttons = if (n == total) listOf(BtnSpec("Continue", Kind.Dark) { flow.finish() })
-        else listOf(BtnSpec("Review mistakes", Kind.Dark) { flow.startReview() }, BtnSpec("Skip review", Kind.Outline) { flow.skipReview() }),
+        else listOf(BtnSpec("Retry skill check", Kind.Dark) { flow.startSkill() }, BtnSpec("Continue", Kind.Outline) { flow.finish() }),
     )
 }
 
 @Composable
-private fun EndView(flow: LessonFlow, onFinish: (Int) -> Unit) {
+private fun EndView(flow: LessonFlow, humo: HumoState) {
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(Unit) { LessonSounds.play(Cue.Complete); haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
-    CenterScreen(null, "Lesson complete", "${flow.sparks} sparks earned.", listOf(BtnSpec("Continue", Kind.Dark) { onFinish(flow.sparks) }))
+    CenterScreen(humo, null, "Lesson complete", "${flow.sparks} sparks earned.", listOf(BtnSpec("Restart lesson", Kind.Dark) { flow.restart() }))
 }
 
 /**

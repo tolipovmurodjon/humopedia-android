@@ -71,6 +71,13 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** "+15" shows once per page, on its first right answer. */
     var sparkBurst by mutableIntStateOf(0); private set
     var verdict by mutableStateOf<String?>(null); private set
+    /** The "+ 15" chip at the card's top right: shown after this page's first right answer, until the page changes. */
+    var gain by mutableStateOf(false); private set
+    /** Where the flying machine is as Humo sees it (-1..1 each way), written by the boards while it flies. */
+    var humoLook: androidx.compose.ui.geometry.Offset? = null; private set
+    /** A machine is in the air: Humo's eyes follow [humoLook] every frame. */
+    var lookOn by mutableStateOf(false); private set
+    fun look(at: androidx.compose.ui.geometry.Offset?) { humoLook = at; if ((at != null) != lookOn) lookOn = at != null }
     var whyOpen by mutableStateOf(false)
     /** Lesson pages answered right at least once (sparks are paid once per page). */
     private val solved = mutableSetOf<Int>()
@@ -146,11 +153,14 @@ class LessonFlow(val lesson: LessonContent = L11) {
             else -> {
                 phase = if (ok) Phase.Correct else Phase.Wrong
                 verdict = if (ok) L11.praise[praiseAt++ % L11.praise.size] else L11.nudge[nudgeAt++ % L11.nudge.size]
-                if (ok && s is Screen.Page && solved.add(s.i)) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++ }
+                if (ok && s is Screen.Page && solved.add(s.i)) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
             }
         }
         return ok
     }
+
+    /** Humo says [text] in the bubble (a plain remark: no verdict colours). */
+    fun say(text: String) { verdict = text }
 
     fun tryAgain() { phase = Phase.Idle; verdict = null }
 
@@ -184,6 +194,9 @@ class LessonFlow(val lesson: LessonContent = L11) {
     }
 
     fun skipReview() = show(Screen.Retry)
+
+    /** "Restart lesson" on the end card: back to page 1 with nothing earned. */
+    fun restart() { sparks = 0; solved.clear(); for (i in skillResults.indices) skillResults[i] = null; show(Screen.Page(0)) }
     fun finish() = show(Screen.End)
 
     /** Back to page [i] (tests and the end card's replay). */
@@ -194,6 +207,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
         flying = false
         phase = Phase.Idle
         verdict = null
+        gain = false
         whyOpen = false
         dragAt = null
         slots = page?.let { Slots.start(it) } ?: Slots()

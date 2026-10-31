@@ -197,21 +197,3 @@ internal object Words {
 
     fun machine(text: String): String = rules.fold(text) { t, (re, to) -> re.replace(t, to) }
 }
-
-/** The 3-second Mach 3 pass at the end of a lesson: bottom-left to top-right on one curve (fly-layer.js finale). */
-internal object MachPassPath {
-    const val SECONDS = 3f
-
-    /** The pass's place and heading (degrees from nose-up) at [t] 0 ... 1 on a [w] x [h] screen. */
-    fun at(t: Float, w: Float, h: Float): Pair<Offset, Float> {
-        val p0 = Offset(-0.15f * w, 0.92f * h)
-        val p1 = Offset(0.55f * w, 0.75f * h)
-        val p2 = Offset(1.25f * w, -0.1f * h)
-        val q = 1f - t
-        val x = q * q * p0.x + 2f * q * t * p1.x + t * t * p2.x
-        val y = q * q * p0.y + 2f * q * t * p1.y + t * t * p2.y
-        val tx = 2f * q * (p1.x - p0.x) + 2f * t * (p2.x - p1.x)
-        val ty = 2f * q * (p1.y - p0.y) + 2f * t * (p2.y - p1.y)
-        return Offset(x, y) to Flying.bearing(Offset.Zero, Offset(tx, ty))
-    }
-}

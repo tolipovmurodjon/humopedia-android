@@ -107,7 +107,7 @@ object L11 : LessonContent {
 
     fun scoreTitle(right: Int, total: Int): String = when {
         right == total -> "Perfect!"
-        right == total - 1 -> "So close!"
+        right == total - 1 -> "Nice work!"
         total == 3 && right == 1 -> "That was tricky!"
         right > 0 -> "Good effort!"
         else -> "Keep practicing!"

@@ -186,17 +186,17 @@ for P in "P4 1 2 2 2" "P5 1 3 3 1" "P6 3 2 2 3"; do
   press Continue
 done
 shot P7; press Play 1.5; press Continue
-# The splash shows for 1.7 s; the UI tree is read after it, so the check is on the first item.
-shot skill-splash 0.3; sleep 2.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
+# The splash waits for Continue (as the web player does); then the first item shows.
+shot skill-splash 0.3; press Continue 1.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
 scrolldown; press "Tile 3" 0.4; press "Tile 2"; tapsnap Check skill-SC1-flight 0.9
 sleep 6
 press "I don(&apos;|.)t know" 1.5
 scrolldown; press "Tile 1" 0.4; press "Tile 4"; tapsnap Check skill-SC3-flight 0.9
 waitfor "That was tricky!" 20; shot skill-score; has "That was tricky!"
-press "Skip review"; shot skill-retry; has "Retry skill check"
-tapsnap "Skip retry" mach3-a 1.3 mach3-b 1.2
-sleep 3; shot lesson-end; has "Lesson complete"; has "75 sparks earned."
-press Continue 2; shot back-from-lesson
+has "Retry skill check"
+tapsnap Continue mach3-a 1.3 mach3-b 1.2
+sleep 3; shot lesson-end; has "Lesson complete"; has "75 sparks earned."; has "Restart lesson"
+press "Exit lesson" 2; shot back-from-lesson
 has "Lesson 1.1, Translating Points, done"
 has "Lesson 1.2, Negative Translations, current"
 has "Olmos: 75"
@@ -215,13 +215,13 @@ for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
   waitfor "Continue" 15; shot "l12-$1-correct"
   press Continue
 done
-sleep 2.5; shot l12-SC1; has "I don(&apos;|.)t know"
+press Continue 1.5; shot l12-SC1; has "I don(&apos;|.)t know"
 scrolldown; press "Tile -2"; press Check 0.1; sleep 6
 scrolldown; press "Tile 3"; press Check 0.1; sleep 6
 scrolldown; press "Tile -2" 0.4; press "Tile 0"; press Check 0.1
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
 tapsnap Continue l12-mach3 1.6; sleep 2; shot l12-end; has "Lesson complete"; has "75 sparks earned."
-press Continue 2; shot back-from-l12
+press "Exit lesson" 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
 has "Olmos: 150"

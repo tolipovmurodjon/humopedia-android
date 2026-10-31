@@ -6,7 +6,7 @@ import com.mcompany.humo.ui.lesson.Flying
 import com.mcompany.humo.ui.lesson.L11
 import com.mcompany.humo.ui.lesson.L12
 import com.mcompany.humo.ui.lesson.LessonFlow
-import com.mcompany.humo.ui.lesson.MachPassPath
+import com.mcompany.humo.ui.lesson.MachPassRoute
 import com.mcompany.humo.ui.lesson.Node
 import com.mcompany.humo.ui.lesson.Words
 import org.junit.Assert.assertEquals
@@ -82,13 +82,15 @@ class LessonFlightTest {
         assertEquals("A translation by (*a*, 0) moves the SR-71 to the right.", Words.machine("A translation by (*a*, 0) moves a point to the right."))
     }
 
-    @Test fun `the Mach 3 pass crosses the screen from bottom-left to top-right in 3 seconds`() {
-        val (a, _) = MachPassPath.at(0f, 400f, 800f)
-        val (b, degB) = MachPassPath.at(1f, 400f, 800f)
-        assertTrue(a.x < 0f && a.y > 700f)
-        assertTrue(b.x > 400f && b.y < 0f)
-        assertTrue("it ends heading up and right, was $degB", degB in 1f..89f)
-        assertEquals(3f, MachPassPath.SECONDS, 0f)
+    @Test fun `the Mach 3 pass crosses the screen from below to the top right in 2_3 seconds at 28 degrees`() {
+        val a = MachPassRoute.at(0f, 390f, 844f)
+        val b = MachPassRoute.at(1f, 390f, 844f)
+        assertTrue("it starts below the screen, was $a", a.y > 844f && a.x in 0f..390f)
+        assertTrue("it ends beyond the top right, was $b", b.x > 390f && b.y < 0f)
+        assertEquals(28.125f, MachPassRoute.DEG, 0f)
+        assertEquals(2300L, MachPassRoute.MS)
+        assertEquals(0.42f * 390f, MachPassRoute.size(390f), 0.01f)
+        assertEquals("slow at both ends, quickest in the middle", 0.5f, MachPassRoute.ease(0.5f), 0f)
     }
 
     @Test fun `a checked board is locked while the machines fly`() {

@@ -5,96 +5,180 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import com.mcompany.humo.ui.path.Jet
 import com.mcompany.humo.ui.path.Jet.jet
 import com.mcompany.humo.ui.path.Jet.jetShadow
 import com.mcompany.humo.ui.path.rememberJetAtlas
 import kotlinx.coroutines.delay
-import java.util.Random
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.pow
+import kotlin.math.sin
 
 /**
- * The peak at the end (peak-end rule): when the lesson-complete card shows, the learner's SR-71 makes one 3-second pass
- * across the screen, bottom-left to top-right, breaks the sound barrier with a white ring half-way and leaves twin smoke.
- * A tap boosts it ([taps] counts the taps). It is drawn over the card but takes no touch, so the buttons work the whole
- * time; the pass ends by itself (fly-layer.js finale).
+ * The end-of-lesson pass's route (player.js `machPass`, phone layout): the SR-71 enters below the screen at a fifth of its
+ * width, flies at 28 degrees from straight up toward the top right, 0.42 of the screen's width tall, in 2.3 s, easing in
+ * and out. Pure numbers so the JVM tests can check the route.
+ */
+internal object MachPassRoute {
+    const val MS = 2300L
+    /** The 64-frame atlas turns in 5.625 degree steps; 5 steps is the 28 degrees the web uses. */
+    const val DEG = 28.125f
+    const val SIZE_OF_WIDTH = 0.42f
+
+    fun ease(u: Float) = if (u < 0.5f) 2f * u * u else 1f - (-2f * u + 2f).pow(2) / 2f
+
+    fun size(w: Float) = w * SIZE_OF_WIDTH
+    fun bannerW(s: Float) = s * 1.5f
+    fun rope(s: Float) = s * 0.22f
+    fun start(w: Float, h: Float) = Offset(w * 0.2f, h + size(w) * 0.6f)
+    fun distance(w: Float, h: Float): Float { val s = size(w); return hypot(w, h) + s * 1.2f + bannerW(s) + rope(s) }
+    private fun fwd(): Offset { val d = Math.toRadians(DEG.toDouble()); return Offset(sin(d).toFloat(), -cos(d).toFloat()) }
+
+    /** The jet's centre at progress [u] (0 ... 1). */
+    fun at(u: Float, w: Float, h: Float): Offset { val s = start(w, h); val f = fwd(); val d = ease(u) * distance(w, h); return Offset(s.x + f.x * d, s.y + f.y * d) }
+}
+
+/** The pass's running state: plain fields redrawn through a frame counter. */
+private class PassRun {
+    var elapsed = 0f
+    var now = 0L
+    var active = false
+    var done = true
+    var boomAt = -1L
+    val puffs = ArrayList<Long>()
+    val px = ArrayList<Offset>()
+    fun reset() { elapsed = 0f; now = 0L; active = false; done = false; boomAt = -1L; puffs.clear(); px.clear() }
+}
+
+/**
+ * The peak at the end (peak-end rule): when the lesson-complete screen shows, the learner's SR-71 makes one pass from the
+ * bottom left to the top right with fire from both nozzles, a continuous soft smoke trail and a white cloth banner on a
+ * rope ("Perfect!" when the skill check was 3/3, else "Well done!"); a white ring opens half-way. A tap asks for another
+ * pass once it is over. It is drawn over the screen but takes no touch, so the buttons work the whole time.
  */
 @Composable
-internal fun MachPass(taps: State<Int>, modifier: Modifier = Modifier) {
+internal fun MachPass(taps: State<Int>, perfect: Boolean, modifier: Modifier = Modifier) {
     val atlas = rememberJetAtlas()
     val density = LocalDensity.current.density
     val cfg = LocalConfiguration.current
     val w = cfg.screenWidthDp * density
     val h = cfg.screenHeightDp * density
     val frame = remember { mutableLongStateOf(0L) }
-    val state = remember { MachState() }
-    LaunchedEffect(Unit) {
-        delay(450)
+    val run = remember { PassRun() }
+    var runs by remember { mutableIntStateOf(0) }
+    val seen = remember { intArrayOf(taps.value) }
+    LaunchedEffect(taps.value) { if (taps.value != seen[0]) { seen[0] = taps.value; if (run.done) runs++ } }
+    val text = rememberTextMeasurer()
+    LaunchedEffect(runs) {
+        run.reset()
+        delay(if (runs == 0) 450L else 0L)
         LessonSounds.play(Cue.Whoosh)
+        run.active = true
         var last = -1L
-        var seen = taps.value
-        var boost = 1f
-        val rnd = Random(11)
-        val size = 120f * density
-        while (state.t < 1f) {
+        while (run.elapsed < MachPassRoute.MS) {
             withFrameMillis { now ->
                 val dt = if (last < 0) 16.7f else (now - last).toFloat().coerceIn(1f, 50f)
                 last = now
-                if (taps.value != seen) { seen = taps.value; boost = 2.2f; LessonSounds.play(Cue.Whoosh) }
-                state.t = (state.t + dt / (MachPassPath.SECONDS * 1000f) * boost).coerceAtMost(1f)
-                boost += (1f - boost) * (1f - Math.pow(0.96, dt / 16.7).toFloat())
-                val (pos, deg) = MachPassPath.at(state.t, w, h)
-                state.pos = pos
-                state.deg = deg
-                if (now - state.puffAt > 60) {
-                    state.puffAt = now
-                    val heading = Math.toRadians(deg - 90.0).toFloat()
-                    Jet.nozzles(heading, size).forEach { n -> state.puffs.add(Puff(pos.x + n.x, pos.y + n.y + 2f, now, (rnd.nextFloat() - 0.5f) * 90f, 0f, 0f)) }
-                }
-                state.puffs.removeAll { now - it.born > 1000L }
-                if (state.boomAt < 0 && state.t > 0.48f) { state.boomAt = now; state.boomOn = pos; LessonSounds.play(Cue.Boom) }
-                state.now = now
+                run.elapsed += dt
+                run.now = now
+                val u = (run.elapsed / MachPassRoute.MS).coerceAtMost(1f)
+                val (tx, ty) = tailPoint(MachPassRoute.at(u, w, h), MachPassRoute.size(w))
+                run.puffs.add(now)
+                run.px.add(Offset(tx, ty))
+                while (run.puffs.isNotEmpty() && now - run.puffs[0] > 1400L) { run.puffs.removeAt(0); run.px.removeAt(0) }
+                if (run.boomAt < 0 && u > 0.45f) { run.boomAt = now; LessonSounds.play(Cue.Boom) }
                 frame.longValue = now
             }
         }
-        state.done = true
+        run.done = true
+        run.active = false
         frame.longValue++
     }
     Canvas(modifier.fillMaxSize()) {
         frame.longValue
-        if (state.done || state.now == 0L) return@Canvas
-        drawPuffs(state.puffs, state.now, 9f * density)
-        if (state.boomAt >= 0) {
-            val u = ((state.now - state.boomAt) / 700f).coerceIn(0f, 1f)
-            val e = 1f - (1f - u) * (1f - u)
-            val r = 60f * density * (0.2f + 2.4f * e)
-            drawCircle(Color(0x2E375CE3), r + 6f * density, state.boomOn, alpha = 1f - u, style = Stroke(6f * density))
-            drawCircle(Color.White, r, state.boomOn, alpha = 0.9f * (1f - u), style = Stroke(3f * density))
+        if (!run.active) return@Canvas
+        val s = MachPassRoute.size(w)
+        val u = (run.elapsed / MachPassRoute.MS).coerceAtMost(1f)
+        val pos = MachPassRoute.at(u, w, h)
+        drawSmoke(run, s)
+        if (run.boomAt >= 0) {
+            val k = ((run.now - run.boomAt) / 900f).coerceIn(0f, 1f)
+            drawCircle(Color.White, 10.dp.toPx() * (1f + 25f * k), Offset(w * 0.5f, h * 0.55f), alpha = 0.95f * (1f - k), style = Stroke(2.dp.toPx()))
         }
-        val heading = Math.toRadians(state.deg - 90.0).toFloat()
-        jetShadow(atlas, state.pos, 120.dp.toPx(), heading, 0f, 0f, 1f, density)
-        jet(atlas, state.pos, 120.dp.toPx(), heading, 0f, 0f, state.now / 1000f, true, 0.8f)
+        val heading = Math.toRadians(MachPassRoute.DEG - 90.0).toFloat()
+        val (tx, ty) = tailPoint(pos, s)
+        drawBanner(text, if (perfect) "Perfect!" else "Well done!", Offset(tx, ty), s, run.now)
+        jetShadow(atlas, pos, s, heading, 0f, 0f, 1f, density)
+        jet(atlas, pos, s, heading, 0f, 0f, run.now / 1000f, true, 1f)
     }
 }
 
-/** The pass's running numbers; plain fields, redrawn through the frame counter. */
-private class MachState {
-    var t = 0f
-    var now = 0L
-    var pos = Offset.Zero
-    var deg = 0f
-    var puffAt = 0L
-    var boomAt = -1L
-    var boomOn = Offset.Zero
-    var done = false
-    val puffs = ArrayList<Puff>()
+/** Where the cloth's rope is tied and the smoke is born: behind the jet's tail (player.js `tx`, `ty`). */
+private fun tailPoint(pos: Offset, s: Float): Pair<Float, Float> {
+    val d = Math.toRadians(MachPassRoute.DEG.toDouble())
+    val tail = 0.45f * s
+    return (pos.x - sin(d).toFloat() * tail) to (pos.y + cos(d).toFloat() * tail * 0.766f)
+}
+
+/** One soft grey puff per frame, 0.045 of the jet's size, growing to 3x and fading over 1.4 s. */
+private fun DrawScope.drawSmoke(run: PassRun, s: Float) {
+    for (i in run.puffs.indices) {
+        val u = ((run.now - run.puffs[i]) / 1400f).coerceIn(0f, 1f)
+        val e = 1f - (1f - u) * (1f - u)
+        drawCircle(Color(0xFF787C84), s * 0.045f * (0.7f + 2.3f * e), run.px[i], alpha = 0.32f * 0.6f * (1f - e))
+    }
+}
+
+/**
+ * The cloth on its rope (player.js `ban`): white with a thin grey edge and a green leading edge, the word in Figtree 800;
+ * the free end ripples most. Drawn in a frame whose origin is the rope's tie point and whose -x axis runs back along the cloth.
+ */
+private fun DrawScope.drawBanner(text: TextMeasurer, word: String, tie: Offset, s: Float, now: Long) {
+    val bw = MachPassRoute.bannerW(s)
+    val bh = s * 0.3f
+    val rope = MachPassRoute.rope(s)
+    val tw = rope + bw
+    val d = Math.toRadians(MachPassRoute.DEG.toDouble())
+    val back = Math.toDegrees(atan2(cos(d), -sin(d))).toFloat()
+    val t = now.toFloat()
+    withTransform({ translate(tie.x, tie.y); rotate(back - 180f, Offset.Zero); translate(-tw, -bh / 2f) }) {
+        fun pts(y0: Float) = List(9) { i -> Offset(bw * i / 8f, y0 + sin(t / 90f - i * 0.9f) * bh * 0.08f * (1f - i / 8f)) }
+        val top = pts(bh * 0.08f)
+        val bot = pts(bh * 0.92f).reversed()
+        val rope1 = Path().apply { moveTo(tw, bh / 2f); lineTo(bw, bh * 0.1f); moveTo(tw, bh / 2f); lineTo(bw, bh * 0.9f) }
+        drawPath(rope1, Color(0xFF6B7079), style = Stroke(1.5f * density))
+        val cloth = Path().apply {
+            top.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+            bot.forEach { lineTo(it.x, it.y) }
+            close()
+        }
+        drawPath(cloth, Color.White)
+        drawPath(cloth, Color(0xFFE2E2E2), style = Stroke(1f * density))
+        val edge = Path().apply { moveTo(bw * 0.965f, top[8].y); lineTo(bw, top[8].y); lineTo(bw, bot[0].y); lineTo(bw * 0.965f, bot[0].y); close() }
+        drawPath(edge, Color(0xFF3FCE69))
+        val m = text.measure(word, TextStyle(fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = (bh * 0.52f).toSp(), color = Color(0xFF111111)))
+        drawText(m, topLeft = Offset(bw * 0.5f - m.size.width / 2f, bh * 0.67f - m.firstBaseline))
+    }
 }

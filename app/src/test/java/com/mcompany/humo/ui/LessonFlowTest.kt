@@ -199,7 +199,7 @@ class LessonFlowTest {
 
     @Test fun `score titles as Brilliant words them`() {
         assertEquals("Perfect!", L11.scoreTitle(3, 3))
-        assertEquals("So close!", L11.scoreTitle(2, 3))
+        assertEquals("Nice work!", L11.scoreTitle(2, 3))
         assertEquals("That was tricky!", L11.scoreTitle(1, 3))
         assertEquals("Keep practicing!", L11.scoreTitle(0, 3))
     }

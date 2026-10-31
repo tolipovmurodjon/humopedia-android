@@ -124,7 +124,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
     var busy by remember(page) { mutableStateOf(false) }
     val wake = remember(page) { mutableIntStateOf(0) }
     val dotR by animateFloatAsState(if (dragging) 15f else 5f, tween(if (motion) 120 else 0), label = "dot")
-    val len = g.cell * 0.9f
+    val len = g.cell * 1.45f
     val craft = remember(page, wPx) { Craft(handle.value) }
     val tick = remember { mutableLongStateOf(0L) }
     val rnd = remember { Random(3) }
@@ -148,6 +148,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                     last = now
                     val moving = Flying.glue(craft, handle.value, dt, now, g.cell, len / 0.857f, 5f * density.density, steering = dragging || busy, flying = busy, rnd = rnd)
                     live = moving || dragging || busy || armed
+                    flow.look(if (busy) humoLookAt(craft.pos.x, craft.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) else null)
                     tick.longValue = now
                 }
             }
@@ -248,8 +249,9 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
         graph(g, text, dragging)
         val s = g.s
         drawCircle(BoardColors.Axis, 5f * s, g.px(Node(0, 0)))
-        drawCircle(BoardColors.Start, 5f * s, start)
         val p = handle.value
+        // The grey start dot shows once the machine has left it; never a dot or ring under a flying jet.
+        if (atlas == null || dist(if (motion) craft.pos else p, start) > len * 0.45f) drawCircle(BoardColors.Start, 5f * s, start)
         val ok = flow.phase == Phase.Correct
         val bad = flow.phase == Phase.Wrong
         if (atlas != null) {
@@ -268,7 +270,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
             }
             val flames = if (motion && busy && craft.speed > 0.02f) max(craft.speed, 0.3f) else 0f
             jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion)
-            if (armed) armedRing(at, len * 0.62f, s)
+            if (armed && !busy) armedRing(at, len * 0.62f, s)
             if (ok || bad) badge(Offset(at.x, at.y - len * 0.55f - 12f * s), ok, s)
         } else {
             val dot = when { ok -> BoardColors.Green; bad -> BoardColors.Yellow; else -> BoardColors.Blue }
@@ -327,7 +329,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
     val wake = remember(page) { mutableIntStateOf(0) }
     val tick = remember { mutableLongStateOf(0L) }
     val rnd = remember { Random(5) }
-    val len = g.cell * 0.9f
+    val len = g.cell * 1.45f
 
     // One machine per point. A board opened already checked (review, state restore) has them landed; otherwise they wait
     // at their start. The recap's ride the points exactly.
@@ -411,6 +413,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         any = any || c.flight != null || c.puffs.isNotEmpty()
                     }
                     live = any
+                    flow.look(crafts.firstOrNull { it.flight != null }?.let { humoLookAt(it.pos.x, it.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) })
                     tick.longValue = now
                 }
             }

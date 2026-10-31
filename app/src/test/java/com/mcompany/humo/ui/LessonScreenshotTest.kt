@@ -65,7 +65,7 @@ class LessonScreenshotTest {
         compose.setContent {
             val d = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = motion) }
+                GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = finished, theme = theme, lesson = flow.lesson, flow = flow, motion = motion, humoAlive = false) }
             }
         }
         compose.waitForIdle()
@@ -182,14 +182,11 @@ class LessonScreenshotTest {
     }
 
     @Test fun skillCheckScoreAndEnd() {
-        var sparks = -1
-        val flow = player(LessonTheme.Fly, finished = { sparks = it })
-        compose.mainClock.autoAdvance = false
+        val flow = player(LessonTheme.Fly)
         act { flow.beginSkillSplash() }
-        compose.mainClock.advanceTimeBy(400)
+        compose.onNodeWithText("Skill check").assertIsDisplayed()
         shot("skill-splash")
-        compose.mainClock.autoAdvance = true
-        compose.mainClock.advanceTimeBy(2000)
+        compose.onNodeWithText("Continue").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Skill(0), flow.screen)
         shot("skill-SC1-start")
@@ -208,16 +205,24 @@ class LessonScreenshotTest {
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         compose.onNodeWithText("That was tricky!").assertIsDisplayed()
+        compose.onNodeWithText("Retry skill check").assertIsDisplayed()
         shot("skill-score")
-        compose.onNodeWithText("Review mistakes").performClick()
-        compose.waitForIdle()
-        shot("skill-review")
-        act { flow.goTo(Screen.Retry) }
-        shot("skill-retry")
         act { flow.finish() }
         compose.onNodeWithText("Lesson complete").assertIsDisplayed()
+        compose.onNodeWithText("Restart lesson").assertIsDisplayed()
         shot("end-card")
-        compose.onNodeWithText("Continue").performClick()
+        compose.onNodeWithText("Restart lesson").performClick()
+        compose.waitForIdle()
+        assertEquals(Screen.Page(0), flow.screen)
+        assertEquals(0, flow.sparks)
+    }
+
+    /** The close button on the end screen finishes the lesson (the level is marked done); elsewhere it asks first. */
+    @Test fun closingTheEndScreenFinishes() {
+        var sparks = -1
+        val flow = player(LessonTheme.Fly, finished = { sparks = it })
+        act { flow.finish() }
+        compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
         assertEquals(0, sparks)
     }
