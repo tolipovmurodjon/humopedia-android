@@ -252,17 +252,17 @@ internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifie
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
     }
     Column(modifier.padding(horizontal = 16.dp).alpha(if (live) 1f else 0.32f).testTag("keypad"), verticalArrangement = Arrangement.spacedBy(if (keyHeight < 40.dp) 6.dp else 8.dp)) {
-        for (row in listOf(listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9))) {
+        // 12 keys: 3 across on a normal phone (4 rows), 4 across on a short one (3 rows) so the board keeps its room
+        val keys = (1..9).map { "$it" } + if (negatives) listOf("−", "0", "undo") else listOf("undo", "0", "tick")
+        for (row in keys.chunked(if (keyHeight < 36.dp) 4 else 3)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (d in row) PadKey(Modifier.weight(1f), keyHeight, live, "tile-$d", "$d") { digit(d) }
+                for (k in row) when (k) {
+                    "undo" -> PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
+                    "tick" -> PadKey(Modifier.weight(1f), keyHeight, live && flow.canCheck, "tick", "tick") { onCheck() }
+                    "−" -> PadKey(Modifier.weight(1f), keyHeight, live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Tick) }
+                    else -> PadKey(Modifier.weight(1f), keyHeight, live, "tile-$k", k) { digit(k.toInt()) }
+                }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (negatives) PadKey(Modifier.weight(1f), keyHeight, live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Tick) }
-            else PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
-            PadKey(Modifier.weight(1f), keyHeight, live, "tile-0", "0") { digit(0) }
-            if (negatives) PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
-            else PadKey(Modifier.weight(1f), keyHeight, live && flow.canCheck, "tick", "tick") { onCheck() }
         }
     }
 }

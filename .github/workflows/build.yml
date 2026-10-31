@@ -41,16 +41,6 @@ jobs:
           python3 -m pip install --quiet pillow numpy
           python3 .github/scripts/screen-checks.py --self-test
           python3 .github/scripts/screen-checks.py
-      - name: Keep the screenshots and test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots-and-reports
-          path: |
-            app/build/outputs/roborazzi/
-            app/build/reports/tests/
-            app/build/test-results/
-          retention-days: 7
       # The lesson's own pictures (round 6) as small JPEG copies, so a person or an agent can download them in seconds; the full
       # PNGs of every screen are in the big artifact above.
       - name: Small copies of the lesson pictures
@@ -73,6 +63,16 @@ jobs:
         with:
           name: lesson-pictures-small
           path: lesson-small/
+          retention-days: 7
+      - name: Keep the screenshots and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-and-reports
+          path: |
+            app/build/outputs/roborazzi/
+            app/build/reports/tests/
+            app/build/test-results/
           retention-days: 7
       - name: Keep the debug APK
         uses: actions/upload-artifact@v4

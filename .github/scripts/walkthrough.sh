@@ -367,7 +367,10 @@ log "-- best effort, never fails the run: L1.2 replayed with animations ON, as o
 (
   fail() { log "motion phase stopped: $*"; exit 1; }
   ANIM 1.0
-  $T adb shell am force-stop "$PKG"; $T adb shell am start -n "$PKG/.MainActivity" > /dev/null; sleep 15
+  $T adb shell am force-stop "$PKG"; $T adb shell am start -n "$PKG/.MainActivity" > /dev/null; sleep 12
+  # a picture first: if uiautomator cannot get idle with animations on, the evidence shows what the screen was
+  N=$((N + 1)); $T adb exec-out screencap -p > "$WALK/$(printf "%02d" $N)-motion-home.png"
+  waitfor "Lesson 1.2, Negative Translations, done" 30
   tap "Lesson 1.2, Negative Translations, done"; sleep 2
   tap "Takrorlash"; sleep 4
   $T adb shell dumpsys gfxinfo "$PKG" reset > /dev/null
