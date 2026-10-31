@@ -6,6 +6,11 @@ on:
   push:
     branches: [main, "feat/**", "ci/**"]
   workflow_dispatch:
+    inputs:
+      quick:
+        description: Only launch the app and check the request it sends (8 minutes, to debug the fake backend)
+        type: boolean
+        default: false
 
 concurrency:
   group: smoke-${{ github.ref }}
@@ -45,6 +50,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash .github/scripts/walkthrough.sh
+        env:
+          QUICK: ${{ (inputs.quick || contains(github.event.head_commit.message, '[quick]')) && '1' || '0' }}
       - name: Keep the evidence
         if: always()
         uses: actions/upload-artifact@v4

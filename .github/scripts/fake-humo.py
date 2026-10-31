@@ -50,9 +50,13 @@ def serve(port, log_path):
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
-def assert_requests(log_path, version, lo=2, hi=3):
+def assert_requests(log_path, version, lo=None, hi=3):
     """One registerPushDevice per cold start. The walkthrough cold-starts the app 3 times (first launch, the forced
     crash, the motion phase); the crash run can die before its call leaves, so 2 to 3 are right."""
+    import os
+    if lo is None:
+        lo = 1 if os.environ.get("QUICK") == "1" else 2
+        hi = 1 if os.environ.get("QUICK") == "1" else hi
     rows = [json.loads(line) for line in open(log_path) if line.strip()]
     posts = [r for r in rows if r["path"] != "/health"]
     errors = []

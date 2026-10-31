@@ -56,6 +56,8 @@ object DailyPush {
         functions.useEmulator(hostAndPort.substringBefore(':'), hostAndPort.substringAfter(':').toInt())
         functions.getHttpsCallable("registerPushDevice")
             .call(mapOf("fid" to "ci-fid", "token" to "ci-token", "sendId" to null, "appVersion" to appVersion))
+            .addOnSuccessListener { android.util.Log.i("HumoSmoke", "registerPushDevice answered") }
+            .addOnFailureListener { android.util.Log.w("HumoSmoke", "registerPushDevice failed", it) }
     }
 
     private const val REGION = "asia-south1"
