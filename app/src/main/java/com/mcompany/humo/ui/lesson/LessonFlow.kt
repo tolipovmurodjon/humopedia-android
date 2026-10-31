@@ -50,7 +50,6 @@ sealed interface Screen {
     data class Skill(val j: Int) : Screen
     data object Score : Screen
     data class Review(val k: Int) : Screen
-    data object Retry : Screen
     data object End : Screen
 }
 
@@ -71,6 +70,8 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** "+15" shows once per page, on its first right answer. */
     var sparkBurst by mutableIntStateOf(0); private set
     var verdict by mutableStateOf<String?>(null); private set
+    /** Humo's bubble after a verdict: empty while the state shows (wrong 0.65 s, right 0.5 s), then the line (player.js `later`). */
+    var bubble by mutableStateOf<String?>(null); private set
     /** The "+ 15" chip at the card's top right: shown after this page's first right answer, until the page changes. */
     var gain by mutableStateOf(false); private set
     /** Where the flying machine is as Humo sees it (-1..1 each way), written by the boards while it flies. */
@@ -88,8 +89,12 @@ class LessonFlow(val lesson: LessonContent = L11) {
     val coach: String? get() = page?.id?.let { lesson.coach[it] }
     /** Lesson pages answered right at least once (sparks are paid once per page). */
     private val solved = mutableSetOf<Int>()
-    private var praiseAt = 0
-    private var nudgeAt = 0
+    /** The web player picks the praise by the page's place in the whole flow (pages, splash, skill items); so do we. */
+    private fun praiseIndex(s: Screen): Int = when (s) {
+        is Screen.Page -> s.i
+        is Screen.Review -> pages.size + 1 + reviewQueue[s.k]
+        else -> 0
+    }
     /** null = not answered yet; per skill item. */
     val skillResults = mutableStateListOf<Boolean?>().apply { repeat(skill.size) { add(null) } }
     private val skillAnswers = arrayOfNulls<Slots>(skill.size)
@@ -121,7 +126,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** Check is live once the board changed (Brilliant greys it out on an untouched board). */
     val canCheck: Boolean get() {
         val p = page ?: return false
-        return phase == Phase.Idle && !flying && when (p.kind) {
+        return phase == Phase.Idle && !flying && !answered && when (p.kind) {
             PageKind.Drag -> dragAt != null && dragAt != p.points[0]
             PageKind.Translate -> slots.full
             else -> false
@@ -158,15 +163,20 @@ class LessonFlow(val lesson: LessonContent = L11) {
         val p = page ?: return false
         val ok = isRight(p)
         when (val s = screen) {
-            is Screen.Skill -> { skillResults[s.j] = ok; skillAnswers[s.j] = slots }
+            is Screen.Skill -> {
+                // The skill check keeps the page tint and shows a corner verdict instead of Humo's bubble (player.js graded).
+                skillResults[s.j] = ok; skillAnswers[s.j] = slots
+                phase = if (ok) Phase.Correct else Phase.Wrong
+                verdict = if (ok) "Correct!" else "Not quite."
+                if (ok) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
+            }
             else -> {
                 phase = if (ok) Phase.Correct else Phase.Wrong
                 verdict = when {
-                    ok -> L11.praise[praiseAt++ % L11.praise.size]
-                    p.kind == PageKind.Translate -> "Not all the ${machineName}s landed on their targets."
-                    else -> L11.nudge[nudgeAt++ % L11.nudge.size]
+                    ok -> L11.praise[praiseIndex(s) % L11.praise.size]
+                    p.kind == PageKind.Translate -> "Not all the ${machineName}s landed on their targets, lowkey close though."
+                    else -> "The $machineName isn't in the right spot yet, no stress."
                 }
-                chat.hear(verdict!!)
                 if (ok && s is Screen.Page && solved.add(s.i)) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
             }
         }
@@ -174,16 +184,27 @@ class LessonFlow(val lesson: LessonContent = L11) {
     }
 
     /** Humo says [text] in the bubble (a plain remark: no verdict colours). */
-    fun say(text: String) { verdict = text }
+    fun say(text: String) { verdict = text; bubble = text; chat.hear(text) }
+
+    /** The verdict's line reaches the bubble (and the chat, and the voice) once its delay is over. */
+    fun showVerdict() { val v = verdict ?: return; if (bubble == null) { bubble = v; chat.hear(v) } }
 
     /** Try again clears the verdict, Humo's marks and (on a translate page) both numbers, so the machines fly home. */
     fun tryAgain() {
-        phase = Phase.Idle; verdict = null; marks = emptyList()
+        phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList()
         val p = page
         if (p?.kind == PageKind.Translate && screen !is Screen.Review) slots = Slots.start(p)
     }
 
-    fun dontKnow() { val s = screen as? Screen.Skill ?: return; skillResults[s.j] = false; skillAnswers[s.j] = slots }
+    /** "I don't know": counts as missed and the machines fly the right move (no shame, no tint). */
+    fun dontKnow() {
+        val s = screen as? Screen.Skill ?: return
+        val p = skill[s.j]
+        skillResults[s.j] = false
+        slots = Slots(p.move.x, p.move.y, null, slots.fixed)
+        skillAnswers[s.j] = slots
+        verdict = "Here's how it goes."
+    }
 
     /** After a skill item's Check (or "I don't know"): the next item, or the score. */
     fun nextSkill() {
@@ -195,7 +216,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
     fun next() {
         when (val s = screen) {
             is Screen.Page -> show(if (s.i + 1 < pages.size) Screen.Page(s.i + 1) else Screen.SkillSplash)
-            is Screen.Review -> show(if (s.k + 1 < reviewQueue.size) Screen.Review(s.k + 1) else Screen.Retry)
+            is Screen.Review -> show(if (s.k + 1 < reviewQueue.size) Screen.Review(s.k + 1) else Screen.End)
             else -> Unit
         }
     }
@@ -212,7 +233,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
         if (reviewQueue.isEmpty()) show(Screen.End) else show(Screen.Review(0))
     }
 
-    fun skipReview() = show(Screen.Retry)
+    fun skipReview() = show(Screen.End)
 
     /** "Restart lesson" on the end card: back to page 1 with nothing earned. */
     fun restart() { sparks = 0; solved.clear(); for (i in skillResults.indices) skillResults[i] = null; show(Screen.Page(0)) }
@@ -226,6 +247,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
         flying = false
         phase = Phase.Idle
         verdict = null
+        bubble = null
         gain = false
         marks = emptyList()
         dragAt = null

@@ -96,7 +96,7 @@ class LessonFlightTest {
     @Test fun `a checked board is locked while the machines fly`() {
         val flow = LessonFlow(L11)
         flow.goTo(com.mcompany.humo.ui.lesson.Screen.Page(3))
-        flow.tapTile(2); flow.tapTile(2)
+        flow.tapTile(2); flow.tapTile(1)
         assertTrue(flow.canCheck)
         flow.flying = true
         assertFalse(flow.canCheck)
@@ -105,7 +105,7 @@ class LessonFlightTest {
         assertTrue(flow.check())
         assertTrue(flow.answered)
         assertNotNull(flow.verdict)
-        assertEquals(Node(2, 2), flow.slots.move)
+        assertEquals(Node(2, 1), flow.slots.move)
         assertEquals("L1.2 uses the same machine words", "SR-71", Words.MACHINE)
         assertEquals(7, L12.pages.size)
     }

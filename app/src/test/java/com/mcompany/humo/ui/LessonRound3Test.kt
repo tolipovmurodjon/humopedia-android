@@ -43,6 +43,8 @@ class LessonRound3Test {
 
     private fun act(block: () -> Unit) { compose.runOnIdle(block); compose.waitForIdle() }
 
+    private fun settle() { compose.mainClock.advanceTimeBy(800); compose.waitForIdle() }
+
     @Test fun p1Start() {
         player()
         shot("P1-start")
@@ -52,14 +54,14 @@ class LessonRound3Test {
         val flow = player()
         act { flow.goTo(Screen.Page(3)) }
         act { flow.tapTile(1); flow.tapTile(2); flow.check() }
-        shot("P4-wrong")
+        settle(); shot("P4-wrong")
     }
 
     @Test fun p4Correct() {
         val flow = player()
         act { flow.goTo(Screen.Page(3)) }
-        act { flow.tapTile(2); flow.tapTile(2); flow.check() }
-        shot("P4-correct")
+        act { flow.tapTile(2); flow.tapTile(1); flow.check() }
+        settle(); shot("P4-correct")
     }
 
     @Test fun skillSplash() {
@@ -68,7 +70,7 @@ class LessonRound3Test {
         shot("SC-splash")
     }
 
-    /** 2 of 3 right: the "Nice work!" score the web picture shows. */
+    /** 1 of 3 right (one missed, one "I don't know"): the "That was tricky!" score. */
     @Test fun skillScore() {
         val flow = player()
         act { flow.beginSkillSplash(); flow.startSkill() }

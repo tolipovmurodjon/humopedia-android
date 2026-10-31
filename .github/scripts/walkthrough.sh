@@ -144,7 +144,7 @@ log "-- one tap on the current island starts L1.1 (no sheet); Back asks before l
 # once more, best effort, at the end of this script with animations ON.
 ANIM() { $T adb shell settings put global animator_duration_scale "$1"; }
 tap "Lesson 1.1, Translating Points, current"; shot lesson
-has "Move the SR-71 3 steps to the right and 1 up."
+has "Move the SR-71 4 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
 has "Leave the lesson\?"
 tap "Keep going"; sleep 1
@@ -158,47 +158,60 @@ drag() { board; local a b; a=$(npx "$1" "$2"); b=$(npx "$3" "$4"); $T adb shell 
 press() { tap "$1"; sleep "${2:-0.8}"; }
 
 tapnode() { board; local a; a=$(npx "$1" "$2"); $T adb shell input tap $a; }
-shot P1-start; has "Move the SR-71 3 steps to the right and 1 up."
-drag 2 1 3 4; press Check; shot P1-wrong
-has "Hmm, think about that again."
-press "Try again"; drag 3 4 5 2; press Check; shot P1-correct
-has "Good!"
+shot P1-start; has "Move the SR-71 4 steps to the right and 1 up."
+drag 1 2 2 5; press Check; shot P1-wrong 1.3
+has "The SR-71 isn.t in the right spot yet, no stress\."
+press "Get help" 1.5; shot P1-help; has "Why was my answer wrong\?"
+$T adb shell input keyevent 4; sleep 1
+press "Try again"; drag 2 5 5 3; press Check; shot P1-correct 1.3
+has "Nice, that.s it!"
 press "Why\?"; shot P1-why; has "Why is this the answer\?"; press Yes; press "Continue lesson"
 shot P2-start
 log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
-tapnode 1 3; snap P2-armed 0.5
+tapnode 2 4; snap P2-armed 0.5
 board; shoot_after $(npx 6 0) P2-tapfly-a 0.5 P2-tapfly-b 0.7
 sleep 5; shot P2-landed 0.5
-press Check; shot P2-wrong
-has "(Hmm, think about that again\.|Not quite.*)"
-press "Try again"; drag 6 0 4 4; press Check; shot P2-correct
+press Check; shot P2-wrong 1.3
+has "The SR-71 isn.t in the right spot yet, no stress\."
+press "Try again"; drag 6 0 6 5; press Check; shot P2-correct 1.3
 has "Continue"; press Continue
-shot P3; has "Two points, each moved a steps right and b steps up."; press Continue
-for P in "P4 1 2 2 2" "P5 1 3 3 1" "P6 3 2 2 3"; do
+shot P3; press Continue
+for P in "P4 1 2 2 1" "P5 3 1 1 2" "P6 2 3 3 2"; do
   set -- $P
   shot "$1-start" 0.5
   press "Tile $2" 0.4; press "Tile $3"; tapsnap Check "$1-flight" 0.9
-  waitfor "Try again" 15; shot "$1-wrong"
+  waitfor "Try again" 15; shot "$1-wrong" 1.3
+  has "Not all the SR-71s landed on their targets, lowkey close though\."
+  press "Get help" 1.5; shot "$1-help"; $T adb shell input keyevent 4; sleep 1
   press "Try again"; scrolldown; press "Start over"; sleep 1.5
   press "Tile $4" 0.4; press "Tile $5"; tapsnap Check "$1-flight-2" 0.9
   waitfor "Continue" 15; shot "$1-correct"
   press Continue
 done
 shot P7; press Play 1.5; press Continue
-# The splash waits for Continue (as the web player does); then the first item shows.
-shot skill-splash 0.3; press Continue 1.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
-scrolldown; press "Tile 3" 0.4; press "Tile 2"; tapsnap Check skill-SC1-flight 0.9
-sleep 6
-press "I don(&apos;|.)t know" 1.5
-scrolldown; press "Tile 1" 0.4; press "Tile 4"; tapsnap Check skill-SC3-flight 0.9
-waitfor "That was tricky!" 20; shot skill-score; has "That was tricky!"
-has "Retry skill check"
+# The splash waits for Continue (as the web player does); then the first item shows. The skill check has no Humo and no
+# bar: a wrong item, an "I don't know" item and a right one, each with its corner verdict.
+shot skill-splash 0.3; has "Let.s see if it all clicked\."; press Continue 1.5; shot skill-SC1 0.5; has "I don(&apos;|.)t know"
+scrolldown; press "Tile 3" 0.4; press "Tile 1"; tapsnap Check skill-SC1-flight 0.9
+waitfor "Not quite\." 15; shot skill-SC1-wrong 1.0
+press Continue 1.5
+press "I don(&apos;|.)t know" 1.5; waitfor "Here(&apos;|.)s how it goes\." 15; shot skill-SC2-idk 3.0
+press Continue 1.5
+scrolldown; press "Tile 5" 0.4; press "Tile 2"; tapsnap Check skill-SC3-flight 0.9
+waitfor "Correct!" 15; shot skill-SC3-right 1.0
+has "Finish"; press Finish 1.5
+waitfor "That was tricky!" 20; shot skill-score; has "Review with Humo"; has "Skip review"
+press "Review with Humo" 2.5; shot review-1; has "Try again"
+press "Try again"; scrolldown; press "Tile 1" 0.4; press "Tile 3"; tapsnap Check review-1-flight 0.9
+waitfor "Continue" 15; shot review-1-right; press Continue 2.5
+shot review-2; press "Try again"; scrolldown; press "Tile 4" 0.4; press "Tile 0"; tapsnap Check review-2-flight 0.9
+waitfor "Continue" 15
 tapsnap Continue mach3-a 1.3 mach3-b 1.2
-sleep 3; shot lesson-end; has "Lesson complete"; has "75 sparks earned."; has "Restart lesson"
+sleep 3; shot lesson-end; has "Lesson complete"; has "90 sparks earned."; has "Restart lesson"
 press "Exit lesson" 2; shot back-from-lesson
 has "Lesson 1.1, Translating Points, done"
 has "Lesson 1.2, Negative Translations, current"
-has "Olmos: 75"
+has "Olmos: 90"
 shot jet-roll-done 1.5
 
 log "-- L1.2 Negative Translations, the next island: one wrong try on every graded page, then a perfect skill check"
@@ -215,15 +228,15 @@ for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
   press Continue
 done
 press Continue 1.5; shot l12-SC1; has "I don(&apos;|.)t know"
-scrolldown; press "Tile -2"; press Check 0.1; sleep 6
-scrolldown; press "Tile 3"; press Check 0.1; sleep 6
-scrolldown; press "Tile -2" 0.4; press "Tile 0"; press Check 0.1
+scrolldown; press "Tile -2"; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
+scrolldown; press "Tile 3"; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
+scrolldown; press "Tile -2" 0.4; press "Tile 0"; press Check 0.1; waitfor "Correct!" 15; press Finish 1.5
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
-tapsnap Continue l12-mach3 1.6; sleep 2; shot l12-end; has "Lesson complete"; has "75 sparks earned."
+tapsnap Continue l12-mach3 1.6; sleep 2; shot l12-end; has "Lesson complete"; has "120 sparks earned."
 press "Exit lesson" 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
-has "Olmos: 150"
+has "Olmos: 210"
 
 log "-- the next island is not built yet: its sheet says so, with no fake button"
 tap "Lesson 1.3, Translating Shapes, current"; shot coming-sheet

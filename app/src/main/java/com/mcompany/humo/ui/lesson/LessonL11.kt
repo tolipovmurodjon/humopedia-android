@@ -1,5 +1,8 @@
 package com.mcompany.humo.ui.lesson
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
 /** A grid node (whole numbers), x right, y up, as the lesson's maths writes it. */
 data class Node(val x: Int, val y: Int) {
     operator fun plus(o: Node) = Node(x + o.x, y + o.y)
@@ -53,71 +56,64 @@ interface LessonContent {
     val coach: Map<String, String> get() = emptyMap()
 }
 
-/** L1.1 Translating Points, page by page: same texts, numbers, order and answers as Brilliant (clean English). */
+/**
+ * L1.1 Translating Points: read from `resources/lessons/l11.json`, which `scripts/convert-lesson.cjs` writes from the web
+ * lesson file, so the web player and this one never disagree on a number, a word or a coach line.
+ */
+@Serializable
+private class LessonJsonPage(
+    val id: String, val kind: String, val grid: String, val prompt: String, val points: List<List<Int>>, val move: List<Int>,
+    val skill: Boolean = false, val explain: String? = null,
+)
+
+@Serializable
+private class LessonJson(
+    val title: String, val pages: List<LessonJsonPage>, val coach: Map<String, String>, val praise: List<String>, val nudge: List<String>,
+    /** Humo's scripted line -> the bundled mp3 (assets/voice) that has it in Jessa's voice; a line missing here is silent. */
+    val voice: Map<String, String> = emptyMap(),
+)
+
 object L11 : LessonContent {
-    override val code = "1.1"
-    override val title = "Translating Points"
-    override val coach = mapOf(
-        "P1" to "Let's get started. Count the steps, then move it.", "P2" to "Same move, different starting point.", "P3" to "Here is the idea behind it.",
-        "P4" to "Now you pick the numbers.", "P5" to "Three of them now. One move for all.", "P6" to "Four this time. Same idea.", "P7" to "Watch them all move together.",
-        "SC1" to "Your turn. One try each.", "SC2" to "Keep going.", "SC3" to "Last one.",
+    private val data: LessonJson = Json { ignoreUnknownKeys = true }.decodeFromString(
+        L11::class.java.getResourceAsStream("/lessons/l11.json")!!.bufferedReader(Charsets.UTF_8).use { it.readText() },
     )
+
+    override val code = "1.1"
+    override val title = data.title
+    override val coach = data.coach
 
     /** "Graph" (P1, P2): 0..6 both ways, every tick labelled, no axis names; cell 42.67 px. */
     private val Graph = GraphSpec(350f, 370f, 48f, 308f, 42.67f, 6, 6, 1, false)
-    /** P3's figure: 0..6, no labels, cell 47 px. */
-    private val Figure = GraphSpec(350f, 366f, 22f, 334f, 47f, 6, 6, 0, false)
+    /** P3's figure: 0..7 by 0..6, no labels. */
+    private val Figure = GraphSpec(350f, 366f, 22f, 334f, 43f, 7, 6, 0, false)
     /** The transformation workspace's graph area: x 0..7, y 0..5, labels every 2, axes named; cell 37.15 px. */
     private val Work = GraphSpec(346f, 256f, 44f, 216f, 37.15f, 7, 5, 2, true)
     /** P7's graph: x 0..8, y 0..6, cell 32.5 px. */
     private val Recap = GraphSpec(346f, 265f, 44f, 225f, 32.5f, 8, 6, 2, true)
 
-    /** *a* is maths italic; digits in a sentence are maths too (KaTeX on Brilliant). */
-    private const val MOVE = "Move the point 3 steps to the right and 1 up."
-    private const val TRANSLATE = "Translate the points to the targets."
-    private const val SKILL = "Translate the points to the target."
-
-    override val pages = listOf(
-        LessonPage("P1", PageKind.Drag, MOVE, Graph, listOf(Node(2, 1)), Node(3, 1),
-            "The point starts at (2, 1). After moving it 3 steps right and 1 step up, it will be at (5, 2)."),
-        LessonPage("P2", PageKind.Drag, MOVE, Graph, listOf(Node(1, 3)), Node(3, 1),
-            "The point starts at (1, 3). After moving it 3 steps right and 1 step up, it will be at (4, 4)."),
-        LessonPage("P3", PageKind.Explainer,
-            "Moving points is described as a translation. A translation by (*a*, *b*) moves every point on the plane *a* steps right and *b* steps up.",
-            Figure, listOf(Node(2, 1), Node(1, 3)), Node(3, 1)),
-        LessonPage("P4", PageKind.Translate, TRANSLATE, Work, listOf(Node(1, 1), Node(1, 2)), Node(2, 2),
-            "A translation by (2, 2) will move the points to the targets."),
-        LessonPage("P5", PageKind.Translate, TRANSLATE, Work, listOf(Node(3, 1), Node(1, 2), Node(1, 3)), Node(3, 1),
-            "A translation by (3, 1) will move the points 3 steps right and 1 step up, landing on the targets."),
-        LessonPage("P6", PageKind.Translate, TRANSLATE, Work, listOf(Node(1, 1), Node(1, 2), Node(3, 1), Node(3, 2)), Node(2, 3),
-            "A translation by (2, 3) will move the points 2 steps right and 3 steps up, landing on the targets."),
-        LessonPage("P7", PageKind.Recap, "A translation moves any number of points in the same way.", Recap,
-            listOf(Node(2, 1), Node(1, 2), Node(5, 1), Node(4, 3), Node(3, 1), Node(1, 4)), Node(3, 2)),
+    private fun page(j: LessonJsonPage) = LessonPage(
+        j.id, PageKind.valueOf(j.kind), j.prompt,
+        when (j.grid) { "graph" -> Graph; "figure" -> Figure; "work" -> Work; else -> Recap },
+        j.points.map { Node(it[0], it[1]) }, Node(j.move[0], j.move[1]), j.explain, j.skill,
     )
 
-    /** The skill check: Brilliant's own three boards (measured), no verdict per item. */
-    override val skill = listOf(
-        LessonPage("SC1", PageKind.Translate, SKILL, Work, listOf(Node(1, 1), Node(3, 1)), Node(3, 2),
-            "Each point needs to move 3 steps right and 2 steps up, so the translation is (3, 2).", skill = true),
-        LessonPage("SC2", PageKind.Translate, SKILL, Work, listOf(Node(1, 1), Node(3, 1)), Node(0, 3),
-            "Each point needs to move 0 steps right and 3 steps up, so the translation is (0, 3).", skill = true),
-        LessonPage("SC3", PageKind.Translate, SKILL, Work, listOf(Node(1, 1), Node(3, 1)), Node(2, 4),
-            "Each point needs to move 2 steps right and 4 steps up, so the translation is (2, 4).", skill = true),
-    )
+    private val all = data.pages.map(::page)
+    override val pages = all.filter { !it.skill }
+    override val skill = all.filter { it.skill }
 
-    /** Brilliant's tutor lines and score titles are the same in every lesson (recorded runs); they live here. */
-    val praise = listOf("Good!", "Nice!", "Nicely done.", "Yep.", "Correct.", "Boom.", "Perfect.", "Exactly.")
-    val nudge = listOf("Hmm, think about that again.", "Not quite. What’s another way to look at it?")
+    val praise = data.praise
+    val nudge = data.nudge
+    /** Humo's scripted line -> bundled mp3 file name. */
+    val voice: Map<String, String> = data.voice
 
     /** Sparks for the first right answer on each lesson page (Brilliant: 15 each, 75 for L1.1). */
     const val SPARKS_PER_PAGE = 15
 
     fun scoreTitle(right: Int, total: Int): String = when {
         right == total -> "Perfect!"
-        right == total - 1 -> "Nice work!"
-        total == 3 && right == 1 -> "That was tricky!"
-        right > 0 -> "Good effort!"
-        else -> "Keep practicing!"
+        right == total - 1 -> "So close!"
+        right > 0 -> "That was tricky!"
+        else -> "Good start!"
     }
 }
 

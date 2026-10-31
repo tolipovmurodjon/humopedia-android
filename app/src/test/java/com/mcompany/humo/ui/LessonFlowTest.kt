@@ -24,13 +24,14 @@ class LessonFlowTest {
     @Test fun `the lesson is Brilliant's seven pages and three skill items, in order`() {
         assertEquals(listOf("P1", "P2", "P3", "P4", "P5", "P6", "P7"), L11.pages.map { it.id })
         assertEquals(listOf("SC1", "SC2", "SC3"), L11.skill.map { it.id })
-        assertEquals(listOf(Node(5, 2)), L11.pages[0].targets)
-        assertEquals(listOf(Node(4, 4)), L11.pages[1].targets)
-        assertEquals(listOf(Node(3, 3), Node(3, 4)), L11.pages[3].targets)
-        assertEquals(listOf(Node(6, 2), Node(4, 3), Node(4, 4)), L11.pages[4].targets)
-        assertEquals(listOf(Node(3, 4), Node(3, 5), Node(5, 4), Node(5, 5)), L11.pages[5].targets)
-        assertEquals(listOf(Node(3, 2), Node(0, 3), Node(2, 4)), L11.skill.map { it.move })
-        assertEquals(listOf(Node(4, 3), Node(6, 3)), L11.skill[0].targets)
+        // the numbers come from the web lesson file through scripts/convert-lesson.cjs
+        assertEquals(listOf(Node(5, 3)), L11.pages[0].targets)
+        assertEquals(listOf(Node(6, 5)), L11.pages[1].targets)
+        assertEquals(listOf(Node(4, 2), Node(4, 3)), L11.pages[3].targets)
+        assertEquals(listOf(Node(2, 3), Node(3, 5), Node(5, 4)), L11.pages[4].targets)
+        assertEquals(listOf(Node(4, 3), Node(4, 4), Node(5, 3), Node(5, 4)), L11.pages[5].targets)
+        assertEquals(listOf(Node(1, 3), Node(4, 0), Node(5, 2)), L11.skill.map { it.move })
+        assertEquals(listOf(Node(3, 4), Node(4, 5)), L11.skill[0].targets)
     }
 
     @Test fun `L1_2 is Brilliant's Negative Translations - answers, given slots and the -5 to 5 tray`() {
@@ -156,26 +157,31 @@ class LessonFlowTest {
             }
         }
         assertEquals(75, flow.sparks)
-        flow.goTo(Screen.Page(0)); flow.dropAt(Node(5, 2)); flow.check()
+        flow.goTo(Screen.Page(0)); flow.dropAt(Node(5, 3)); flow.check()
         assertEquals(75, flow.sparks)
     }
 
-    @Test fun `praise and nudges rotate in Brilliant's order`() {
+    @Test fun `a wrong drag gets the same calm line, a right one the praise of its page place`() {
         val flow = LessonFlow()
         val said = mutableListOf<String?>()
-        repeat(3) { flow.goTo(Screen.Page(0)); flow.dropAt(Node(3, 3)); flow.check(); said += flow.verdict }
-        repeat(2) { flow.goTo(Screen.Page(0)); flow.dropAt(Node(5, 2)); flow.check(); said += flow.verdict }
-        assertEquals(listOf(L11.nudge[0], L11.nudge[1], L11.nudge[0], "Good!", "Nice!"), said)
+        repeat(2) { flow.goTo(Screen.Page(0)); flow.dropAt(Node(3, 3)); flow.check(); said += flow.verdict }
+        flow.goTo(Screen.Page(0)); flow.dropAt(Node(5, 3)); flow.check(); said += flow.verdict
+        flow.goTo(Screen.Page(1)); flow.dropAt(Node(6, 5)); flow.check(); said += flow.verdict
+        val calm = "The point isn't in the right spot yet, no stress."
+        assertEquals(listOf(calm, calm, L11.praise[0], L11.praise[1]), said)
+        assertEquals("Nice, that's it!", L11.praise[0])
     }
 
     @Test fun `Humo has one teacher line per page and a translate page says how it went wrong`() {
         val flow = LessonFlow(L11)
-        assertEquals("Let's get started. Count the steps, then move it.", flow.coach)
+        assertEquals("Ok so, let's go. Count the steps, then move it.", flow.coach)
         flow.goTo(Screen.Page(3))
-        assertEquals("Now you pick the numbers.", flow.coach)
+        assertEquals("Now you pick the numbers. No stress.", flow.coach)
         flow.machineName = "SR-71"
         flow.tapTile(1); flow.tapTile(1); flow.check()
-        assertEquals("Not all the SR-71s landed on their targets.", flow.verdict)
+        assertEquals("Not all the SR-71s landed on their targets, lowkey close though.", flow.verdict)
+        assertNull("the line waits for its delay", flow.bubble)
+        flow.showVerdict()
         assertTrue("the talk keeps the coach line and the verdict", flow.chat.lines.any { it.text.startsWith("Not all") })
     }
 
@@ -191,40 +197,47 @@ class LessonFlowTest {
         assertTrue(flow.marks.isEmpty())
     }
 
-    @Test fun `the walk - pages, skill check with no verdict, score, review, retry, end`() {
+    @Test fun `the walk - pages, skill check with a corner verdict, score, review, end`() {
         val flow = LessonFlow()
         repeat(7) { flow.next() }
         assertEquals(Screen.SkillSplash, flow.screen)
         flow.startSkill()
         assertEquals(Screen.Skill(0), flow.screen)
-        flow.tapTile(3); flow.tapTile(2)
+        flow.tapTile(1); flow.tapTile(3)
         assertTrue(flow.check())
-        assertEquals("no verdict in the skill check", Phase.Idle, flow.phase)
-        assertNull(flow.verdict)
+        assertEquals(Phase.Correct, flow.phase)
+        assertEquals("Correct!", flow.verdict)
+        assertTrue(flow.locked)
+        assertFalse("a checked item cannot be checked again", flow.canCheck)
+        assertEquals(15, flow.sparks - 0)
+        flow.nextSkill()
+        flow.dontKnow()
+        assertEquals("Here's how it goes.", flow.verdict)
+        assertEquals("the right move is shown", Node(4, 0), flow.slots.move)
+        assertEquals(Phase.Idle, flow.phase)
         assertTrue(flow.locked)
         flow.nextSkill()
-        flow.dontKnow(); flow.nextSkill()
-        flow.tapTile(1); flow.tapTile(4); assertFalse(flow.check()); flow.nextSkill()
+        flow.tapTile(1); flow.tapTile(4); assertFalse(flow.check())
+        assertEquals("Not quite.", flow.verdict)
+        flow.nextSkill()
         assertEquals(Screen.Score, flow.screen)
         assertEquals(listOf(true, false, false), flow.skillResults.toList())
         assertEquals("That was tricky!", L11.scoreTitle(flow.skillRight, 3))
         flow.startReview()
         assertEquals(Screen.Review(0), flow.screen)
         assertEquals(Phase.Wrong, flow.phase)
-        flow.tryAgain(); flow.tapTile(0); flow.tapTile(3); assertTrue(flow.check()); flow.next()
+        flow.tryAgain(); flow.tapTile(4); flow.tapTile(0); assertTrue(flow.check()); flow.next()
         assertEquals(Screen.Review(1), flow.screen)
         assertEquals("the learner's own wrong tiles come back", Node(1, 4), flow.slots.move)
         flow.next()
-        assertEquals(Screen.Retry, flow.screen)
-        flow.finish()
-        assertEquals(Screen.End, flow.screen)
+        assertEquals("the review ends at the end card", Screen.End, flow.screen)
     }
 
     @Test fun `score titles as Brilliant words them`() {
         assertEquals("Perfect!", L11.scoreTitle(3, 3))
-        assertEquals("Nice work!", L11.scoreTitle(2, 3))
+        assertEquals("So close!", L11.scoreTitle(2, 3))
         assertEquals("That was tricky!", L11.scoreTitle(1, 3))
-        assertEquals("Keep practicing!", L11.scoreTitle(0, 3))
+        assertEquals("Good start!", L11.scoreTitle(0, 3))
     }
 
     @Test fun `back only from page 2, and the progress runs page by page`() {

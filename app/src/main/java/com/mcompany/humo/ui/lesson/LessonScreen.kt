@@ -156,15 +156,17 @@ fun LessonPlayer(
     BackHandler(enabled = !leaving) { close() }
     val page by animateColorAsState(
         when {
-            flow.phase == Phase.Correct && !flow.inSkill -> Chrome.PageGood
-            flow.phase == Phase.Wrong && flow.screen !is Screen.Review && !flow.inSkill -> Chrome.PageBad
+            flow.phase == Phase.Correct -> Chrome.PageGood
+            flow.phase == Phase.Wrong && flow.screen !is Screen.Review -> Chrome.PageBad
             else -> Color.White
         },
         tween(250), label = "page",
     )
     val humo = rememberHumo(humoAlive)
     flow.machineName = if (theme == LessonTheme.Fly) Words.MACHINE else "point"
-    HumoMoods(flow, humo)
+    val voice = rememberHumoVoice()
+    LaunchedEffect(flow.screen) { voice.stop() }
+    HumoMoods(flow, humo, voice)
     // A tap anywhere asks the Mach 3 pass for another run; the root only counts it (the Initial pass), the buttons still get it.
     val taps = remember { mutableIntStateOf(0) }
     Box(
@@ -176,7 +178,9 @@ fun LessonPlayer(
     ) {
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
             TopBar(flow, onClose = close)
-            LessonCard(flow, theme == LessonTheme.Fly, motion, humo, onFinish = onFinish)
+            androidx.compose.runtime.CompositionLocalProvider(LocalHumoVoice provides voice) {
+                LessonCard(flow, theme == LessonTheme.Fly, motion, humo, onFinish = onFinish)
+            }
         }
         if (theme == LessonTheme.Fly && motion && atEnd) MachPass(taps, flow.skillRight == flow.skill.size)
     }
@@ -193,7 +197,7 @@ fun LessonPlayer(
 
 /** What Humo feels on each screen (player.js `react`): glad and a hop on right, thinking on wrong, cheering on the bare screens. */
 @Composable
-private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
+private fun HumoMoods(flow: LessonFlow, humo: HumoState, voice: HumoVoice) {
     val screen = flow.screen
     val perfect = flow.skillRight == flow.skill.size
     LaunchedEffect(flow.phase, screen, flow.inSkill) {
@@ -212,7 +216,9 @@ private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
     LaunchedEffect(last) {
         if (last == null || last.mine || last.typing || !humo.alive) return@LaunchedEffect
         humo.talking = true
-        delay((last.text.length * 45L).coerceIn(700L, 2600L))
+        // A bundled recording sets how long the mouth moves; a line without one gets the letter estimate and stays silent.
+        val spoken = voice.on && !flow.inSkill && voice.say(last.text)
+        if (!spoken) delay((last.text.length * 45L).coerceIn(700L, 2600L))
         humo.talking = false
         humo.face = if (flow.phase == Phase.Correct && !flow.inSkill) HumoFace.Happy else HumoFace.Rest
     }
@@ -234,7 +240,7 @@ private fun TopBar(flow: LessonFlow, onClose: () -> Unit) {
         Spacer(Modifier.width(4.dp))
         // The back arrow keeps its slot on page 1 too, so the bar never moves.
         Box(Modifier.size(36.dp)) {
-            if (flow.canGoBack) IconButton("Previous page", { LessonSounds.play(Cue.Tick); flow.back() }, tint = Chrome.Close) { c ->
+            if (flow.canGoBack && !flow.inSkill) IconButton("Previous page", { LessonSounds.play(Cue.Tick); flow.back() }, tint = Chrome.Close) { c ->
                 val y = size.height / 2f
                 drawLine(c, Offset(size.width * 0.25f, y), Offset(size.width * 0.78f, y), 2.dp.toPx(), StrokeCap.Round)
                 drawLine(c, Offset(size.width * 0.25f, y), Offset(size.width * 0.48f, y - size.height * 0.22f), 2.dp.toPx(), StrokeCap.Round)
@@ -242,7 +248,7 @@ private fun TopBar(flow: LessonFlow, onClose: () -> Unit) {
             }
         }
         Spacer(Modifier.width(8.dp))
-        Box(
+        if (flow.inSkill) Spacer(Modifier.weight(1f)) else Box(
             Modifier.weight(1f).height(10.dp).clip(CircleShape).background(Chrome.Track)
                 .semantics { contentDescription = "Lesson progress ${(flow.progress * 100).toInt()} %" },
         ) {
@@ -297,8 +303,8 @@ private fun IconButton(label: String, onClick: () -> Unit, tint: Color = Color(0
 /** The lesson card (play.html `.card`): the page, its verdict border and glow; the bare screens have none. */
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: HumoState, onFinish: (Int) -> Unit) {
-    val bare = flow.screen.let { it is Screen.SkillSplash || it is Screen.Score || it is Screen.Retry || it is Screen.End }
-    val verdictOn = !flow.inSkill && !bare
+    val bare = flow.screen.let { it is Screen.SkillSplash || it is Screen.Score || it is Screen.End }
+    val verdictOn = !bare
     val border by animateColorAsState(
         when {
             bare -> Color.Transparent
@@ -331,10 +337,6 @@ private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: Less
                 is Screen.Page, is Screen.Skill, is Screen.Review -> PageView(flow, fly, motion, humo)
                 Screen.SkillSplash -> SkillSplash(flow, humo)
                 Screen.Score -> ScoreView(flow, humo)
-                Screen.Retry -> CenterScreen(humo, null, "Skill check", null, listOf(
-                    BtnSpec("Retry skill check", Kind.Dark) { flow.beginSkillSplash() },
-                    BtnSpec("Continue", Kind.Outline) { flow.finish() },
-                ))
                 Screen.End -> EndView(flow, humo)
             }
         }
@@ -374,9 +376,6 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val haptics = LocalHapticFeedback.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val read = rememberReader()
-    var advancing by remember(flow.screen) { mutableStateOf(false) }
-    // A skill item moves on by itself half a second after Check (Brilliant: no verdict per item).
-    LaunchedEffect(advancing) { if (advancing) { delay(500); flow.nextSkill() } }
 
     // Check: on a tile board the machines fly to where the numbers sent them first, and only then is the answer graded
     // (Brilliant's own tick or cross); in the skill check the same flight comes before the next item.
@@ -387,17 +386,24 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             flow.flying = true
             try { deck.fly() } finally { flow.flying = false }
             val ok = flow.check()
-            if (flow.inSkill) { advancing = true; return@launch }
             if (ok) { LessonSounds.play(Cue.Correct); haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
             else { LessonSounds.play(Cue.Incorrect); haptics.performHapticFeedback(HapticFeedbackType.Reject) }
         }
     }
 
     val review = flow.screen is Screen.Review
+    // The state shows first; Humo's line follows: 0.5 s after a right answer, 0.65 s after a wrong one (Brilliant's frame study).
+    LaunchedEffect(flow.verdict, flow.phase) {
+        if (flow.inSkill || flow.verdict == null || flow.bubble != null) return@LaunchedEffect
+        delay(if (flow.phase == Phase.Correct) 500 else 650)
+        flow.showVerdict()
+    }
     val buttons: List<BtnSpec> = when {
-        advancing -> emptyList()
+        flow.inSkill && flow.answered -> listOf(
+            BtnSpec(if ((flow.screen as Screen.Skill).j == flow.skill.size - 1) "Finish" else "Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.nextSkill() },
+        )
         flow.inSkill -> listOf(
-            BtnSpec("I don't know", Kind.Outline, enabled = !flow.flying, weight = 0.55f) { LessonSounds.play(Cue.Tick); flow.dontKnow(); advancing = true },
+            BtnSpec("I don't know", Kind.Outline, enabled = !flow.flying, weight = 0.55f) { LessonSounds.play(Cue.Tick); flow.dontKnow() },
             BtnSpec("Check", Kind.Dark, enabled = flow.canCheck) { check() },
         )
         page.kind == PageKind.Explainer || page.kind == PageKind.Recap -> listOf(BtnSpec("Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.next() })
@@ -430,13 +436,22 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                     if (page.graded && !page.skill) StartOver(flow, Modifier.width(boardW).alpha(if (page.kind == PageKind.Translate && flow.answered) 0f else 1f))
                 }
             }
-            FootRow(humo, buttons, motion, key = "${flow.screen}-${flow.phase}-$advancing", onAsk = { flow.chat.open = true })
+            FootRow(humo, buttons, motion, key = "${flow.screen}-${flow.phase}-${flow.answered}", onAsk = { flow.chat.open = true }, skill = flow.inSkill, verdict = flow.verdict.takeIf { flow.inSkill }, verdictOk = flow.phase.let { if (it == Phase.Idle) null else it == Phase.Correct })
         }
         // The tools (play.html `.tools`): the "+ 15" chip after a first right answer, report a problem, read aloud.
         Row(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GainChip(flow.gain)
             IconButton("Report a problem", { reportPage(context, flow) }, tint = Chrome.Icon) { c ->
                 withTransform({ scale(size.width / 24f, size.height / 24f, Offset.Zero) }) { drawPath(FlagPath, c) }
+            }
+            val voice = LocalHumoVoice.current
+            if (voice != null) IconButton(if (voice.on) "Humo's voice: on" else "Humo's voice: off", { voice.toggle() }, tint = if (voice.on) Chrome.Icon else Chrome.Icon.copy(alpha = 0.55f)) { c ->
+                val w = size.width; val h = size.height
+                drawPath(Path().apply { moveTo(w * 0.17f, h * 0.38f); lineTo(w * 0.33f, h * 0.38f); lineTo(w * 0.54f, h * 0.2f); lineTo(w * 0.54f, h * 0.8f); lineTo(w * 0.33f, h * 0.62f); lineTo(w * 0.17f, h * 0.62f); close() }, c)
+                if (voice.on) {
+                    drawArc(c, -45f, 90f, false, topLeft = Offset(w * 0.46f, h * 0.3f), size = androidx.compose.ui.geometry.Size(w * 0.3f, h * 0.4f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
+                    drawArc(c, -45f, 90f, false, topLeft = Offset(w * 0.46f, h * 0.17f), size = androidx.compose.ui.geometry.Size(w * 0.5f, h * 0.66f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
+                } else drawLine(c, Offset(w * 0.12f, h * 0.12f), Offset(w * 0.88f, h * 0.88f), 2.dp.toPx(), StrokeCap.Round)
             }
             IconButton("Read aloud", { read((if (fly) Words.machine(page.prompt) else page.prompt).replace("*", "")) }, tint = Chrome.Icon) { c ->
                 val h = size.height
@@ -446,7 +461,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             }
         }
         // What Humo says: it floats over the board's foot, just above the buttons (play.html `.bubble`, left 12, bottom 74).
-        Bubble((flow.verdict ?: flow.coach).takeUnless { flow.chat.open }, flow.phase, flow.inSkill, Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 74.dp))
+        Bubble((if (flow.phase == Phase.Idle) (flow.bubble ?: flow.coach) else flow.bubble).takeUnless { flow.chat.open || flow.inSkill }, flow.phase, flow.inSkill, Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 74.dp))
         HumoChat(flow, page, fly, read, onTryAgain = { LessonSounds.play(Cue.Tick); flow.tryAgain() }, onContinue = { if (flow.phase == Phase.Correct) flow.next() }, Modifier.align(Alignment.BottomCenter).padding(8.dp))
     }
 }
@@ -461,10 +476,13 @@ private fun reportPage(context: android.content.Context, flow: LessonFlow) {
 
 /** The foot: Humo (58 dp) and the buttons in one row; each new set of buttons rises 6 dp and fades in over 200 ms. */
 @Composable
-private fun FootRow(humo: HumoState, buttons: List<BtnSpec>, motion: Boolean, key: String, onAsk: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 10.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Humo(humo, Modifier.size(58.dp))
-        if (onAsk != null) AskButton(onAsk)
+private fun FootRow(humo: HumoState, buttons: List<BtnSpec>, motion: Boolean, key: String, onAsk: (() -> Unit)?, skill: Boolean, verdict: String?, verdictOk: Boolean?) {
+    Row(Modifier.fillMaxWidth().padding(start = if (skill) 14.dp else 4.dp, end = 10.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // The skill check has no Humo (play.html body.skillmode .buddy): the verdict stands in the corner instead.
+        if (!skill) {
+            Humo(humo, Modifier.size(58.dp))
+            if (onAsk != null) AskButton(onAsk)
+        } else if (verdict != null) SkillVerdict(verdict, verdictOk)
         ButtonsRow(buttons, motion, key, Modifier.weight(1f))
     }
 }
@@ -609,6 +627,27 @@ private fun CenterScreen(humo: HumoState, big: (@Composable () -> Unit)?, title:
     }
 }
 
+/** The skill check's corner verdict (play.html `.verdict`): our own drawn icon, then "Correct!" / "Not quite." in 800 19 sp. */
+@Composable
+private fun SkillVerdict(text: String, ok: Boolean?) {
+    Row(Modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (ok != null) Canvas(Modifier.size(30.dp)) {
+            val k = size.width / 34f
+            if (ok) {
+                drawPath(Path().apply { moveTo(5f * k, 30f * k); lineTo(12f * k, 11f * k); lineTo(24f * k, 23f * k); close() }, Color(0xFFF7C51E))
+                drawPath(Path().apply { moveTo(5f * k, 30f * k); lineTo(12f * k, 11f * k); lineTo(16f * k, 15f * k); lineTo(10f * k, 30f * k); close() }, Color(0xFFE8A500))
+                drawCircle(Color(0xFF3FCE69), 2.4f * k, Offset(24f * k, 7f * k)); drawCircle(Color(0xFF6170EC), 2f * k, Offset(30f * k, 15f * k))
+                for (l in listOf(listOf(19f, 4f, 20f, 8f), listOf(27f, 22f, 31f, 23f), listOf(22f, 12f, 27f, 7f))) drawLine(Color(0xFFFF7A59), Offset(l[0] * k, l[1] * k), Offset(l[2] * k, l[3] * k), 2.2f * k, StrokeCap.Round)
+            } else {
+                drawCircle(Color(0xFFFBE8A4), 13f * k, center)
+                drawLine(Color(0xFFC99A00), Offset(10f * k, 10f * k), Offset(20f * k, 20f * k), 3f * k, StrokeCap.Round)
+                drawLine(Color(0xFFC99A00), Offset(20f * k, 10f * k), Offset(10f * k, 20f * k), 3f * k, StrokeCap.Round)
+            }
+        }
+        Text(text, fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, color = Chrome.Ink)
+    }
+}
+
 /** The skill check's blue medal with a white tick (play.html `.medal`), drawn, not anyone's art. */
 @Composable
 private fun Medal(modifier: Modifier) {
@@ -622,7 +661,7 @@ private fun Medal(modifier: Modifier) {
 @Composable
 private fun SkillSplash(flow: LessonFlow, humo: HumoState) {
     LaunchedEffect(Unit) { LessonSounds.play(Cue.Start) }
-    CenterScreen(humo, null, "Skill check", null, emptyList(), foot = BtnSpec("Continue", Kind.Dark) { flow.startSkill() })
+    CenterScreen(humo, null, "Skill check", "Let's see if it all clicked.", emptyList(), foot = BtnSpec("Continue", Kind.Dark) { flow.startSkill() })
 }
 
 @Composable
@@ -641,7 +680,7 @@ private fun ScoreView(flow: LessonFlow, humo: HumoState) {
         title = L11.scoreTitle(n, total),
         line = null,
         buttons = if (n == total) listOf(BtnSpec("Continue", Kind.Dark) { flow.finish() })
-        else listOf(BtnSpec("Retry skill check", Kind.Dark) { flow.startSkill() }, BtnSpec("Continue", Kind.Outline) { flow.finish() }),
+        else listOf(BtnSpec("Review with Humo", Kind.Dark) { flow.startReview() }, BtnSpec("Skip review", Kind.Outline) { flow.skipReview() }),
     )
 }
 

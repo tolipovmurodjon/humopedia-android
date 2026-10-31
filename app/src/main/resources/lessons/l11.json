@@ -1,0 +1,280 @@
+{
+ "id": "L1.1",
+ "title": "Translating Points",
+ "pages": [
+  {
+   "id": "P1",
+   "kind": "Drag",
+   "grid": "graph",
+   "prompt": "Move the point 4 steps to the right and 1 up.",
+   "points": [
+    [
+     1,
+     2
+    ]
+   ],
+   "move": [
+    4,
+    1
+   ],
+   "skill": false,
+   "explain": "The point starts at (1, 2). After moving it 4 steps right and 1 step up, it will be at (5, 3)."
+  },
+  {
+   "id": "P2",
+   "kind": "Drag",
+   "grid": "graph",
+   "prompt": "Move the point 4 steps to the right and 1 up.",
+   "points": [
+    [
+     2,
+     4
+    ]
+   ],
+   "move": [
+    4,
+    1
+   ],
+   "skill": false,
+   "explain": "The point starts at (2, 4). After moving it 4 steps right and 1 step up, it will be at (6, 5)."
+  },
+  {
+   "id": "P3",
+   "kind": "Explainer",
+   "grid": "figure",
+   "prompt": "Moving points is described as a translation. A translation by *(a, b)* moves every point on the plane *a* steps right and *b* steps up.",
+   "points": [
+    [
+     1,
+     2
+    ],
+    [
+     3,
+     1
+    ]
+   ],
+   "move": [
+    4,
+    1
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "P4",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Translate the points to the targets.",
+   "points": [
+    [
+     2,
+     1
+    ],
+    [
+     2,
+     2
+    ]
+   ],
+   "move": [
+    2,
+    1
+   ],
+   "skill": false,
+   "explain": "A translation by (2, 1) will move the points to the targets."
+  },
+  {
+   "id": "P5",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Translate the points to the targets.",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     3
+    ],
+    [
+     4,
+     2
+    ]
+   ],
+   "move": [
+    3,
+    2
+   ],
+   "skill": false,
+   "explain": "A translation by (3, 2) will move the points 3 steps right and 2 steps up, landing on the targets."
+  },
+  {
+   "id": "P6",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "Translate the points to the targets.",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     2,
+     2
+    ]
+   ],
+   "move": [
+    2,
+    3
+   ],
+   "skill": false,
+   "explain": "A translation by (2, 3) will move the points 2 steps right and 3 steps up, landing on the targets."
+  },
+  {
+   "id": "P7",
+   "kind": "Recap",
+   "grid": "recap",
+   "prompt": "A translation moves any number of points in the same way.",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     3
+    ],
+    [
+     2,
+     2
+    ],
+    [
+     3,
+     1
+    ],
+    [
+     4,
+     2
+    ],
+    [
+     5,
+     1
+    ]
+   ],
+   "move": [
+    3,
+    3
+   ],
+   "skill": false,
+   "explain": null
+  },
+  {
+   "id": "SC1",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "**Translate the points to the target.**",
+   "points": [
+    [
+     2,
+     1
+    ],
+    [
+     3,
+     2
+    ]
+   ],
+   "move": [
+    1,
+    3
+   ],
+   "skill": true,
+   "explain": "Each point needs to move 1 step right and 3 steps up, so the translation is (1, 3)."
+  },
+  {
+   "id": "SC2",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "**Translate the points to the target.**",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     3
+    ]
+   ],
+   "move": [
+    4,
+    0
+   ],
+   "skill": true,
+   "explain": "Each point needs to move 4 steps right and 0 steps up, so the translation is (4, 0)."
+  },
+  {
+   "id": "SC3",
+   "kind": "Translate",
+   "grid": "work",
+   "prompt": "**Translate the points to the target.**",
+   "points": [
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     2
+    ]
+   ],
+   "move": [
+    5,
+    2
+   ],
+   "skill": true,
+   "explain": "Each point needs to move 5 steps right and 2 steps up, so the translation is (5, 2)."
+  }
+ ],
+ "coach": {
+  "P1": "Ok so, let's go. Count the steps, then move it.",
+  "P2": "Same move, new starting spot. You've got this.",
+  "P3": "Ok, here's the idea behind it.",
+  "P4": "Now you pick the numbers. No stress.",
+  "P5": "Three of them now. One move works for all.",
+  "P6": "Four this time. Same idea, you've got it.",
+  "P7": "Watch them all move together.",
+  "SC1": "Your turn. One try each.",
+  "SC2": "Keep going.",
+  "SC3": "Last one."
+ },
+ "praise": [
+  "Nice, that's it!",
+  "You've got it.",
+  "Yes! Clean.",
+  "Boom, nailed it.",
+  "That's the one.",
+  "Love it, exactly.",
+  "Let's go, perfect.",
+  "Yep, you got it."
+ ],
+ "nudge": [
+  "Hmm, think about it one more time.",
+  "Lowkey close. What’s another way to look at it?"
+ ],
+ "voice": {
+  "Nice, that's it!": "b9fd766488523c7f.mp3",
+  "Boom, nailed it.": "4d6ea4cd5b9cc5dc.mp3",
+  "Not all the SR-71s landed on their targets, lowkey close though.": "a829f2801d2425a5.mp3",
+  "The SR-71 isn't in the right spot yet, no stress.": "43d5479e6c5e782f.mp3",
+  "Ok, let's get into it.": "f48de3f16663a63b.mp3",
+  "This one tripped you up on the skill check. How did you figure out what to put in the slots?": "b67df6028de2c0ee.mp3"
+ }
+}

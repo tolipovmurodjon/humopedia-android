@@ -74,6 +74,9 @@ class LessonScreenshotTest {
 
     private fun act(block: () -> Unit) { compose.runOnIdle(block); compose.waitForIdle() }
 
+    /** Humo's line comes 0.5 s (right) or 0.65 s (wrong) after the state; the pictures wait for it. */
+    private fun settle() { compose.mainClock.advanceTimeBy(800); compose.waitForIdle() }
+
     /** Every page: start, then (graded pages) a wrong answer, then the right one. */
     private fun everyPage(theme: LessonTheme, tag: String, fontScale: Float = 1f, lesson: LessonContent = L11) {
         val flow = player(theme, LessonFlow(lesson), fontScale = fontScale)
@@ -83,19 +86,19 @@ class LessonScreenshotTest {
             shot("$tag-${p.id}-start")
             when (p.kind) {
                 PageKind.Drag -> {
-                    act { flow.dropAt(p.points[0] + Node(p.move.y, p.move.x)); flow.check() }
-                    shot("$tag-${p.id}-wrong")
+                    act { flow.dropAt(p.points[0] + Node(p.move.y, p.move.x).let { Node(minOf(it.x, 2), minOf(it.y, 2)) }); flow.check() }
+                    settle(); shot("$tag-${p.id}-wrong")
                     act { flow.tryAgain(); flow.dropAt(p.points[0] + p.move); flow.check() }
-                    shot("$tag-${p.id}-correct")
+                    settle(); shot("$tag-${p.id}-correct")
                 }
                 PageKind.Translate -> {
                     // a wrong try: the open slot(s) one off the answer (L1.1: the second tile; L1.2: the one open slot)
                     fun fill(dx: Int, dy: Int) { if (p.fixedX == null) flow.tapTile(p.move.x + dx); if (p.fixedY == null) flow.tapTile(p.move.y + dy) }
                     if (p.fixedX == null && p.fixedY == null) { act { flow.tapTile(p.move.x) }; shot("$tag-${p.id}-one-tile"); act { flow.tapTile(p.move.y + 1); flow.check() } }
                     else act { fill(if (p.move.x > 0) -1 else 1, if (p.move.y > 0) -1 else 1); flow.check() }
-                    shot("$tag-${p.id}-wrong")
+                    settle(); shot("$tag-${p.id}-wrong")
                     act { flow.tryAgain(); flow.startOver(); fill(0, 0); flow.check() }
-                    shot("$tag-${p.id}-correct")
+                    settle(); shot("$tag-${p.id}-correct")
                 }
                 else -> Unit
             }
@@ -127,13 +130,15 @@ class LessonScreenshotTest {
         compose.onNodeWithTag("board").performTouchInput {
             val s = width / 350f
             fun at(x: Int, y: Int) = Offset((48f + x * 42.67f) * s, (308f - y * 42.67f) * s)
-            swipe(at(2, 1), Offset(at(5, 2).x - 9f * s, at(5, 2).y + 11f * s), durationMillis = 400)
+            swipe(at(1, 2), Offset(at(5, 3).x - 9f * s, at(5, 3).y + 11f * s), durationMillis = 400)
         }
         compose.waitForIdle()
-        assertEquals("snapped to the nearest node", Node(5, 2), flow.dragAt)
+        assertEquals("snapped to the nearest node", Node(5, 3), flow.dragAt)
         compose.onNodeWithText("Check").assertIsEnabled().performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Good!").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        compose.onNodeWithText("Nice, that's it!").assertIsDisplayed()
         compose.onNodeWithText("Why?").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Why is this the answer?").assertIsDisplayed()
@@ -145,27 +150,27 @@ class LessonScreenshotTest {
         compose.onNodeWithTag("board").performTouchInput {
             val s = width / 350f
             fun at(x: Int, y: Int) = Offset((48f + x * 42.67f) * s, (308f - y * 42.67f) * s)
-            click(at(2, 1))
+            click(at(1, 2))
         }
         compose.waitForIdle()
         shot("fly-P1-armed")
         compose.onNodeWithTag("board").performTouchInput {
             val s = width / 350f
-            click(Offset((48f + 5 * 42.67f) * s, (308f - 2 * 42.67f) * s))
+            click(Offset((48f + 5 * 42.67f) * s, (308f - 3 * 42.67f) * s))
         }
         compose.waitForIdle()
-        assertEquals(Node(5, 2), flow.dragAt)
+        assertEquals(Node(5, 3), flow.dragAt)
         shot("fly-P1-flown")
     }
 
     @Test fun tilesFillTheSlotsByTouch() {
         val flow = player(LessonTheme.Plain)
         compose.runOnIdle { flow.goTo(Screen.Page(4)) }
-        compose.onNodeWithContentDescription("Tile 3").performClick()
-        compose.onNodeWithContentDescription("Slot 1, 3").assertIsDisplayed()
         compose.onNodeWithContentDescription("Tile 1").performClick()
+        compose.onNodeWithContentDescription("Slot 1, 1").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Tile 2").performClick()
         compose.waitForIdle()
-        assertEquals(Node(3, 1), flow.slots.move)
+        assertEquals(Node(1, 2), flow.slots.move)
         compose.onNodeWithText("Check").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Why?").performClick()
@@ -191,21 +196,33 @@ class LessonScreenshotTest {
         assertEquals(Screen.Skill(0), flow.screen)
         shot("skill-SC1-start")
         compose.onNodeWithText("I don't know").assertIsDisplayed()
-        act { flow.tapTile(3); flow.tapTile(2) }
+        act { flow.tapTile(1); flow.tapTile(3) }
         shot("skill-SC1-placed")
         compose.onNodeWithText("Check").performClick()
         compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        compose.onNodeWithText("Correct!").assertIsDisplayed()
+        shot("skill-SC1-right")
+        compose.onNodeWithText("Continue").performClick()
         compose.waitForIdle()
         assertEquals(Screen.Skill(1), flow.screen)
         compose.onNodeWithText("I don't know").performClick()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
+        compose.onNodeWithText("Here's how it goes.").assertIsDisplayed()
+        shot("skill-SC2-idk")
+        compose.onNodeWithText("Continue").performClick()
+        compose.waitForIdle()
         act { flow.tapTile(1); flow.tapTile(4) }
         compose.onNodeWithText("Check").performClick()
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
+        compose.onNodeWithText("Not quite.").assertIsDisplayed()
+        shot("skill-SC3-wrong")
+        compose.onNodeWithText("Finish").performClick()
+        compose.waitForIdle()
         compose.onNodeWithText("That was tricky!").assertIsDisplayed()
-        compose.onNodeWithText("Retry skill check").assertIsDisplayed()
+        compose.onNodeWithText("Review with Humo").assertIsDisplayed()
         shot("skill-score")
         act { flow.finish() }
         compose.onNodeWithText("Lesson complete").assertIsDisplayed()
@@ -258,7 +275,7 @@ class LessonScreenshotTest {
         act { flow.tapTile(2) }
         shot("motion-P4-one-number-waiting")
         compose.mainClock.autoAdvance = false
-        compose.runOnUiThread { flow.tapTile(2) }
+        compose.runOnUiThread { flow.tapTile(1) }
         compose.mainClock.advanceTimeBy(700)
         shot("motion-P4-takeoff")
         compose.mainClock.advanceTimeBy(900)
@@ -277,16 +294,16 @@ class LessonScreenshotTest {
         val flow = player(LessonTheme.Fly, motion = true)
         compose.mainClock.autoAdvance = false
         fun at(x: Int, y: Int, k: Float) = Offset((48f + x * 42.67f) * k, (308f - y * 42.67f) * k)
-        compose.onNodeWithTag("board").performTouchInput { click(at(2, 1, width / 350f)) }
+        compose.onNodeWithTag("board").performTouchInput { click(at(1, 2, width / 350f)) }
         compose.mainClock.advanceTimeBy(100)
         shot("motion-P1-armed")
-        compose.onNodeWithTag("board").performTouchInput { click(at(5, 2, width / 350f)) }
+        compose.onNodeWithTag("board").performTouchInput { click(at(5, 3, width / 350f)) }
         compose.mainClock.advanceTimeBy(300)
         shot("motion-P1-turning")
         compose.mainClock.advanceTimeBy(900)
         shot("motion-P1-flying")
         compose.mainClock.advanceTimeBy(4000)
-        assertEquals(Node(5, 2), flow.dragAt)
+        assertEquals(Node(5, 3), flow.dragAt)
         shot("motion-P1-landed")
     }
 
