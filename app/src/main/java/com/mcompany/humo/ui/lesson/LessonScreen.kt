@@ -553,7 +553,7 @@ private fun ButtonsRow(buttons: List<BtnSpec>, motion: Boolean, key: String, mod
         BoxWithConstraints(Modifier.fillMaxWidth().height(51.dp)) {
             val measurer = rememberTextMeasurer()
             val density = LocalDensity.current
-            val gaps = 12.dp * (list.size - 1)
+            val room = maxWidth - 12.dp * (list.size - 1)
             val totalWeight = list.sumOf { it.weight.toDouble() }.toFloat()
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 list.forEach { b ->
@@ -562,7 +562,7 @@ private fun ButtonsRow(buttons: List<BtnSpec>, motion: Boolean, key: String, mod
                     } else {
                         val label = measurer.measure(b.label, TextStyle(fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 17.sp))
                         val needed = with(density) { label.size.width.toDp() } + 32.dp
-                        LButton(b.label, b.kind, b.enabled, Modifier.width(maxOf((maxWidth - gaps) * (b.weight / totalWeight), needed)), b.onClick)
+                        LButton(b.label, b.kind, b.enabled, Modifier.width(maxOf(room * (b.weight / totalWeight), needed)), b.onClick)
                     }
                 }
             }
