@@ -454,10 +454,10 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                 } else drawLine(c, Offset(w * 0.12f, h * 0.12f), Offset(w * 0.88f, h * 0.88f), 2.dp.toPx(), StrokeCap.Round)
             }
             IconButton("Read aloud", { read((if (fly) Words.machine(page.prompt) else page.prompt).replace("*", "")) }, tint = Chrome.Icon) { c ->
-                val h = size.height
-                drawPath(Path().apply { moveTo(size.width * 0.12f, h * 0.38f); lineTo(size.width * 0.3f, h * 0.38f); lineTo(size.width * 0.52f, h * 0.18f); lineTo(size.width * 0.52f, h * 0.82f); lineTo(size.width * 0.3f, h * 0.62f); lineTo(size.width * 0.12f, h * 0.62f); close() }, c)
-                drawArc(c, -50f, 100f, false, topLeft = Offset(size.width * 0.42f, h * 0.3f), size = androidx.compose.ui.geometry.Size(size.width * 0.3f, h * 0.4f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
-                drawArc(c, -50f, 100f, false, topLeft = Offset(size.width * 0.42f, h * 0.16f), size = androidx.compose.ui.geometry.Size(size.width * 0.5f, h * 0.68f), style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round))
+                // three lines of text with a play mark: "read this page to me", not the voice switch
+                val w = size.width; val h = size.height
+                for (y in listOf(0.26f, 0.5f, 0.74f)) drawLine(c, Offset(w * 0.12f, h * y), Offset(w * 0.5f, h * y), 1.8.dp.toPx(), StrokeCap.Round)
+                drawPath(Path().apply { moveTo(w * 0.62f, h * 0.42f); lineTo(w * 0.9f, h * 0.58f); lineTo(w * 0.62f, h * 0.74f); close() }, c)
             }
         }
         // What Humo says: it floats over the board's foot, just above the buttons (play.html `.bubble`, left 12, bottom 74).
@@ -537,7 +537,7 @@ private fun Bubble(text: String?, phase: Phase, inSkill: Boolean, modifier: Modi
         Text(
             last, Modifier.widthIn(max = 250.dp).clip(RoundedCornerShape(12.dp)).background(face).border(1.dp, edge, RoundedCornerShape(12.dp)).padding(horizontal = 17.dp, vertical = 12.dp),
             fontFamily = LessonType.Figtree, fontWeight = if (face == Chrome.SayBubble) FontWeight.Normal else FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
-            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }
