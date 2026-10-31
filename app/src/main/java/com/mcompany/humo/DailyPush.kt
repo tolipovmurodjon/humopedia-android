@@ -1,8 +1,11 @@
 package com.mcompany.humo
 
+import android.app.Application
 import android.content.Intent
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.analytics.analytics
 import com.google.firebase.analytics.logEvent
 import com.google.firebase.functions.functions
@@ -39,6 +42,20 @@ object DailyPush {
             Firebase.functions(REGION).getHttpsCallable("registerPushDevice")
                 .call(mapOf("fid" to id, "token" to fcmToken, "sendId" to tap?.sendId, "appVersion" to appVersion))
         }
+    }
+
+    /**
+     * CI smoke only (BuildConfig.SMOKE_BACKEND = "host:port"): the same callable, sent to the fake server on the runner
+     * through a second Firebase app named "smoke". The real default app, analytics and push are never started, so the
+     * walkthrough can prove that this one request is all the app sends.
+     */
+    fun onLaunchAgainstFakeServer(app: Application, hostAndPort: String, appVersion: String) {
+        val options = FirebaseOptions.Builder().setApplicationId("1:1:android:ci").setApiKey("ci-key").setProjectId("humo-ci").build()
+        val smokeApp = FirebaseApp.getApps(app).firstOrNull { it.name == "smoke" } ?: FirebaseApp.initializeApp(app, options, "smoke")
+        val functions = Firebase.functions(smokeApp, REGION)
+        functions.useEmulator(hostAndPort.substringBefore(':'), hostAndPort.substringAfter(':').toInt())
+        functions.getHttpsCallable("registerPushDevice")
+            .call(mapOf("fid" to "ci-fid", "token" to "ci-token", "sendId" to null, "appVersion" to appVersion))
     }
 
     private const val REGION = "asia-south1"

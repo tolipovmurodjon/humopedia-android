@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- CI smoke: the callable goes to a fake server on the runner (10.0.2.2); the Play app has no cleartext exception. -->
+    <application android:networkSecurityConfig="@xml/debug_network_security" />
+
+</manifest>

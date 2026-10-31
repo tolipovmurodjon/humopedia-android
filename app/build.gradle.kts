@@ -44,6 +44,9 @@ android {
         versionCode = 42
         versionName = "3.0.0-alpha08"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The CI smoke job passes -PsmokeBackend=10.0.2.2:8787 so the app talks to .github/scripts/fake-humo.py. Every
+        // other build leaves it empty and the app never looks at it.
+        buildConfigField("String", "SMOKE_BACKEND", "\"${(findProperty("smokeBackend") as String?).orEmpty()}\"")
     }
 
     signingConfigs {

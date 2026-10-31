@@ -88,9 +88,15 @@ has() { grep -q -E "(text|content-desc)=\"$1\"" "$LAST" || fail "step $(basename
 
 screen_size() { $T adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1; }
 
+log "== fake Humopedia backend on :8787 (the smoke APK sends registerPushDevice there)"
+python3 .github/scripts/fake-humo.py serve 8787 "$OUT/fake-humo.log" &
+for i in $(seq 1 20); do curl -fs http://127.0.0.1:8787/health > /dev/null && break; sleep 0.5; done
+
 log "== root adb, install $APK"
 $T adb root > /dev/null; $T adb wait-for-device
 $T adb install -r -g "$APK" || fail "install"
+VERSION=$($T adb shell dumpsys package "$PKG" | grep -m1 -oE 'versionName=[^ ]+' | cut -d= -f2 | tr -d '')
+[ -n "$VERSION" ] || fail "could not read the installed versionName"
 
 log "== launch, alive after 20 s"
 $T adb logcat -c
@@ -258,6 +264,13 @@ has "Lesson 1.3, Translating Shapes, current"
 log "-- frame stats"
 $T adb shell dumpsys gfxinfo "$PKG" | grep -E "Total frames|Janky frames|percentile|Number Slow|Number Frozen" | tee -a "$WALK/steps.txt"
 
+log "-- what the app sent: sockets of the app right now, then the fake server's log"
+UID_APP=$($T adb shell dumpsys package "$PKG" | grep -m1 -oE 'userId=[0-9]+' | cut -d= -f2)
+$T adb shell cat /proc/net/tcp /proc/net/tcp6 | tr -d '
+' > "$OUT/proc-net-tcp.txt"
+python3 .github/scripts/fake-humo.py assert-connections "$OUT/proc-net-tcp.txt" "$UID_APP" | tee -a "$WALK/steps.txt"
+[ "${PIPESTATUS[0]}" = 0 ] || fail "the app talks to a host that is not the fake server"
+
 log "-- forced test crash is written to files/crashes/"
 $T adb shell am force-stop "$PKG"
 $T adb shell run-as "$PKG" rm -rf files/crashes
@@ -287,5 +300,9 @@ log "-- best effort, never fails the run: L1.2 replayed with animations ON, as o
   shot motion-L12-P1-landed
 ) || log "motion phase did not finish (the run goes on)"
 ANIM 0
+
+log "-- the requests the whole journey sent (3 cold starts: first launch, forced crash, motion phase)"
+python3 .github/scripts/fake-humo.py assert-requests "$OUT/fake-humo.log" "$VERSION" | tee -a "$WALK/steps.txt"
+[ "${PIPESTATUS[0]}" = 0 ] || fail "the fake server did not receive exactly what the journey should send"
 
 log "== walkthrough passed ($N steps)"
