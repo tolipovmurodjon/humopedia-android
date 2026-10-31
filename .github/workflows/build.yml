@@ -51,20 +51,28 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
           retention-days: 7
-      # The lesson's own pictures (round 6) on their own, small enough to download in a minute; the matrix of every screen is the big one above.
+      # The lesson's own pictures (round 6) as small JPEG copies, so a person or an agent can download them in seconds; the full
+      # PNGs of every screen are in the big artifact above.
+      - name: Small copies of the lesson pictures
+        if: always()
+        run: |
+          python3 -m pip install --quiet pillow
+          mkdir -p lesson-small
+          python3 - <<'EOF'
+          import glob, os
+          from PIL import Image
+          for d in ('round6', 'lesson', 'phones'):
+              for f in glob.glob(f'app/build/outputs/roborazzi/{d}/*.png'):
+                  im = Image.open(f).convert('RGB')
+                  k = 780 / im.size[0]
+                  im.resize((780, round(im.size[1] * k))).save(f'lesson-small/{d}-' + os.path.basename(f)[:-4] + '.jpg', quality=84)
+          EOF
       - name: Keep the lesson pictures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lesson-pictures
-          path: |
-            app/build/outputs/roborazzi/round6/
-            app/build/outputs/roborazzi/lesson/
-            app/build/outputs/roborazzi/phones/
-            app/build/outputs/roborazzi/track/
-            app/build/outputs/roborazzi/pill/
-            app/build/outputs/roborazzi/motion/
-            app/build/outputs/roborazzi/checks/
+          name: lesson-pictures-small
+          path: lesson-small/
           retention-days: 7
       - name: Keep the debug APK
         uses: actions/upload-artifact@v4

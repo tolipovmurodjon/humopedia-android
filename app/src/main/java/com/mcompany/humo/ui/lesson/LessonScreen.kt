@@ -463,7 +463,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            HumoHeader(headerText, humo, askHumo)
+            // Humo moves into his sheet while it is open: the board gets the room his header held
+            if (!tutorOpen) HumoHeader(headerText, humo, askHumo)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val boardW = (maxWidth - 24.dp).coerceAtMost(460.dp)
