@@ -89,7 +89,8 @@ import kotlin.math.roundToInt
 /** Brilliant's page easing (cubic-bezier(.2,.8,.2,1)) and the decelerating glide measured on P7's Play (~ ease-out cubic). */
 internal val BrilliantEase = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
 internal val GlideEase = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
-private const val NOSE_UP = -PI.toFloat() / 2f
+/** A machine at rest points 30 degrees right of straight up, as the web player draws it. */
+private val NOSE_UP = ((30f - 90f) * PI / 180f).toFloat()
 
 /** The puff and the burst are sized from the jet's length. */
 private const val PUFF_R = 0.07f

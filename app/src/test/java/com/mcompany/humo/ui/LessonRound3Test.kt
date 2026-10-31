@@ -105,7 +105,7 @@ class LessonRound3Test {
     @Test fun endPass() {
         val flow = player(motion = true)
         compose.mainClock.autoAdvance = false
-        compose.runOnUiThread { flow.goTo(Screen.End) }
+        compose.runOnUiThread { flow.goTo(Screen.End); androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
         compose.mainClock.advanceTimeBy(450 + 900)
         shot("End-pass")
         compose.mainClock.advanceTimeBy(500)

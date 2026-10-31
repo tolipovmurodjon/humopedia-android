@@ -294,7 +294,7 @@ class LessonScreenshotTest {
     @Test fun machPassAtTheEnd() {
         val flow = player(LessonTheme.Fly, motion = true)
         compose.mainClock.autoAdvance = false
-        compose.runOnUiThread { flow.goTo(Screen.End) }
+        compose.runOnUiThread { flow.goTo(Screen.End); androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
         compose.mainClock.advanceTimeBy(1450)
         shot("motion-end-mach3-a")
         compose.mainClock.advanceTimeBy(900)

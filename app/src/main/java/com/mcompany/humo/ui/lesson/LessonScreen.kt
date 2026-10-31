@@ -225,7 +225,7 @@ private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
 /** Close, back, the progress bar, the skill check's three dots and the sparks (play.html `.top`, 64 dp tall, slots reserved). */
 @Composable
 private fun TopBar(flow: LessonFlow, onClose: () -> Unit) {
-    val p by animateFloatAsState(flow.progress.coerceAtLeast(0.03f), tween(400, easing = BrilliantEase), label = "progress")
+    val p by animateFloatAsState(flow.progress, tween(400, easing = BrilliantEase), label = "progress")
     Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton("Exit lesson", onClose, tint = Chrome.Close) { c ->
             drawLine(c, Offset(size.width * 0.3f, size.height * 0.3f), Offset(size.width * 0.7f, size.height * 0.7f), 2.dp.toPx(), StrokeCap.Round)

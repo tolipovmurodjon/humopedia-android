@@ -28,7 +28,7 @@ internal class Flight(val from: Offset, val to: Offset, val ctrl: Offset, val t0
  * One machine on a board (fly-layer.js's `craft`): its place in board px, its heading in degrees clockwise from
  * nose-up, its altitude 0 ... 1, and what it leaves behind. Plain mutable state, stepped once per frame and read in draw.
  */
-internal class Craft(var pos: Offset, var deg: Float = 0f) {
+internal class Craft(var pos: Offset, var deg: Float = 30f) {
     var alt = 0f
     var speed = 0f
     var flight: Flight? = null
