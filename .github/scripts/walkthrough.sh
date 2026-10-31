@@ -128,8 +128,8 @@ fi
 
 # ---- cold start and the lesson's first frame (Boss: "slow load"). Two cold runs of the same build: warm-up OFF (the old path,
 # everything decoded on the first tap) and ON (what ships). The numbers come from the app's own HumoPerf log line and am start -W.
-COLD_LIMIT_MS=9000
-LESSON_LIMIT_MS=1500
+COLD_LIMIT_MS=4500
+LESSON_LIMIT_MS=600
 perf_cold() {
   local mode=$1
   $T adb shell am force-stop "$PKG"
@@ -199,7 +199,7 @@ ANIM() { $T adb shell settings put global animator_duration_scale "$1"; }
 tap "Lesson 1.1, Translating Points, current"; shot lesson
 has "Move the SR-71 4 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
-has "Wait, you.re so close!"
+has "KEEP LEARNING"; has "END LESSON"
 tap "KEEP LEARNING"; sleep 1
 
 log "-- play L1.1 to the end like a child: one wrong try on every graded page"
