@@ -592,7 +592,15 @@ private fun LButton(label: String, kind: Kind, enabled: Boolean, modifier: Modif
                 .then(if (kind == Kind.Outline && enabled) Modifier.border(1.dp, Chrome.GrayEdge, RoundedCornerShape(24.dp)) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, fontFamily = LessonType.Figtree, fontWeight = if (enabled) FontWeight.SemiBold else FontWeight.Normal, fontSize = 17.sp, color = ink, maxLines = 1)
+            // 17 sp whenever the label fits; on a narrow phone or at a big font it shrinks to fit instead of losing letters.
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                val measurer = rememberTextMeasurer()
+                val weight = if (enabled) FontWeight.SemiBold else FontWeight.Normal
+                val wanted = measurer.measure(label, TextStyle(fontFamily = LessonType.Figtree, fontWeight = weight, fontSize = 17.sp)).size.width
+                val room = with(LocalDensity.current) { (maxWidth - 16.dp).toPx() }
+                val size = if (wanted <= room) 17f else (17f * room / wanted).coerceAtLeast(11f)
+                Text(label, fontFamily = LessonType.Figtree, fontWeight = weight, fontSize = size.sp, color = ink, maxLines = 1)
+            }
         }
     }
 }
