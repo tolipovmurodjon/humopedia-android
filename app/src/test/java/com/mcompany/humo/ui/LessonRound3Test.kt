@@ -2,7 +2,10 @@ package com.mcompany.humo.ui
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.mcompany.humo.ui.glass.GlassTheme
@@ -77,6 +80,25 @@ class LessonRound3Test {
             }
         }
         shot("SC-score")
+    }
+
+    /** Get help on a wrong try: Humo asks the question for the learner, looks at where the machines landed and marks the points. */
+    @Test fun chatAfterAWrongTry() {
+        val flow = player()
+        act { flow.goTo(Screen.Page(3)) }
+        act { flow.tapTile(1); flow.tapTile(2); flow.check() }
+        compose.onNodeWithText("Get help").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Why was my answer wrong?").assertIsDisplayed()
+        shot("chat-wrong")
+    }
+
+    /** A perfect score: Humo in sunglasses. */
+    @Test fun perfectScoreWearsSunglasses() {
+        val flow = player()
+        act { flow.beginSkillSplash(); flow.startSkill() }
+        for (j in 0 until 3) act { val p = flow.page!!; flow.tapTile(p.move.x); flow.tapTile(p.move.y); flow.check(); flow.nextSkill() }
+        shot("SC-score-perfect")
     }
 
     /** The end pass part-way along its route: fire on both nozzles, the smoke trail, the banner. */

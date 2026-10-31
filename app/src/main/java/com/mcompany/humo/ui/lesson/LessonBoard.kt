@@ -182,7 +182,6 @@ internal fun DrawScope.explainer(g: BoardGeo, page: LessonPage, text: TextMeasur
         if (atlas == null) drawCircle(colour, 5f * s, b)
         else jetAt(atlas, b, atan2(b.y - a.y, b.x - a.x), g.cell * 0.9f, flames = 0f, t = 0f, motion = false)
     }
-    drawCircle(BoardColors.Axis, 5f * s, g.px(Node(0, 0)))
 }
 
 /** The SR-71 as the point: [len] its nose-to-tail length in px; the sprite frame is 1/0.857 of that. [alt] 0 ... 1 lifts it. */
@@ -195,6 +194,17 @@ internal fun DrawScope.jetAt(atlas: ImageBitmap, c: Offset, heading: Float, len:
 /** The armed jet (tap-then-tap): one thin blue ring around it. */
 internal fun DrawScope.armedRing(c: Offset, r: Float, s: Float) {
     drawCircle(Color(0x8C375CE3), r, c, style = Stroke(1.5f * s))
+}
+
+/** Humo's look-together marks: a teal rounded square (26 px) round each point he talks about (play.html `.hl`). */
+internal fun DrawScope.humoMarks(g: BoardGeo, points: List<Node>) {
+    val s = g.s
+    for (n in points) {
+        val c = g.px(n)
+        val tl = Offset(c.x - 13f * s, c.y - 13f * s)
+        drawRoundRect(Color(0x1F2CBFA7), tl, Size(26f * s, 26f * s), CornerRadius(6f * s))
+        drawRoundRect(Color(0xFF2CBFA7), tl, Size(26f * s, 26f * s), CornerRadius(6f * s), style = Stroke(2f * s))
+    }
 }
 
 internal fun dist(a: Offset, b: Offset) = hypot(a.x - b.x, a.y - b.y)

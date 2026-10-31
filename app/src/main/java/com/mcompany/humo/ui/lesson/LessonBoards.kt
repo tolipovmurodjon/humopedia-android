@@ -237,6 +237,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         val n = g.snapPx(handle.value)
                         scope.launch { if (motion) handle.animateTo(g.px(n), tween(90, easing = GlideEase)) else handle.snapTo(g.px(n)) }
                         land(n)
+                        LessonSounds.play(Cue.Tick)
                     } else if (fly) {
                         armed = !armed
                         wake.intValue++
@@ -247,8 +248,8 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
     ) {
         tick.longValue
         graph(g, text, dragging)
+        humoMarks(g, flow.marks)
         val s = g.s
-        drawCircle(BoardColors.Axis, 5f * s, g.px(Node(0, 0)))
         val p = handle.value
         // The grey start dot shows once the machine has left it; never a dot or ring under a flying jet.
         if (atlas == null || dist(if (motion) craft.pos else p, start) > len * 0.45f) drawCircle(BoardColors.Start, 5f * s, start)
@@ -349,43 +350,25 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
         delay(200)
         disp.animateTo(to, tween(700, easing = GlideEase))
     }
-    // A board that was checked without a flight (state restore, review) puts the machines where the numbers send them;
-    // Start over quietly slides them back to their start.
-    LaunchedEffect(settled, shown, atlas != null) {
+    // Preview before Check (Boss, 2026-10-31): the machines stay while only one number is in; the moment both are in they fly
+    // the move, and clearing a number sends them home. A new change waits for the flight in the air, so quick taps never fight.
+    LaunchedEffect(shown, atlas != null) {
         if (recap || atlas == null) return@LaunchedEffect
+        while (crafts.any { it.flight != null }) withFrameMillis { }
+        var launched = false
         crafts.forEachIndexed { i, c ->
-            if (c.flight != null) return@forEachIndexed
-            val want = when {
-                settled && shown != null -> g.px(page.points[i] + shown)
-                !settled && shown == null -> g.px(page.points[i])
-                else -> null
-            } ?: return@forEachIndexed
+            val want = g.px(if (shown != null) page.points[i] + shown else page.points[i])
             if (dist(c.pos, want) < 1f) return@forEachIndexed
             if (motion) {
-                Flying.plan(c, want, withFrameMillis { it }, density.density, climb = false)
-                wake.intValue++
+                Flying.plan(c, want, withFrameMillis { it }, density.density)
+                launched = true
             } else { c.deg = Flying.bearing(c.pos, want); c.pos = want }
         }
+        if (launched) { LessonSounds.play(Cue.Whoosh); wake.intValue++ }
     }
-    // Check: the machines fly first; the player grades afterwards.
-    val shownNow = rememberUpdatedState(shown)
-    DisposableEffect(deck, crafts, atlas != null) {
-        deck.launcher = launcher@{
-            val move = shownNow.value
-            if (move == null || recap || atlas == null) return@launcher
-            if (!motion) {
-                crafts.forEachIndexed { i, c -> val to = g.px(page.points[i] + move); c.deg = Flying.bearing(c.pos, to); c.pos = to }
-                return@launcher
-            }
-            val now = withFrameMillis { it }
-            var longest = 0L
-            crafts.forEachIndexed { i, c -> longest = max(longest, Flying.plan(c, g.px(page.points[i] + move), now, density.density)) }
-            if (longest > 0L) {
-                LessonSounds.play(Cue.Whoosh)
-                wake.intValue++
-                delay(longest + 120L)
-            }
-        }
+    // Check only grades: it waits for a preview flight still in the air, then the player grades.
+    DisposableEffect(deck, crafts) {
+        deck.launcher = { while (crafts.any { it.flight != null }) withFrameMillis { } }
         onDispose { deck.launcher = null }
     }
     LaunchedEffect(page, fly, motion) {
@@ -435,6 +418,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             Canvas(Modifier.width(width).height(frameH).testTag("board").semantics { contentDescription = described }) {
                 translate(2f * s, 12f * s) {
                     graph(g, text)
+                    humoMarks(g, flow.marks)
                     val now = tick.longValue
                     val run = disp.value
                     if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
@@ -457,7 +441,6 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         }
                         if (phase != Phase.Idle) badge(Offset(c.pos.x + g.cell * 0.42f, c.pos.y - g.cell * 0.42f), phase == Phase.Correct, s)
                     }
-                    drawCircle(BoardColors.Axis, 5f * s, g.px(Node(0, 0)))
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.5.dp * (u / 1.dp)).background(Color(0xFFE5E5E5)))
@@ -545,7 +528,11 @@ private fun ActionRow(page: LessonPage, flow: LessonFlow, recap: Boolean, u: Dp)
     val right = flow.phase == Phase.Correct && !flow.inSkill
     Row(Modifier.fillMaxWidth().height(66.dp * k).padding(start = 10.dp * k), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(34.dp * k), contentAlignment = Alignment.CenterStart) {
-            if (right) Canvas(Modifier.size(16.dp * k)) { badge(Offset(size.width / 2f, size.height / 2f), true, size.width / 16f) }
+            if (right) Canvas(Modifier.size(18.dp * k)) {
+                val u1 = size.width / 18f
+                drawRoundRect(Color(0xFF22B14C), Offset.Zero, size, androidx.compose.ui.geometry.CornerRadius(4f * u1))
+                drawPath(Path().apply { moveTo(4.5f * u1, 9.3f * u1); lineTo(7.5f * u1, 12.3f * u1); lineTo(13.5f * u1, 6f * u1) }, Color.White, style = Stroke(2.2f * u1, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
             else Text("1", fontFamily = FontFamily.Monospace, fontSize = with(density) { (14.dp * k).toSp() }, color = Color(0x99000000))
         }
         Row(

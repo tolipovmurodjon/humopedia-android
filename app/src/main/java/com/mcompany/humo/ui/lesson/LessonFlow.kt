@@ -78,7 +78,14 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** A machine is in the air: Humo's eyes follow [humoLook] every frame. */
     var lookOn by mutableStateOf(false); private set
     fun look(at: androidx.compose.ui.geometry.Offset?) { humoLook = at; if ((at != null) != lookOn) lookOn = at != null }
-    var whyOpen by mutableStateOf(false)
+    /** What the machines are called in words ("SR-71" on the fly layer); set by the player. */
+    var machineName = "point"
+    /** Humo's one conversation for the whole lesson (the chat sheet and the bubble share it). */
+    val chat = HumoChatState()
+    /** Teal squares Humo draws round points on the board when he looks at a wrong try with the learner. */
+    var marks by mutableStateOf<List<Node>>(emptyList())
+    /** Humo's teacher line for this page (shown in the bubble until a verdict replaces it). */
+    val coach: String? get() = page?.id?.let { lesson.coach[it] }
     /** Lesson pages answered right at least once (sparks are paid once per page). */
     private val solved = mutableSetOf<Int>()
     private var praiseAt = 0
@@ -87,6 +94,8 @@ class LessonFlow(val lesson: LessonContent = L11) {
     val skillResults = mutableStateListOf<Boolean?>().apply { repeat(skill.size) { add(null) } }
     private val skillAnswers = arrayOfNulls<Slots>(skill.size)
     private var reviewQueue = emptyList<Int>()
+
+    init { coach?.let { chat.hear(it) } }
 
     val page: LessonPage? get() = when (val s = screen) {
         is Screen.Page -> pages[s.i]
@@ -152,7 +161,12 @@ class LessonFlow(val lesson: LessonContent = L11) {
             is Screen.Skill -> { skillResults[s.j] = ok; skillAnswers[s.j] = slots }
             else -> {
                 phase = if (ok) Phase.Correct else Phase.Wrong
-                verdict = if (ok) L11.praise[praiseAt++ % L11.praise.size] else L11.nudge[nudgeAt++ % L11.nudge.size]
+                verdict = when {
+                    ok -> L11.praise[praiseAt++ % L11.praise.size]
+                    p.kind == PageKind.Translate -> "Not all the ${machineName}s landed on their targets."
+                    else -> L11.nudge[nudgeAt++ % L11.nudge.size]
+                }
+                chat.hear(verdict!!)
                 if (ok && s is Screen.Page && solved.add(s.i)) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
             }
         }
@@ -162,7 +176,12 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** Humo says [text] in the bubble (a plain remark: no verdict colours). */
     fun say(text: String) { verdict = text }
 
-    fun tryAgain() { phase = Phase.Idle; verdict = null }
+    /** Try again clears the verdict, Humo's marks and (on a translate page) both numbers, so the machines fly home. */
+    fun tryAgain() {
+        phase = Phase.Idle; verdict = null; marks = emptyList()
+        val p = page
+        if (p?.kind == PageKind.Translate && screen !is Screen.Review) slots = Slots.start(p)
+    }
 
     fun dontKnow() { val s = screen as? Screen.Skill ?: return; skillResults[s.j] = false; skillAnswers[s.j] = slots }
 
@@ -208,9 +227,10 @@ class LessonFlow(val lesson: LessonContent = L11) {
         phase = Phase.Idle
         verdict = null
         gain = false
-        whyOpen = false
+        marks = emptyList()
         dragAt = null
         slots = page?.let { Slots.start(it) } ?: Slots()
+        coach?.let { chat.hear(it) }
         if (s is Screen.Review) {
             // The missed item comes back as the learner left it, in its wrong colours, until Try again.
             val j = reviewQueue[s.k]

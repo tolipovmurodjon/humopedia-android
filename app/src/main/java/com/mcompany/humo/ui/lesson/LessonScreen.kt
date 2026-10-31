@@ -59,6 +59,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathParser
@@ -116,7 +117,7 @@ private object Chrome {
     val GrayEdge = Color(0xFFCFCFCF)
     val Teal = Color(0xFF2CBFA7)
     val TealEdge = Color(0xFF1F9784)
-    val GoodBubble = Color(0xFFC9F0D4)
+    val GoodBubble = Color(0xFFBDF0C9)
     val BadBubble = Color(0xFFFBE8A4)
     val SayBubble = Color(0xFFEEF3F8)
     val SayEdge = Color(0xFFCDDAE6)
@@ -162,6 +163,7 @@ fun LessonPlayer(
         tween(250), label = "page",
     )
     val humo = rememberHumo(humoAlive)
+    flow.machineName = if (theme == LessonTheme.Fly) Words.MACHINE else "point"
     HumoMoods(flow, humo)
     // A tap anywhere asks the Mach 3 pass for another run; the root only counts it (the Initial pass), the buttons still get it.
     val taps = remember { mutableIntStateOf(0) }
@@ -177,7 +179,6 @@ fun LessonPlayer(
             LessonCard(flow, theme == LessonTheme.Fly, motion, humo, onFinish = onFinish)
         }
         if (theme == LessonTheme.Fly && motion && atEnd) MachPass(taps, flow.skillRight == flow.skill.size)
-        WhySheet(flow, theme == LessonTheme.Fly, Modifier.align(Alignment.BottomCenter).padding(bottom = padding.calculateBottomPadding()))
     }
     if (leaving) {
         AlertDialog(
@@ -195,6 +196,7 @@ fun LessonPlayer(
 private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
     val screen = flow.screen
     val perfect = flow.skillRight == flow.skill.size
+    androidx.compose.runtime.SideEffect { humo.shades = perfect && (screen is Screen.Score || screen is Screen.End) }
     LaunchedEffect(flow.phase, screen, flow.inSkill) {
         when {
             screen is Screen.End -> { humo.face = HumoFace.Happy; humo.play(HumoMove.Celebrate) }
@@ -202,7 +204,7 @@ private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
             screen is Screen.Score && perfect -> { humo.face = HumoFace.Laugh; humo.play(HumoMove.Celebrate); if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
             screen is Screen.Score -> { humo.face = HumoFace.Proud; humo.play(HumoMove.Nod); if (humo.alive) { delay(2200); humo.face = HumoFace.Rest } }
             flow.phase == Phase.Correct && !flow.inSkill -> { humo.face = HumoFace.Happy; humo.play(HumoMove.Jump); if (humo.alive) { delay(1800); humo.face = HumoFace.Rest } }
-            flow.phase == Phase.Wrong && !flow.inSkill -> { humo.face = HumoFace.Thinking; if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
+            flow.phase == Phase.Wrong && !flow.inSkill -> { humo.face = HumoFace.Cry; if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
             else -> humo.face = HumoFace.Rest
         }
     }
@@ -304,7 +306,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: Less
     Box(
         Modifier.weight(1f).fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
             .drawBehind {
-                if (glowOn) drawRoundRect(border.copy(alpha = 0.16f), Offset(-4.dp.toPx(), -4.dp.toPx()), androidx.compose.ui.geometry.Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()), CornerRadius(22.dp.toPx()))
+                if (glowOn) drawRoundRect(border.copy(alpha = if (flow.phase == Phase.Correct) 0.12f else 0.16f), Offset(-4.dp.toPx(), -4.dp.toPx()), androidx.compose.ui.geometry.Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()), CornerRadius(22.dp.toPx()))
             }
             .clip(RoundedCornerShape(18.dp)).background(if (bare) Color.Transparent else Color.White).border(1.dp, border, RoundedCornerShape(18.dp)),
     ) {
@@ -332,7 +334,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LessonCard(flow: Less
 }
 
 private data class BtnSpec(val label: String, val kind: Kind, val enabled: Boolean = true, val weight: Float = 1f, val onClick: () -> Unit)
-private enum class Kind { Dark, Gray, Outline, Teal }
+private enum class Kind { Dark, Gray, Outline, Teal, Yellow, Green }
 
 /** Reads a prompt aloud with the phone's own voice (Android TextToSpeech), made on the first tap and released on exit. */
 @Composable
@@ -392,12 +394,12 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
         )
         page.kind == PageKind.Explainer || page.kind == PageKind.Recap -> listOf(BtnSpec("Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.next() })
         flow.phase == Phase.Correct -> listOf(
-            BtnSpec("Why?", Kind.Gray, weight = 0.42f) { LessonSounds.play(Cue.Tick); flow.whyOpen = true },
-            BtnSpec("Continue", Kind.Dark) { LessonSounds.play(Cue.Tick); flow.next() },
+            BtnSpec("Why?", Kind.Gray, weight = 0.42f) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.Why) },
+            BtnSpec("Continue", Kind.Green) { LessonSounds.play(Cue.Tick); flow.next() },
         )
         flow.phase == Phase.Wrong -> listOf(
-            BtnSpec("Get help", Kind.Gray, weight = 0.55f) { LessonSounds.play(Cue.Tick); flow.whyOpen = true },
-            BtnSpec("Try again", if (review) Kind.Teal else Kind.Dark) { LessonSounds.play(Cue.Tick); flow.tryAgain() },
+            BtnSpec("Get help", Kind.Gray, weight = 0.55f) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) },
+            BtnSpec("Try again", if (review) Kind.Teal else Kind.Yellow) { LessonSounds.play(Cue.Tick); flow.tryAgain() },
         )
         else -> listOf(BtnSpec("Check", Kind.Dark, enabled = flow.canCheck) { check() })
     }
@@ -417,10 +419,10 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                         PageKind.Explainer -> FigureBoard(page, fly, boardW)
                         PageKind.Translate, PageKind.Recap -> WorkspaceBoard(page, flow, fly, motion, boardW, deck)
                     }
-                    if (page.graded && !page.skill) StartOver(flow, Modifier.width(boardW))
+                    if (page.graded && !page.skill) StartOver(flow, Modifier.width(boardW).alpha(if (page.kind == PageKind.Translate && flow.answered) 0f else 1f))
                 }
             }
-            FootRow(humo, buttons, motion, key = "${flow.screen}-${flow.phase}-$advancing")
+            FootRow(humo, buttons, motion, key = "${flow.screen}-${flow.phase}-$advancing", onAsk = { flow.chat.open = true })
         }
         // The tools (play.html `.tools`): the "+ 15" chip after a first right answer, report a problem, read aloud.
         Row(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -436,7 +438,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             }
         }
         // What Humo says: it floats over the board's foot, just above the buttons (play.html `.bubble`, left 12, bottom 74).
-        Bubble(flow.verdict, flow.phase, flow.inSkill, Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 74.dp))
+        Bubble((flow.verdict ?: flow.coach).takeUnless { flow.chat.open }, flow.phase, flow.inSkill, Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 74.dp))
+        HumoChat(flow, page, fly, read, onTryAgain = { LessonSounds.play(Cue.Tick); flow.tryAgain() }, onContinue = { if (flow.phase == Phase.Correct) flow.next() }, Modifier.align(Alignment.BottomCenter).padding(8.dp))
     }
 }
 
@@ -450,9 +453,10 @@ private fun reportPage(context: android.content.Context, flow: LessonFlow) {
 
 /** The foot: Humo (58 dp) and the buttons in one row; each new set of buttons rises 6 dp and fades in over 200 ms. */
 @Composable
-private fun FootRow(humo: HumoState, buttons: List<BtnSpec>, motion: Boolean, key: String) {
+private fun FootRow(humo: HumoState, buttons: List<BtnSpec>, motion: Boolean, key: String, onAsk: (() -> Unit)?) {
     Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 10.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Humo(humo, Modifier.size(58.dp))
+        if (onAsk != null) AskButton(onAsk)
         ButtonsRow(buttons, motion, key, Modifier.weight(1f))
     }
 }
@@ -549,6 +553,8 @@ private fun LButton(label: String, kind: Kind, enabled: Boolean, modifier: Modif
         !enabled -> Triple(Chrome.Off, Chrome.Off, Chrome.OffText)
         kind == Kind.Dark -> Triple(Chrome.Dark, Chrome.DarkEdge, Color.White)
         kind == Kind.Teal -> Triple(Chrome.Teal, Chrome.TealEdge, Color.White)
+        kind == Kind.Yellow -> Triple(Color(0xFFF7C51E), Color(0xFFC99A00), Color(0xFF1D1D1D))
+        kind == Kind.Green -> Triple(Color(0xFF2BC556), Color(0xFF1F9E45), Color.White)
         kind == Kind.Gray -> Triple(Chrome.Gray, Chrome.GrayEdge, Color(0xFF222222))
         else -> Triple(Color.White, Chrome.GrayEdge, Color(0xFF222222))
     }
@@ -636,47 +642,4 @@ private fun EndView(flow: LessonFlow, humo: HumoState) {
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(Unit) { LessonSounds.play(Cue.Complete); haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
     CenterScreen(humo, null, "Lesson complete", "${flow.sparks} sparks earned.", listOf(BtnSpec("Restart lesson", Kind.Dark) { flow.restart() }))
-}
-
-/**
- * Why? (spec §7): Brilliant opens its tutor chat with the explanation; here a sheet over the card's foot with the same
- * explanation text and the same two answers. Both close it.
- */
-@Composable
-private fun WhySheet(flow: LessonFlow, fly: Boolean, modifier: Modifier) {
-    val last = flow.page?.explain?.let { if (fly) Words.machine(it) else it } ?: ""
-    AnimatedVisibility(flow.whyOpen, modifier, enter = slideInVertically(tween(280, easing = EaseOutStrong)) { it } + fadeIn(), exit = slideOutVertically(tween(200)) { it } + fadeOut()) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(bottom = 8.dp)
-                .drawBehind { drawRoundRect(Color(0x1F000000), Offset(0f, -3.dp.toPx()), size, CornerRadius(20.dp.toPx())) }
-                .clip(RoundedCornerShape(18.dp)).background(Color.White).border(1.dp, Chrome.Line, RoundedCornerShape(18.dp))
-                .padding(16.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton("Close", { flow.whyOpen = false }, tint = Color(0xFF999999)) { c ->
-                    drawLine(c, Offset(size.width * 0.3f, size.height * 0.3f), Offset(size.width * 0.7f, size.height * 0.7f), 2.dp.toPx(), StrokeCap.Round)
-                    drawLine(c, Offset(size.width * 0.7f, size.height * 0.3f), Offset(size.width * 0.3f, size.height * 0.7f), 2.dp.toPx(), StrokeCap.Round)
-                }
-            }
-            Text(
-                "Why is this the answer?", Modifier.align(Alignment.End).clip(RoundedCornerShape(12.dp)).border(1.dp, Chrome.Line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
-                fontFamily = LessonType.Figtree, fontSize = 15.sp, color = Chrome.Ink,
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "$last\n\nDoes that make sense?", Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFEEF3F8)).padding(horizontal = 14.dp, vertical = 12.dp),
-                fontFamily = LessonType.Figtree, fontSize = 15.sp, lineHeight = 21.75.sp, color = Chrome.Ink,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Yes, that makes sense", "Not really").forEach { chip ->
-                    Text(
-                        chip, Modifier.clip(RoundedCornerShape(18.dp)).border(1.dp, Chrome.GrayEdge, RoundedCornerShape(18.dp))
-                            .clickable(role = Role.Button) { LessonSounds.play(Cue.Tick); flow.whyOpen = false }.padding(horizontal = 14.dp, vertical = 9.dp),
-                        fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Chrome.Ink,
-                    )
-                }
-            }
-        }
-    }
 }

@@ -163,8 +163,7 @@ drag 2 1 3 4; press Check; shot P1-wrong
 has "Hmm, think about that again."
 press "Try again"; drag 3 4 5 2; press Check; shot P1-correct
 has "Good!"
-press "Why\?"; shot P1-why; has "Why is this the answer\?"; press "Yes, that makes sense"
-press Continue
+press "Why\?"; shot P1-why; has "Why is this the answer\?"; press Yes; press "Continue lesson"
 shot P2-start
 log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
 tapnode 1 3; snap P2-armed 0.5

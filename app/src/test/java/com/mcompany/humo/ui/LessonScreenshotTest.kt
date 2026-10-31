@@ -255,16 +255,18 @@ class LessonScreenshotTest {
     @Test fun tileFlightInTheAir() {
         val flow = player(LessonTheme.Fly, motion = true)
         act { flow.goTo(Screen.Page(3)) }
-        act { flow.tapTile(2); flow.tapTile(2) }
-        shot("motion-P4-waiting")
+        act { flow.tapTile(2) }
+        shot("motion-P4-one-number-waiting")
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithText("Check").performClick()
+        compose.runOnUiThread { flow.tapTile(2) }
         compose.mainClock.advanceTimeBy(700)
         shot("motion-P4-takeoff")
         compose.mainClock.advanceTimeBy(900)
         shot("motion-P4-cruise")
         compose.mainClock.advanceTimeBy(4500)
         compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Check").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Continue").assertIsDisplayed()
         shot("motion-P4-landed")

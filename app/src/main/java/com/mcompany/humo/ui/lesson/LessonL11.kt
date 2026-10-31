@@ -49,12 +49,19 @@ interface LessonContent {
     val title: String
     val pages: List<LessonPage>
     val skill: List<LessonPage>
+    /** Humo's one teacher line per page (lesson.js `coach`): it adds something new and never repeats the task. */
+    val coach: Map<String, String> get() = emptyMap()
 }
 
 /** L1.1 Translating Points, page by page: same texts, numbers, order and answers as Brilliant (clean English). */
 object L11 : LessonContent {
     override val code = "1.1"
     override val title = "Translating Points"
+    override val coach = mapOf(
+        "P1" to "Let's get started. Count the steps, then move it.", "P2" to "Same move, different starting point.", "P3" to "Here is the idea behind it.",
+        "P4" to "Now you pick the numbers.", "P5" to "Three of them now. One move for all.", "P6" to "Four this time. Same idea.", "P7" to "Watch them all move together.",
+        "SC1" to "Your turn. One try each.", "SC2" to "Keep going.", "SC3" to "Last one.",
+    )
 
     /** "Graph" (P1, P2): 0..6 both ways, every tick labelled, no axis names; cell 42.67 px. */
     private val Graph = GraphSpec(350f, 370f, 48f, 308f, 42.67f, 6, 6, 1, false)

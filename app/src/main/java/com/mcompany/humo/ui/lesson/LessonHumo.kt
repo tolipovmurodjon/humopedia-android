@@ -37,7 +37,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** What Humo's face shows (humo-live.js FACES: the ones the lesson uses). */
-enum class HumoFace { Rest, Happy, Thinking, Cheer, Laugh, Proud, Talk }
+enum class HumoFace { Rest, Happy, Thinking, Cheer, Laugh, Proud, Talk, Cry }
 
 /** The one-shot moves (humo-live.js MOVES). */
 enum class HumoMove { Jump, Celebrate, Nod }
@@ -55,6 +55,8 @@ class HumoState(val alive: Boolean) {
     var lookSource: (() -> Offset?)? = null
     /** True while the machine flies: Humo's eyes follow [look] every frame instead of settling. */
     var tracking by mutableStateOf(false)
+    /** Black sunglasses: a perfect skill check and the end screen after it. */
+    var shades by mutableStateOf(false)
     val frame = mutableLongStateOf(0L)
     internal var moveSerial by mutableStateOf(0)
     internal var move: HumoMove? = null
@@ -84,6 +86,7 @@ class HumoState(val alive: Boolean) {
             HumoFace.Laugh -> { set(Ch.Happy, 1f); set(Ch.Squash, 0.03f) }
             HumoFace.Cheer -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.25f); set(Ch.Tilt, 3f) }
             HumoFace.Proud -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.22f); set(Ch.Tilt, -4f) }
+            HumoFace.Cry -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.12f); set(Ch.Squash, 0.05f); set(Ch.LookY, 0.45f) }
             HumoFace.Thinking -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.32f); set(Ch.TiltR, 6f); set(Ch.LookX, -0.7f); set(Ch.LookY, -0.9f); set(Ch.Tilt, -5f); set(Ch.Sway, -4f) }
             else -> Unit
         }
@@ -93,6 +96,7 @@ class HumoState(val alive: Boolean) {
     internal fun mouthOf(f: HumoFace) = when (f) {
         HumoFace.Happy, HumoFace.Laugh, HumoFace.Cheer -> "big"
         HumoFace.Thinking -> "smirk"
+        HumoFace.Cry -> "frown"
         HumoFace.Proud -> "smile"
         else -> "smile"
     }
@@ -137,7 +141,7 @@ private fun HumoMotion(h: HumoState) {
             val tg = h.targets(face)
             val lk = h.lookSource?.invoke() ?: h.look
             if (lk != null && h.tracking && face == HumoFace.Rest) { tg[HumoState.Ch.LookX.ordinal] = lk.x; tg[HumoState.Ch.LookY.ordinal] = lk.y }
-            var moving = h.tracking
+            var moving = h.tracking || face == HumoFace.Cry
             if (keys != null && ms <= keys.last().first + 200) {
                 moving = true
                 val cur = keys.lastOrNull { ms >= it.first }
@@ -276,6 +280,38 @@ private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean, layers: HumoLayer
     }
 }
 
+/** Falling tears from the outer corners (humo-live.js `tears`); a still frame when the screen is not animated. */
+private fun DrawScope.tears(h: HumoState) {
+    var j = 0
+    for ((e, k) in listOf(EyeL to -1f, EyeR to 1f)) for (i in 0..1) {
+        val ph = if (h.alive) ((h.frame.longValue / 1150f + j * 0.37f) % 1f) else ((0.45f + j * 0.37f) % 1f)
+        j++
+        val r = 0.26f * e.ry
+        val x0 = e.cx + k * 0.62f * e.rx
+        val y0 = e.cy + 0.8f * e.ry + ph * 1.7f * e.ry
+        val a = if (ph < 0.15f) ph / 0.15f * 0.9f else 0.9f * (1f - (ph - 0.15f) / 0.85f)
+        val p = Path().apply {
+            moveTo(x0, y0 - 1.6f * r); quadraticTo(x0 + r, y0 - 0.2f * r, x0 + r, y0 + 0.2f * r)
+            arcTo(androidx.compose.ui.geometry.Rect(x0 - r, y0 + 0.2f * r - r, x0 + r, y0 + 0.2f * r + r), 0f, 180f, false)
+            quadraticTo(x0 - r, y0 - 0.2f * r, x0, y0 - 1.6f * r); close()
+        }
+        drawPath(p, Color(0xFF7CC8FF), alpha = a)
+    }
+}
+
+/** Black sunglasses over both eyes with a bridge and a pale glint (humo-live.js `glasses`). */
+private fun DrawScope.glasses() {
+    val dark = Color(0xFF141414)
+    for (e in listOf(EyeL, EyeR)) {
+        val w = 1.16f * e.rx
+        val t0 = e.cy - 0.92f * e.ry
+        val hh = 2.02f * e.ry
+        drawPath(Path().apply { moveTo(e.cx - w, t0); lineTo(e.cx + w, t0); lineTo(e.cx + w, t0 + 0.45f * hh); quadraticTo(e.cx + w, t0 + hh, e.cx, t0 + hh); quadraticTo(e.cx - w, t0 + hh, e.cx - w, t0 + 0.45f * hh); close() }, dark)
+        drawPath(Path().apply { moveTo(e.cx - 0.75f * w, t0 + 0.18f * hh); lineTo(e.cx - 0.25f * w, t0 + 0.18f * hh); lineTo(e.cx - 0.6f * w, t0 + 0.62f * hh); close() }, Color.White, alpha = 0.28f)
+    }
+    drawPath(Path().apply { moveTo(EyeL.cx + 1.2f * EyeL.rx, EyeL.cy - 0.62f * EyeL.ry); quadraticTo((EyeL.cx + EyeR.cx) / 2f, EyeL.cy - 0.95f * EyeL.ry, EyeR.cx - 1.2f * EyeR.rx, EyeR.cy - 0.62f * EyeR.ry) }, dark, style = Stroke(0.22f * EyeL.ry, cap = StrokeCap.Round))
+}
+
 private fun DrawScope.mouth(kind: String) {
     val sm = HumoShapes.smile.getBounds()
     val mcx = sm.left + sm.width / 2f
@@ -290,6 +326,7 @@ private fun DrawScope.mouth(kind: String) {
             cubicTo(sm.left + 1.02f * mw, sm.top + 2.1f * mh, sm.left - .02f * mw, sm.top + 2.1f * mh, sm.left - .06f * mw, sm.top + .1f * mh)
             close()
         }, Ink)
+        "frown" -> drawPath(Path().apply { moveTo(mcx - .28f * mw, sm.top + .85f * mh); quadraticTo(mcx, sm.top + .1f * mh, mcx + .28f * mw, sm.top + .85f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
         "smirk" -> drawPath(Path().apply { moveTo(mcx - .34f * mw, sm.top + .55f * mh); quadraticTo(mcx + .1f * mw, sm.top + .75f * mh, mcx + .4f * mw, sm.top + .05f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
         else -> drawPath(HumoShapes.smile, Ink)
     }
@@ -357,6 +394,8 @@ private fun DrawScope.humoPicture(h: HumoState, layers: HumoLayers) {
         eye(EyeL, h, true, layers)
         eye(EyeR, h, false, layers)
         mouth(h.mouth)
+        if (h.face == HumoFace.Cry) tears(h)
+        if (h.shades) glasses()
     }
 }
 

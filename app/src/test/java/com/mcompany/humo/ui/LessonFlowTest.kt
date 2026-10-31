@@ -168,6 +168,29 @@ class LessonFlowTest {
         assertEquals(listOf(L11.nudge[0], L11.nudge[1], L11.nudge[0], "Good!", "Nice!"), said)
     }
 
+    @Test fun `Humo has one teacher line per page and a translate page says how it went wrong`() {
+        val flow = LessonFlow(L11)
+        assertEquals("Let's get started. Count the steps, then move it.", flow.coach)
+        flow.goTo(Screen.Page(3))
+        assertEquals("Now you pick the numbers.", flow.coach)
+        flow.machineName = "SR-71"
+        flow.tapTile(1); flow.tapTile(1); flow.check()
+        assertEquals("Not all the SR-71s landed on their targets.", flow.verdict)
+        assertTrue("the talk keeps the coach line and the verdict", flow.chat.lines.any { it.text.startsWith("Not all") })
+    }
+
+    @Test fun `Try again on a translate page clears both numbers and Humo's marks`() {
+        val flow = LessonFlow(L11)
+        flow.goTo(Screen.Page(3))
+        flow.tapTile(1); flow.tapTile(1); flow.check()
+        flow.marks = listOf(Node(1, 1))
+        flow.tryAgain()
+        assertEquals(Phase.Idle, flow.phase)
+        assertNull(flow.slots.a)
+        assertNull(flow.slots.b)
+        assertTrue(flow.marks.isEmpty())
+    }
+
     @Test fun `the walk - pages, skill check with no verdict, score, review, retry, end`() {
         val flow = LessonFlow()
         repeat(7) { flow.next() }
