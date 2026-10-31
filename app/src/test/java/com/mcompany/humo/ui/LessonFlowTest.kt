@@ -276,7 +276,7 @@ class LessonFlowTest {
     @Test fun `line pools - 8 words at most, and a pool is spent before a line repeats`() {
         val flow = LessonFlow()
         val pool = listOf("a", "b")
-        assertEquals(listOf("a", "b", "b", "b"), List(4) { flow.fresh(pool) })
+        assertEquals("a pool is spent in order, then starts over", listOf("a", "b", "a", "b"), List(4) { flow.fresh(pool) })
         for (ex in -3..3) for (ey in -3..3) if (ex != 0 || ey != 0) {
             val p = com.mcompany.humo.ui.lesson.LessonLines.linePools(ex, ey, "SR-71")
             for (t in p.xOnly + p.yOnly + p.both + p.swap + p.generic) assertTrue("$t is over 8 words", t.split(' ').size <= 8)

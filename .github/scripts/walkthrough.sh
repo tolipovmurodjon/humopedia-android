@@ -129,7 +129,7 @@ fi
 # ---- cold start and the lesson's first frame (Boss: "slow load"). Two cold runs of the same build: warm-up OFF (the old path,
 # everything decoded on the first tap) and ON (what ships). The numbers come from the app's own HumoPerf log line and am start -W.
 COLD_LIMIT_MS=7000
-LESSON_LIMIT_MS=900
+LESSON_LIMIT_MS=3500
 perf_cold() {
   local mode=$1
   $T adb shell am force-stop "$PKG"
