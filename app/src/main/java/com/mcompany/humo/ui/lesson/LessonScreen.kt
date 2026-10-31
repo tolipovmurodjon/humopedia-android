@@ -196,7 +196,6 @@ fun LessonPlayer(
 private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
     val screen = flow.screen
     val perfect = flow.skillRight == flow.skill.size
-    androidx.compose.runtime.SideEffect { humo.shades = perfect && (screen is Screen.Score || screen is Screen.End) }
     LaunchedEffect(flow.phase, screen, flow.inSkill) {
         when {
             screen is Screen.End -> { humo.face = HumoFace.Happy; humo.play(HumoMove.Celebrate) }
@@ -204,9 +203,18 @@ private fun HumoMoods(flow: LessonFlow, humo: HumoState) {
             screen is Screen.Score && perfect -> { humo.face = HumoFace.Laugh; humo.play(HumoMove.Celebrate); if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
             screen is Screen.Score -> { humo.face = HumoFace.Proud; humo.play(HumoMove.Nod); if (humo.alive) { delay(2200); humo.face = HumoFace.Rest } }
             flow.phase == Phase.Correct && !flow.inSkill -> { humo.face = HumoFace.Happy; humo.play(HumoMove.Jump); if (humo.alive) { delay(1800); humo.face = HumoFace.Rest } }
-            flow.phase == Phase.Wrong && !flow.inSkill -> { humo.face = HumoFace.Cry; if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
+            flow.phase == Phase.Wrong && !flow.inSkill -> { humo.face = HumoFace.Thinking; if (humo.alive) { delay(2600); humo.face = HumoFace.Rest } }
             else -> humo.face = HumoFace.Rest
         }
+    }
+    // Humo says every line he shows: his mouth moves for about 45 ms a letter (0.7-2.6 s), then he is glad after a right answer, else at rest.
+    val last = flow.chat.lines.lastOrNull()
+    LaunchedEffect(last) {
+        if (last == null || last.mine || last.typing || !humo.alive) return@LaunchedEffect
+        humo.talking = true
+        delay((last.text.length * 45L).coerceIn(700L, 2600L))
+        humo.talking = false
+        humo.face = if (flow.phase == Phase.Correct && !flow.inSkill) HumoFace.Happy else HumoFace.Rest
     }
     LaunchedEffect(flow.lookOn) {
         humo.lookSource = { flow.humoLook }

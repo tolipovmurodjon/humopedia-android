@@ -93,8 +93,8 @@ class LessonRound3Test {
         shot("chat-wrong")
     }
 
-    /** A perfect score: Humo in sunglasses. */
-    @Test fun perfectScoreWearsSunglasses() {
+    /** A perfect score: Humo laughs. */
+    @Test fun perfectScore() {
         val flow = player()
         act { flow.beginSkillSplash(); flow.startSkill() }
         for (j in 0 until 3) act { val p = flow.page!!; flow.tapTile(p.move.x); flow.tapTile(p.move.y); flow.check(); flow.nextSkill() }

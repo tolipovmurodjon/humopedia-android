@@ -37,7 +37,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** What Humo's face shows (humo-live.js FACES: the ones the lesson uses). */
-enum class HumoFace { Rest, Happy, Thinking, Cheer, Laugh, Proud, Talk, Cry }
+enum class HumoFace { Rest, Happy, Thinking, Cheer, Laugh, Proud, Talk }
 
 /** The one-shot moves (humo-live.js MOVES). */
 enum class HumoMove { Jump, Celebrate, Nod }
@@ -55,8 +55,8 @@ class HumoState(val alive: Boolean) {
     var lookSource: (() -> Offset?)? = null
     /** True while the machine flies: Humo's eyes follow [look] every frame instead of settling. */
     var tracking by mutableStateOf(false)
-    /** Black sunglasses: a perfect skill check and the end screen after it. */
-    var shades by mutableStateOf(false)
+    /** Humo is saying a line: his mouth moves for about as long as the line takes (player.js `speak`). */
+    var talking by mutableStateOf(false)
     val frame = mutableLongStateOf(0L)
     internal var moveSerial by mutableStateOf(0)
     internal var move: HumoMove? = null
@@ -86,7 +86,6 @@ class HumoState(val alive: Boolean) {
             HumoFace.Laugh -> { set(Ch.Happy, 1f); set(Ch.Squash, 0.03f) }
             HumoFace.Cheer -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.25f); set(Ch.Tilt, 3f) }
             HumoFace.Proud -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.22f); set(Ch.Tilt, -4f) }
-            HumoFace.Cry -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.12f); set(Ch.Squash, 0.05f); set(Ch.LookY, 0.45f) }
             HumoFace.Thinking -> { set(Ch.Brow, 1f); set(Ch.BrowL, -0.32f); set(Ch.TiltR, 6f); set(Ch.LookX, -0.7f); set(Ch.LookY, -0.9f); set(Ch.Tilt, -5f); set(Ch.Sway, -4f) }
             else -> Unit
         }
@@ -96,7 +95,6 @@ class HumoState(val alive: Boolean) {
     internal fun mouthOf(f: HumoFace) = when (f) {
         HumoFace.Happy, HumoFace.Laugh, HumoFace.Cheer -> "big"
         HumoFace.Thinking -> "smirk"
-        HumoFace.Cry -> "frown"
         HumoFace.Proud -> "smile"
         else -> "smile"
     }
@@ -123,10 +121,10 @@ private val Air = mapOf(HumoMove.Jump to Triple(120, 330, 80f), HumoMove.Celebra
 @Composable
 private fun HumoMotion(h: HumoState) {
     if (!h.alive) { LaunchedEffect(h.face) { h.settleStill() }; return }
-    LaunchedEffect(h.face, h.moveSerial, h.tracking) {
+    LaunchedEffect(h.face, h.moveSerial, h.tracking, h.talking) {
         val t0 = withFrameNanos { it }
         var last = t0
-        val face = h.face
+        val face = if (h.talking) HumoFace.Talk else h.face
         val move = if (h.moveSerial != h.playedSerial) h.move else null
         h.playedSerial = h.moveSerial
         val keys = move?.let { Moves[it] }
@@ -141,7 +139,7 @@ private fun HumoMotion(h: HumoState) {
             val tg = h.targets(face)
             val lk = h.lookSource?.invoke() ?: h.look
             if (lk != null && h.tracking && face == HumoFace.Rest) { tg[HumoState.Ch.LookX.ordinal] = lk.x; tg[HumoState.Ch.LookY.ordinal] = lk.y }
-            var moving = h.tracking || face == HumoFace.Cry
+            var moving = h.tracking || face == HumoFace.Talk
             if (keys != null && ms <= keys.last().first + 200) {
                 moving = true
                 val cur = keys.lastOrNull { ms >= it.first }
@@ -160,7 +158,8 @@ private fun HumoMotion(h: HumoState) {
                 val s = (ms - air.first) / air.second
                 h.x[HumoState.Ch.Hop.ordinal] = if (s in 0f..1f) 4f * air.third * s * (1f - s) else 0f
             }
-            h.mouth = if (move == HumoMove.Jump || move == HumoMove.Celebrate) (if (ms < 700) "big" else h.mouthOf(face)) else h.mouthOf(face)
+            if (face == HumoFace.Talk) { val f = (ms / 110f).toInt(); h.mouth = listOf("open", "o", "smile", "big", "small", "open", "o")[(f * 7919 + (f shr 2) * 104729).mod(7)] }
+            else h.mouth = if (move == HumoMove.Jump || move == HumoMove.Celebrate) (if (ms < 700) "big" else h.mouthOf(face)) else h.mouthOf(face)
             h.frame.longValue = now / 1_000_000
             settled = if (moving) 0 else settled + 1
         }
@@ -260,7 +259,7 @@ private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean, layers: HumoLayer
         drawPath(p, Ink.copy(alpha = happy), style = Stroke(0.2f * e.ry, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
     val open = (1f - blink) * (1f - happy)
-    if (open > 0.15f) {
+    if (open >= 0.3f) {
         val yc = e.cy + 0.35f * e.ry
         val clip = Path().apply { addOval(androidx.compose.ui.geometry.Rect(e.cx - e.rx, e.cy - e.ry, e.cx + e.rx, e.cy + e.ry)) }
         withTransform({ translate(e.cx, yc); scale(1f, max(0.05f, open), Offset.Zero); translate(-e.cx, -yc) }) {
@@ -274,42 +273,10 @@ private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean, layers: HumoLayer
             }
         }
     }
-    if (open <= 0.15f && happy < 0.5f) {
-        val p = Path().apply { moveTo(e.cx - r * 0.8f, e.cy + 0.3f * e.ry); quadraticTo(e.cx, e.cy + 0.5f * e.ry, e.cx + r * 0.8f, e.cy + 0.3f * e.ry) }
-        drawPath(p, Ink, style = Stroke(0.16f * e.ry, cap = StrokeCap.Round))
+    if (open < 0.3f && happy < 0.5f) {
+        val p = Path().apply { moveTo(e.cx - r, e.cy + 0.3f * e.ry); quadraticTo(e.cx, e.cy + 0.62f * e.ry, e.cx + r, e.cy + 0.3f * e.ry) }
+        drawPath(p, Ink, style = Stroke(0.2f * e.ry, cap = StrokeCap.Round))
     }
-}
-
-/** Falling tears from the outer corners (humo-live.js `tears`); a still frame when the screen is not animated. */
-private fun DrawScope.tears(h: HumoState) {
-    var j = 0
-    for ((e, k) in listOf(EyeL to -1f, EyeR to 1f)) for (i in 0..1) {
-        val ph = if (h.alive) ((h.frame.longValue / 1150f + j * 0.37f) % 1f) else ((0.45f + j * 0.37f) % 1f)
-        j++
-        val r = 0.26f * e.ry
-        val x0 = e.cx + k * 0.62f * e.rx
-        val y0 = e.cy + 0.8f * e.ry + ph * 1.7f * e.ry
-        val a = if (ph < 0.15f) ph / 0.15f * 0.9f else 0.9f * (1f - (ph - 0.15f) / 0.85f)
-        val p = Path().apply {
-            moveTo(x0, y0 - 1.6f * r); quadraticTo(x0 + r, y0 - 0.2f * r, x0 + r, y0 + 0.2f * r)
-            arcTo(androidx.compose.ui.geometry.Rect(x0 - r, y0 + 0.2f * r - r, x0 + r, y0 + 0.2f * r + r), 0f, 180f, false)
-            quadraticTo(x0 - r, y0 - 0.2f * r, x0, y0 - 1.6f * r); close()
-        }
-        drawPath(p, Color(0xFF7CC8FF), alpha = a)
-    }
-}
-
-/** Black sunglasses over both eyes with a bridge and a pale glint (humo-live.js `glasses`). */
-private fun DrawScope.glasses() {
-    val dark = Color(0xFF141414)
-    for (e in listOf(EyeL, EyeR)) {
-        val w = 1.16f * e.rx
-        val t0 = e.cy - 0.92f * e.ry
-        val hh = 2.02f * e.ry
-        drawPath(Path().apply { moveTo(e.cx - w, t0); lineTo(e.cx + w, t0); lineTo(e.cx + w, t0 + 0.45f * hh); quadraticTo(e.cx + w, t0 + hh, e.cx, t0 + hh); quadraticTo(e.cx - w, t0 + hh, e.cx - w, t0 + 0.45f * hh); close() }, dark)
-        drawPath(Path().apply { moveTo(e.cx - 0.75f * w, t0 + 0.18f * hh); lineTo(e.cx - 0.25f * w, t0 + 0.18f * hh); lineTo(e.cx - 0.6f * w, t0 + 0.62f * hh); close() }, Color.White, alpha = 0.28f)
-    }
-    drawPath(Path().apply { moveTo(EyeL.cx + 1.2f * EyeL.rx, EyeL.cy - 0.62f * EyeL.ry); quadraticTo((EyeL.cx + EyeR.cx) / 2f, EyeL.cy - 0.95f * EyeL.ry, EyeR.cx - 1.2f * EyeR.rx, EyeR.cy - 0.62f * EyeR.ry) }, dark, style = Stroke(0.22f * EyeL.ry, cap = StrokeCap.Round))
 }
 
 private fun DrawScope.mouth(kind: String) {
@@ -326,7 +293,8 @@ private fun DrawScope.mouth(kind: String) {
             cubicTo(sm.left + 1.02f * mw, sm.top + 2.1f * mh, sm.left - .02f * mw, sm.top + 2.1f * mh, sm.left - .06f * mw, sm.top + .1f * mh)
             close()
         }, Ink)
-        "frown" -> drawPath(Path().apply { moveTo(mcx - .28f * mw, sm.top + .85f * mh); quadraticTo(mcx, sm.top + .1f * mh, mcx + .28f * mw, sm.top + .85f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
+        "o" -> drawOval(Ink, Offset(509.4f - 23.2f, 685.5f - 30.1f), Size(46.4f, 60.2f))
+        "small" -> drawPath(Path().apply { moveTo(mcx - .26f * mw, sm.top + .3f * mh); quadraticTo(mcx, sm.top + .9f * mh, mcx + .26f * mw, sm.top + .3f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
         "smirk" -> drawPath(Path().apply { moveTo(mcx - .34f * mw, sm.top + .55f * mh); quadraticTo(mcx + .1f * mw, sm.top + .75f * mh, mcx + .4f * mw, sm.top + .05f * mh) }, Ink, style = Stroke(0.42f * mh, cap = StrokeCap.Round))
         else -> drawPath(HumoShapes.smile, Ink)
     }
@@ -375,7 +343,8 @@ private fun androidx.compose.ui.draw.CacheDrawScope.bakeLayers(): HumoLayers {
 
 /** The body, sprout and face in one picture; the view box is the rig's with 14 % headroom for jumps (humo-live.js). */
 private fun DrawScope.humoPicture(h: HumoState, layers: HumoLayers) {
-    val sq = h.x[HumoState.Ch.Squash.ordinal]
+    // Squash kept to 35 %: a soft body, never a flattened one (Boss).
+    val sq = 0.35f * h.x[HumoState.Ch.Squash.ordinal]
     val sy = 1f - sq
     val sx = 1f + sq * 0.5f
     val hop = h.x[HumoState.Ch.Hop.ordinal]
@@ -394,8 +363,6 @@ private fun DrawScope.humoPicture(h: HumoState, layers: HumoLayers) {
         eye(EyeL, h, true, layers)
         eye(EyeR, h, false, layers)
         mouth(h.mouth)
-        if (h.face == HumoFace.Cry) tears(h)
-        if (h.shades) glasses()
     }
 }
 

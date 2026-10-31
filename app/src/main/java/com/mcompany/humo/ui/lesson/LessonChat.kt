@@ -78,7 +78,7 @@ class HumoChatState {
     internal enum class Request { Why, WhyWrong }
 
     /** Opens the sheet with the learner's question already asked. */
-    fun openWith(r: Request) { chips = Chips.More; open = true; request = r }
+    internal fun openWith(r: Request) { chips = Chips.More; open = true; request = r }
 }
 
 /** The chat button beside Humo (play.html `.ask`, 44 dp on a phone): a round pill with a speech-bubble glyph. */
