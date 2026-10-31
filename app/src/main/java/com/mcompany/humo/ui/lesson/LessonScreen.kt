@@ -357,7 +357,7 @@ private fun FitColumn(fit: Boolean, avail: Int, content: @Composable () -> Unit)
         val h = if (fit) avail else maxOf(p.height, avail)
         layout(c.maxWidth, h) {
             // a little above the middle: the title and the board read as one block, the gap goes under the board
-            p.placeWithLayer((c.maxWidth - p.width) / 2, ((h - p.height * k) * 0.3f).toInt()) {
+            p.placeWithLayer((c.maxWidth - p.width) / 2, ((h - p.height * k) * 0.42f).toInt()) {
                 scaleX = k; scaleY = k; transformOrigin = TransformOrigin(0.5f, 0f)
             }
         }
@@ -459,12 +459,15 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else promptText
     val askHumo: (() -> Unit)? = if (flow.inSkill || demo) null else { { LessonSounds.play(Cue.Tick); flow.chat.openClean() } }
     // the room under the page for the glass bar, so the verdict panel (drawn over it) never moves the board
-    val dockRoom = 84.dp + bottomInset
+    val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    val compact = screenH < 700
+    val keyHeight = when { screenH < 640 -> 34.dp; screenH < 760 -> 40.dp; else -> 46.dp }
+    val dockRoom = (if (compact) 78.dp else 84.dp) + bottomInset
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             // Humo moves into his sheet while it is open: the board gets the room his header held
-            if (!tutorOpen) HumoHeader(headerText, humo, askHumo)
+            if (!tutorOpen) HumoHeader(headerText, humo, askHumo, compact = compact)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val boardW = (maxWidth - 24.dp).coerceAtMost(460.dp)
@@ -490,7 +493,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                 if (tutorOpen && flow.marks.isEmpty()) Box(Modifier.matchParentSize().background(Chrome.Scrim).pointerInput(Unit) { detectTapGestures { } })
             }
             if (keypad) {
-                Keypad(flow, negatives, Modifier.padding(bottom = 8.dp)) { LessonSounds.play(Cue.Tick); check() }
+                Keypad(flow, negatives, keyHeight, Modifier.padding(bottom = if (compact) 4.dp else 8.dp)) { LessonSounds.play(Cue.Tick); check() }
             }
             if (tutorOpen) {
                 TutorSheet(
@@ -620,7 +623,7 @@ private fun Medal(modifier: Modifier) {
 @Composable
 private fun SkillSplash(flow: LessonFlow, humo: HumoState) {
     LaunchedEffect(Unit) { LessonSounds.play(Cue.Start) }
-    CenterScreen(humo, null, L11.fx("gate").first(), null, emptyList(), foot = BtnSpec("Continue", Kind.Primary) { flow.startSkill() })
+    CenterScreen(humo, null, L11.fx("gate").first(), null, emptyList(), foot = BtnSpec("Continue", Kind.Primary) { flow.startSkill() }, medal = false)
 }
 
 /** Almost! Let's fix one. A miss is never a fail screen: Humo starts the fix-it round. */

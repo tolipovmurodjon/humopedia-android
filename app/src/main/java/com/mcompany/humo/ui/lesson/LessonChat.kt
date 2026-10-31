@@ -196,9 +196,10 @@ internal fun TutorSheet(
     ) {
         Box(Modifier.size(width = 44.dp, height = 5.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFD9D9D9)))
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 20.dp, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Humo(humo, Modifier.size(92.dp))
+            val squeeze = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 700
+            Humo(humo, Modifier.size(if (squeeze) 68.dp else 92.dp))
             Spacer(Modifier.width(14.dp))
-            Speech(chat.current.take(shown.coerceAtMost(chat.current.length)), Modifier.weight(1f))
+            Speech(chat.current.take(shown.coerceAtMost(chat.current.length)), Modifier.weight(1f), compact = squeeze)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             when (chat.chips) {
@@ -230,10 +231,10 @@ internal fun TutorSheet(
 
 /** Humo's line in an outlined bubble with a tail pointing at him (the tail covers the border where it joins). */
 @Composable
-internal fun Speech(text: String, modifier: Modifier) {
+internal fun Speech(text: String, modifier: Modifier, compact: Boolean = false) {
     val line = Color(0xFFE5E5E5)
     Box(
-        modifier.heightIn(min = 104.dp)
+        modifier.heightIn(min = if (compact) 68.dp else 104.dp)
             .clip(RoundedCornerShape(20.dp)).background(Color.White).border(2.dp, line, RoundedCornerShape(20.dp))
             .drawWithContent {
                 drawContent()

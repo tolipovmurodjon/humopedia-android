@@ -80,8 +80,8 @@ import kotlinx.coroutines.delay
  */
 internal enum class Tint(val wash: Color, val glow: Color, val flat: Color) {
     Clear(Color.White.copy(alpha = 0.50f), Glass.Mint2.copy(alpha = 0.26f), Color(0xFFF7FBF9)),
-    Mint(Color(0xFFBDF0D6).copy(alpha = 0.62f), Glass.Mint2.copy(alpha = 0.42f), Chrome.PanelGood),
-    Amber(Color(0xFFFFE08A).copy(alpha = 0.62f), Color(0xFFF7C51E).copy(alpha = 0.36f), Chrome.PanelBad),
+    Mint(Color(0xFFC4F3DA).copy(alpha = 0.82f), Glass.Mint2.copy(alpha = 0.34f), Chrome.PanelGood),
+    Amber(Color(0xFFFFE9A3).copy(alpha = 0.90f), Color(0xFFF7C51E).copy(alpha = 0.30f), Chrome.PanelBad),
 }
 
 /** Glass in the shape of a rounded rectangle; without a page behind it (or before the glass is turned on) a flat tinted pane. */
@@ -187,7 +187,7 @@ private const val WORD_MS = 330L
  * are in the maths serif.
  */
 @Composable
-internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier) {
+internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
     val words = remember(text) { text.replace("*", "").trim().split(Regex("\\s+")).size }
     var shown by remember(text) { mutableIntStateOf(if (humo.alive) 0 else words) }
     LaunchedEffect(text) {
@@ -198,14 +198,14 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
     }
     Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         val tap = if (onTap != null) Modifier.clickable(role = Role.Button, onClickLabel = "Ask Humo", onClick = onTap) else Modifier
-        Humo(humo, tap.size(62.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
+        Humo(humo, tap.size(if (compact) 50.dp else 62.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
         Spacer(Modifier.width(10.dp))
         val shape = RoundedCornerShape(20.dp)
         Box(Modifier.weight(1f).clip(shape).background(Chrome.Line).testTag("humo-bubble")) {
-            Box(Modifier.padding(bottom = 3.dp).clip(shape).background(Color.White).border(1.5.dp, Chrome.Line, shape).padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Box(Modifier.fillMaxWidth().padding(bottom = 3.dp).clip(shape).background(Color.White).border(1.5.dp, Chrome.Line, shape).padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp)) {
                 Text(
                     task(text, shown),
-                    style = TextStyle(fontFamily = LessonType.Figtree, fontSize = 18.sp, lineHeight = 25.sp, fontWeight = FontWeight.Normal, color = Chrome.Ink),
+                    style = TextStyle(fontFamily = LessonType.Figtree, fontSize = if (compact) 16.sp else 18.sp, lineHeight = if (compact) 22.sp else 25.sp, fontWeight = FontWeight.Normal, color = Chrome.Ink),
                     modifier = Modifier.semantics { heading(); contentDescription = text.replace("*", "") },
                 )
             }
@@ -241,7 +241,7 @@ private fun task(text: String, shown: Int): AnnotatedString {
  * typed) so nothing under it jumps.
  */
 @Composable
-internal fun Keypad(flow: LessonFlow, negatives: Boolean, modifier: Modifier = Modifier, onCheck: () -> Unit) {
+internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifier: Modifier = Modifier, onCheck: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     var minus by remember(flow.screen) { androidx.compose.runtime.mutableStateOf(false) }
     val live = flow.slots.trayShown && !flow.locked
@@ -251,45 +251,51 @@ internal fun Keypad(flow: LessonFlow, negatives: Boolean, modifier: Modifier = M
         LessonSounds.play(Cue.Tick)
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
     }
-    Column(modifier.padding(horizontal = 16.dp).alpha(if (live) 1f else 0.0f).testTag("keypad"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.padding(horizontal = 16.dp).alpha(if (live) 1f else 0.32f).testTag("keypad"), verticalArrangement = Arrangement.spacedBy(if (keyHeight < 40.dp) 6.dp else 8.dp)) {
         for (row in listOf(listOf(1, 2, 3), listOf(4, 5, 6), listOf(7, 8, 9))) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (d in row) PadKey(Modifier.weight(1f), live, "tile-$d", "$d") { digit(d) }
+                for (d in row) PadKey(Modifier.weight(1f), keyHeight, live, "tile-$d", "$d") { digit(d) }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (negatives) PadKey(Modifier.weight(1f), live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Tick) }
-            else PadKey(Modifier.weight(1f), live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
-            PadKey(Modifier.weight(1f), live, "tile-0", "0") { digit(0) }
-            if (negatives) PadKey(Modifier.weight(1f), live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
-            else PadKey(Modifier.weight(1f), live && flow.canCheck, "tick", "tick") { onCheck() }
+            if (negatives) PadKey(Modifier.weight(1f), keyHeight, live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Tick) }
+            else PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
+            PadKey(Modifier.weight(1f), keyHeight, live, "tile-0", "0") { digit(0) }
+            if (negatives) PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
+            else PadKey(Modifier.weight(1f), keyHeight, live && flow.canCheck, "tick", "tick") { onCheck() }
         }
     }
 }
 
 /** One key: a white face on a thick edge that the face presses into. "undo" and "tick" draw their icons. */
 @Composable
-private fun PadKey(modifier: Modifier, enabled: Boolean, tag: String, label: String, on: Boolean = false, onClick: () -> Unit) {
+private fun PadKey(modifier: Modifier, keyHeight: Dp, enabled: Boolean, tag: String, label: String, on: Boolean = false, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(14.dp)
     val edge = Color(0xFFD5DDD9)
     Box(
-        modifier.height(46.dp).testTag(tag).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
+        modifier.height(keyHeight).testTag(tag).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = when (label) { "undo" -> "Undo"; "tick" -> "Done"; else -> "Key $label" } },
         propagateMinConstraints = true,
     ) {
         Box(Modifier.matchParentSize().padding(top = 3.dp).clip(shape).background(edge))
         Box(
-            Modifier.height(43.dp).offset(y = if (pressed) 3.dp else 0.dp).clip(shape).background(if (on) Chrome.PanelGood else Color.White).border(1.5.dp, if (on) Chrome.Mint else Chrome.Line, shape),
+            Modifier.height(keyHeight - 3.dp).offset(y = if (pressed) 3.dp else 0.dp).clip(shape).background(if (on) Chrome.PanelGood else Color.White).border(1.5.dp, if (on) Chrome.Mint else Chrome.Line, shape),
             contentAlignment = Alignment.Center,
         ) {
             when (label) {
                 "undo" -> Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
-                    drawArc(Chrome.Ink, 40f, 290f, false, Offset(4f * k, 4f * k), Size(16f * k, 16f * k), style = Stroke(2.4f * k, cap = StrokeCap.Round))
-                    drawPath(Path().apply { moveTo(3f * k, 2.5f * k); lineTo(3f * k, 9f * k); lineTo(9.5f * k, 9f * k) }, Chrome.Ink, style = Stroke(2.4f * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    val st = Stroke(2.4f * k, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    drawPath(Path().apply { moveTo(9f * k, 14f * k); lineTo(4f * k, 9f * k); lineTo(9f * k, 4f * k) }, Chrome.Ink, style = st)
+                    drawPath(Path().apply {
+                        moveTo(4f * k, 9f * k); lineTo(14.5f * k, 9f * k)
+                        arcTo(androidx.compose.ui.geometry.Rect(9f * k, 9f * k, 20f * k, 20f * k), -90f, 180f, false)
+                        lineTo(11f * k, 20f * k)
+                    }, Chrome.Ink, style = st)
                 }
+                "−" -> Canvas(Modifier.size(22.dp)) { drawLine(Chrome.Ink, Offset(4.dp.toPx(), size.height / 2f), Offset(size.width - 4.dp.toPx(), size.height / 2f), 3.dp.toPx(), StrokeCap.Round) }
                 "tick" -> Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
                     drawPath(Path().apply { moveTo(4f * k, 12.5f * k); lineTo(9.5f * k, 18f * k); lineTo(20f * k, 6f * k) }, Chrome.MintInk, style = Stroke(3f * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
