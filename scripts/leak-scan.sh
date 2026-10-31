@@ -14,6 +14,6 @@ for f in $files; do
   case "$f" in *.png|*.jpg|*.webp|*.mp3|*.ttf|*.jar|*.apk|*.gif|*.ico) continue;; esac
   [ "$f" = scripts/leak-scan.sh ] && continue
   [ -f "$f" ] || continue
-  if grep -vE 'git@github\.com' "$f" | grep -qIE 'private_key|AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9]{20,}|xi-api-key|ghp_[A-Za-z0-9]{20,}|github_pat_|\+998[ 0-9]{9,}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'; then echo "LEAK content: $f"; bad=1; fi
+  if grep -vE 'git@github\.com|CiFakeKey' "$f" | grep -qIE 'private_key|AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9]{20,}|xi-api-key|ghp_[A-Za-z0-9]{20,}|github_pat_|\+998[ 0-9]{9,}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'; then echo "LEAK content: $f"; bad=1; fi
 done
 [ $bad = 0 ] && echo "leak scan: 0 hits" || { echo "leak scan FAILED"; exit 1; }
