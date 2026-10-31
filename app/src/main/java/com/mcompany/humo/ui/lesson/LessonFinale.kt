@@ -147,7 +147,7 @@ private fun DrawScope.drawSmoke(run: PassRun, s: Float) {
     for (i in run.puffs.indices) {
         val u = ((run.now - run.puffs[i]) / 1400f).coerceIn(0f, 1f)
         val e = 1f - (1f - u) * (1f - u)
-        drawCircle(Color(0xFF787C84), s * 0.045f * (0.7f + 2.3f * e), run.px[i], alpha = 0.32f * 0.6f * (1f - e))
+        drawCircle(Color(0xFF8A8F98), s * 0.045f * (0.7f + 2.3f * e), run.px[i], alpha = 0.55f * (1f - u * u))
     }
 }
 
