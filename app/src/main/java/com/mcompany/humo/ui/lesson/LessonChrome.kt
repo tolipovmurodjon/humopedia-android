@@ -263,33 +263,41 @@ private fun task(text: String, shown: Int): AnnotatedString {
     }
 }
 
+/** The two slots' colours (Boss's K1 pick): a blue, b mint. Digits are the darker ink (4.5:1 on the fill); marks and rings use the brighter one. */
+internal object SlotColors {
+    val BlueMark = Color(0xFF2F6FE4); val BlueFill = Color(0xFFEAF1FD); val BlueInk = Color(0xFF2A62CC); val BlueLip = Color(0xFFC3D6F7)
+    val MintMark = Color(0xFF1C9A74); val MintFill = Color(0xFFE6F5EF); val MintInk = Color(0xFF12755A); val MintLip = Color(0xFFBFE3D5)
+    fun mark(i: Int) = if (i == 0) BlueMark else MintMark
+    fun fill(i: Int) = if (i == 0) BlueFill else MintFill
+    fun ink(i: Int) = if (i == 0) BlueInk else MintInk
+    fun lip(i: Int) = if (i == 0) BlueLip else MintLip
+}
+
 /**
- * The big keypad (Boss: "good"): 1-9, undo, 0, tick in chunky white keys with a thick edge, low on the page right above the
- * Check bar for the thumb. A digit fills the active slot of "translate by ( , )". The tick checks. A lesson with negative
- * numbers swaps the tick for a minus key that signs the next digit. The keypad keeps its room (it fades when nothing can be
- * typed) so nothing under it jumps.
+ * The two-row pad (Boss's K1): 1 2 3 4 5 and back, 6 7 8 9 0 and minus, low above the button row, tinted to the slot it is filling
+ * (blue for a, mint for b). A digit fills the active slot and the cursor moves on to b; there is no tick key, Check commits.
  */
 @Composable
-internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifier: Modifier = Modifier, onCheck: () -> Unit) {
+internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     var minus by remember(flow.screen) { androidx.compose.runtime.mutableStateOf(false) }
-    val live = flow.slots.trayShown && !flow.locked
+    val live = !flow.locked
+    val slot = flow.slots.active ?: 1
     fun digit(d: Int) {
+        if (flow.slots.active == null) flow.tapSlot(1)
         flow.tapTile(if (minus) -d else d)
         minus = false
         LessonSounds.play(Cue.Toggle)
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
     }
-    Column(modifier.padding(horizontal = 16.dp).alpha(if (live) 1f else 0.32f).testTag("keypad"), verticalArrangement = Arrangement.spacedBy(if (keyHeight < 40.dp) 6.dp else 8.dp)) {
-        // 12 keys: 3 across on a normal phone (4 rows), 4 across on a short one (3 rows) so the board keeps its room
-        val keys = (1..9).map { "$it" } + if (negatives) listOf("−", "0", "undo") else listOf("undo", "0", "tick")
-        for (row in keys.chunked(if (keyHeight < 36.dp) 4 else 3)) {
+    val h = maxOf(keyHeight, 42.dp)
+    Column(modifier.padding(horizontal = 16.dp).testTag("keypad"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (row in listOf(listOf("1", "2", "3", "4", "5", "undo"), listOf("6", "7", "8", "9", "0", "−"))) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (k in row) when (k) {
-                    "undo" -> PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Toggle) }
-                    "tick" -> PadKey(Modifier.weight(1f), keyHeight, live && flow.canCheck, "tick", "tick") { onCheck() }
-                    "−" -> PadKey(Modifier.weight(1f), keyHeight, live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Toggle) }
-                    else -> PadKey(Modifier.weight(1f), keyHeight, live, "tile-$k", k) { digit(k.toInt()) }
+                    "undo" -> PadKey(Modifier.weight(1f), h, live, "undo", "undo", slot = slot) { flow.undo(); LessonSounds.play(Cue.Toggle) }
+                    "−" -> PadKey(Modifier.weight(1f), h, live && negatives, "minus", "−", on = minus, slot = slot) { minus = !minus; LessonSounds.play(Cue.Toggle) }
+                    else -> PadKey(Modifier.weight(1f), h, live, "tile-$k", k, slot = slot) { digit(k.toInt()) }
                 }
             }
         }
@@ -298,21 +306,23 @@ internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifie
 
 /** One key as ONE shape: a white face over a solid lip, drawn by this node; the face presses into the lip. "undo" and the minus draw their icons. */
 @Composable
-private fun PadKey(modifier: Modifier, keyHeight: Dp, enabled: Boolean, tag: String, label: String, on: Boolean = false, onClick: () -> Unit) {
+private fun PadKey(modifier: Modifier, keyHeight: Dp, enabled: Boolean, tag: String, label: String, on: Boolean = false, slot: Int = 0, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val edge = Color(0xFFD5DDD9)
+    val edge = SlotColors.lip(slot)
+    val ink = SlotColors.ink(slot)
+    val face by androidx.compose.animation.animateColorAsState(if (on) Chrome.PanelGood else SlotColors.fill(slot), androidx.compose.animation.core.tween(120), label = "key")
     Box(
-        modifier.height(keyHeight).testTag(tag).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
+        modifier.height(keyHeight).alpha(if (enabled) 1f else 0.4f).testTag(tag).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = when (label) { "undo" -> "Undo"; "tick" -> "Done"; else -> "Key $label" } }
             .drawBehind {
                 val lip = 3.dp.toPx()
                 val r = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx())
-                val face = Size(size.width, size.height - lip)
+                val faceSize = Size(size.width, size.height - lip)
                 val dy = if (pressed) lip else 0f
-                if (!pressed) drawRoundRect(edge, Offset(0f, lip), face, r)
-                drawRoundRect(if (on) Chrome.PanelGood else Color.White, Offset(0f, dy), face, r)
-                drawRoundRect(if (on) Chrome.Mint else Chrome.Line, Offset(0.75.dp.toPx(), dy + 0.75.dp.toPx()), Size(face.width - 1.5.dp.toPx(), face.height - 1.5.dp.toPx()), r, style = Stroke(1.5.dp.toPx()))
+                if (!pressed) drawRoundRect(edge, Offset(0f, lip), faceSize, r)
+                drawRoundRect(face, Offset(0f, dy), faceSize, r)
+                drawRoundRect(if (on) Chrome.Mint else edge, Offset(0.75.dp.toPx(), dy + 0.75.dp.toPx()), Size(faceSize.width - 1.5.dp.toPx(), faceSize.height - 1.5.dp.toPx()), r, style = Stroke(1.5.dp.toPx()))
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -321,19 +331,19 @@ private fun PadKey(modifier: Modifier, keyHeight: Dp, enabled: Boolean, tag: Str
                 "undo" -> Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
                     val st = Stroke(2.4f * k, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    drawPath(Path().apply { moveTo(9f * k, 14f * k); lineTo(4f * k, 9f * k); lineTo(9f * k, 4f * k) }, Chrome.Ink, style = st)
+                    drawPath(Path().apply { moveTo(9f * k, 14f * k); lineTo(4f * k, 9f * k); lineTo(9f * k, 4f * k) }, ink, style = st)
                     drawPath(Path().apply {
                         moveTo(4f * k, 9f * k); lineTo(14.5f * k, 9f * k)
                         arcTo(androidx.compose.ui.geometry.Rect(9f * k, 9f * k, 20f * k, 20f * k), -90f, 180f, false)
                         lineTo(11f * k, 20f * k)
-                    }, Chrome.Ink, style = st)
+                    }, ink, style = st)
                 }
                 "tick" -> Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
                     drawPath(Path().apply { moveTo(4f * k, 12.5f * k); lineTo(9.5f * k, 18f * k); lineTo(20f * k, 6f * k) }, Chrome.MintInk, style = Stroke(3f * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
-                "\u2212" -> Canvas(Modifier.size(22.dp)) { drawLine(Chrome.Ink, Offset(4.dp.toPx(), size.height / 2f), Offset(size.width - 4.dp.toPx(), size.height / 2f), 3.dp.toPx(), StrokeCap.Round) }
-                else -> Text(label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = 22.sp, color = Chrome.Ink)
+                "\u2212" -> Canvas(Modifier.size(22.dp)) { drawLine(ink, Offset(4.dp.toPx(), size.height / 2f), Offset(size.width - 4.dp.toPx(), size.height / 2f), 3.dp.toPx(), StrokeCap.Round) }
+                else -> Text(label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = 22.sp, color = ink)
             }
         }
     }

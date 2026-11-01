@@ -547,7 +547,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                 if (tutorOpen && flow.marks.isEmpty()) Box(Modifier.matchParentSize().background(Chrome.Scrim).pointerInput(Unit) { detectTapGestures { } })
             }
             if (keypad) {
-                Keypad(flow, negatives, keyHeight, Modifier.padding(bottom = if (compact) 4.dp else 8.dp)) { LessonSounds.play(Cue.Tick); check() }
+                Keypad(flow, negatives, keyHeight, Modifier.padding(bottom = if (compact) 4.dp else 8.dp))
             }
             AnimatedVisibility(
                 visible = tutorOpen,
@@ -597,7 +597,10 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                         Chunky("Get help", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Help) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
                         Chunky("Try again", Kind.Warn, true, Modifier.weight(3f)) { LessonSounds.play(Cue.Tick); flow.tryAgain() }
                     }
-                    else -> ButtonBar(bottomInset) { Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(1f)) { check() } }
+                    else -> ButtonBar(bottomInset) {
+                        if (page.kind == PageKind.Translate) Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
+                        Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(if (page.kind == PageKind.Translate) 3f else 1f)) { check() }
+                    }
                 }
             }
         }

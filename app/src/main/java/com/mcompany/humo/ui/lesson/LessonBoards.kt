@@ -71,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mcompany.humo.ui.glass.pressScale
 import com.mcompany.humo.ui.path.rememberJetAtlas
 import kotlinx.coroutines.CoroutineStart
@@ -494,31 +495,30 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
     }
 }
 
-/** "1  translate by (▢, ▢)": the row number (a green tick once right), the chip and its two slots. */
+/**
+ * Boss's K1 row: the label "translate by" above one baked-glass bar "( a , b )" with the comma inside; slot a is blue, slot b mint
+ * (the board's marks use the same colours), the active slot has a 2 dp inset ring in its own colour. A recap page shows the numbers only.
+ */
 @Composable
 private fun ActionRow(page: LessonPage, flow: LessonFlow, recap: Boolean, u: Dp) {
-    val density = LocalDensity.current
     val k = u / 1.dp
-    val fs = with(density) { (16.dp * k).toSp() }
-    val right = flow.phase == Phase.Correct && !flow.inSkill
-    Row(Modifier.fillMaxWidth().height(66.dp * k).padding(start = 10.dp * k), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(34.dp * k), contentAlignment = Alignment.CenterStart) {
-            if (right) Canvas(Modifier.size(18.dp * k)) {
-                val u1 = size.width / 18f
-                drawRoundRect(Color(0xFF22B14C), Offset.Zero, size, androidx.compose.ui.geometry.CornerRadius(4f * u1))
-                drawPath(Path().apply { moveTo(4.5f * u1, 9.3f * u1); lineTo(7.5f * u1, 12.3f * u1); lineTo(13.5f * u1, 6f * u1) }, Color.White, style = Stroke(2.2f * u1, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            }
-            else Text("1", fontFamily = FontFamily.Monospace, fontSize = with(density) { (14.dp * k).toSp() }, color = Color(0x99000000))
+    val ink = Color(0xFF1B1F24)
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp * k), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row {
+            Text("translate", fontFamily = LessonType.Figtree, fontSize = 13.sp, color = ink)
+            Text(" by", fontFamily = LessonType.Figtree, fontSize = 13.sp, color = Color(0xFF5B6770))
         }
+        Spacer(Modifier.height(6.dp))
+        val shape = RoundedCornerShape(28.dp)
         Row(
-            Modifier.height(32.dp * k).clip(RoundedCornerShape(4.dp * k)).background(Color(0xFFF2F2F2)).padding(horizontal = 8.dp * k),
-            verticalAlignment = Alignment.CenterVertically,
+            Modifier.height(56.dp).clip(shape).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.86f), Color.White.copy(alpha = 0.58f))))
+                .border(1.dp, Brush.verticalGradient(listOf(Color.White, Color(0x33FFFFFF))), shape).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("translate", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = fs, color = Color(0xFF294BC6))
-            Text(" by (", fontFamily = LessonType.Figtree, fontSize = fs, color = Color.Black)
-            if (recap) { Fixed(signed(page.move.x), u); Text(",", fontSize = fs); Fixed(signed(page.move.y), u) }
-            else { Slot(0, flow, u); Text(",", fontSize = fs, color = Color.Black); Slot(1, flow, u) }
-            Text(")", fontFamily = LessonType.Figtree, fontSize = fs, color = Color.Black)
+            Text("(", fontFamily = FontFamily.Monospace, fontSize = 24.sp, color = ink)
+            if (recap) { Fixed(signed(page.move.x), u); Text(",", fontFamily = FontFamily.Monospace, fontSize = 24.sp, color = ink); Fixed(signed(page.move.y), u) }
+            else { Slot(0, flow, u); Text(",", fontFamily = FontFamily.Monospace, fontSize = 24.sp, color = ink); Slot(1, flow, u) }
+            Text(")", fontFamily = FontFamily.Monospace, fontSize = 24.sp, color = ink)
         }
     }
 }
@@ -540,20 +540,15 @@ private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
         return
     }
     val active = flow.slots.active == i && !flow.locked
-    val border = when {
-        active -> Color(0xFF23A06C)
-        v != null -> Color(0x1A000000)
-        else -> Color(0xFF999999)
-    }
+    val ring by androidx.compose.animation.animateColorAsState(if (active) SlotColors.mark(i) else Color.Transparent, tween(120), label = "ring")
+    val shape = RoundedCornerShape(12.dp)
     val interaction = remember { MutableInteractionSource() }
     Box(
-        Modifier.padding(horizontal = 1.dp).size(32.dp * k, 24.dp * k).clip(RoundedCornerShape(4.dp * k))
-            .background(if (active) Color(0xFFE3F4EC) else Color.White)
-            .border(2.dp * k, border, RoundedCornerShape(4.dp * k))
-            .clickable(interaction, null, enabled = !flow.locked && v != null, role = Role.Button) { flow.tapSlot(i); LessonSounds.play(Cue.Tick) }
+        Modifier.size(48.dp, 40.dp).clip(shape).background(SlotColors.fill(i)).border(2.dp, ring, shape)
+            .clickable(interaction, null, enabled = !flow.locked, role = Role.Button) { flow.tapSlot(i); LessonSounds.play(Cue.Tick) }
             .semantics { contentDescription = "Slot ${i + 1}, ${v ?: "empty"}" }.testTag("slot-$i"),
         contentAlignment = Alignment.Center,
     ) {
-        if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, lineHeight = with(LocalDensity.current) { (16.dp * k).toSp() }, maxLines = 1, color = Color.Black)
+        if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = 22.sp, lineHeight = 22.sp, maxLines = 1, color = SlotColors.ink(i))
     }
 }
