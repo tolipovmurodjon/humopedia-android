@@ -4,6 +4,7 @@
 #   scripts/phone-perf.sh path/to/app-debug.apk            perf_v2 ON (the default)
 #   scripts/phone-perf.sh path/to/app-debug.apk off        perf_v2 OFF (to compare)
 # Scenes: P1 drag (adb swipes), P4 Check flight (two jets). The Mach 3 pass has no debug deep link yet, so it is not measured.
+# Baseline measured on the A05s on alpha13 (checker): about 26 fps everywhere, p50 36-40 ms; drag 19.5 % janky, P4 flight 60.7 % janky, p99 129 ms.
 # Needs: adb, one phone on USB, the screen on and unlocked. Output goes to phone-perf-out/<time>-<on|off>/.
 set -u
 APK=${1:?usage: scripts/phone-perf.sh app-debug.apk [off]}

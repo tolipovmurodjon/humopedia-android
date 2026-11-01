@@ -156,3 +156,7 @@ Not done: one language per run. There is no language setting in the app (one `va
 - A5: icon buttons are a soft dark tint with a darker edge, visible on every ground (alpha13: white on white); 56 dp tall.
 - Audit: disabled CHECK label #7A7A7A on #E5E5E5 (3.4:1); key lip is the slot ink at 40 %; digits are highlighted only as whole tokens ("SR-71s" stays whole); Humo's drawing replay is about 2.4 s.
 - Not done: the mic question with Humo's reason (needs the talk pill's permission flow), fix-it lines capped at 8 words (needs new voice clips), the measured 26 fps baseline in `phone-perf.sh`.
+
+## Round 6i (alpha15)
+
+- Icon buttons (bulb, question mark): were a dark tint with a dark glyph (read as black). Now a white capsule, a mint-ink (#1C7E69) glyph (4.9:1 on white), a 30 % mint-ink rim and lip, and the same press-down as the primary button. Pure black text on the board (Play, given numbers) is now #1B1F24; the axes and labels of Brilliant's graph keep their black. The close cross is #4A4F57. The tutor's mic and send buttons were not opened in this pass.

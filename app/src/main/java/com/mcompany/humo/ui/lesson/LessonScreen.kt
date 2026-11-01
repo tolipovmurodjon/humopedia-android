@@ -366,7 +366,8 @@ internal fun Chunky(
         kind == Kind.Warn -> Triple(Chrome.Yellow, Chrome.YellowEdge, Color(0xFF4A3600))
         kind == Kind.Dark -> Triple(Color(0xFF2B2F33), Color(0xFF15181A), Color.White)
         // an icon button is a soft dark tint, so it reads on white, mint, amber and grey grounds alike (alpha13: white on white)
-        icon != null -> Triple(Color(0x1A000000), Color(0x2E000000), Chrome.Ink)
+        // a light capsule with a mint-ink glyph and a soft rim, the same lip family as the primary button (never black)
+        icon != null -> Triple(Color.White, Color(0x4D1C7E69), Chrome.MintInk)
         else -> Triple(Color.White, Chrome.Line, Chrome.MintInk)
     }
     val sink = !enabled || pressed

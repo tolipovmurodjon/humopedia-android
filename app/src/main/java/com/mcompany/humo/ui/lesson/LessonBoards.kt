@@ -505,10 +505,10 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(16.dp * (u / 1.dp))) {
-                        drawPath(Path().apply { moveTo(size.width * 0.12f, 0f); lineTo(size.width, size.height / 2f); lineTo(size.width * 0.12f, size.height); close() }, if (playing) Color(0xFFBDBDBD) else Color.Black)
+                        drawPath(Path().apply { moveTo(size.width * 0.12f, 0f); lineTo(size.width, size.height / 2f); lineTo(size.width * 0.12f, size.height); close() }, if (playing) Color(0xFFBDBDBD) else Color(0xFF1B1F24))
                     }
                     Spacer(Modifier.width(8.dp * (u / 1.dp)))
-                    Text("Play", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * (u / 1.dp)).toSp() }, color = if (playing) Color(0xFFBDBDBD) else Color.Black)
+                    Text("Play", fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = with(density) { (16.dp * (u / 1.dp)).toSp() }, color = if (playing) Color(0xFFBDBDBD) else Color(0xFF1B1F24))
                 }
             }
         }
@@ -547,7 +547,7 @@ private fun ActionRow(page: LessonPage, flow: LessonFlow, recap: Boolean, u: Dp)
 private fun Fixed(v: String, u: Dp) {
     val k = u / 1.dp
     Box(Modifier.size(32.dp * k, 24.dp * k).clip(RoundedCornerShape(4.dp * k)).background(Color(0x0D000000)).border(2.dp * k, Color(0x0D000000), RoundedCornerShape(4.dp * k)), contentAlignment = Alignment.Center) {
-        Text(v, fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, lineHeight = with(LocalDensity.current) { (16.dp * k).toSp() }, maxLines = 1, color = Color.Black)
+        Text(v, fontFamily = FontFamily.Monospace, fontSize = with(LocalDensity.current) { (16.dp * k).toSp() }, lineHeight = with(LocalDensity.current) { (16.dp * k).toSp() }, maxLines = 1, color = Color(0xFF1B1F24))
     }
 }
 
