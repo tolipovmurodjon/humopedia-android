@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import kotlin.math.hypot
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -64,6 +65,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -368,6 +370,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
 
     // One machine per point. A board opened already checked (review, state restore) has them landed; otherwise they wait
     // at their start. The recap's ride the points exactly.
+    val offBoard = remember(page) { androidx.compose.runtime.mutableStateListOf<Offset?>().also { l -> repeat(page.points.size) { l.add(null) } } }
     val crafts = remember(page, wPx) {
         page.points.map { p ->
             val begin = g.px(p)
@@ -391,7 +394,12 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
         settleFlights(crafts, wake)
         var launched = false
         crafts.forEachIndexed { i, c ->
-            val want = g.px(if (shown != null) page.points[i] + shown else page.points[i])
+            val raw = g.px(if (shown != null) page.points[i] + shown else page.points[i])
+            // a target past the board edge: the machine stops at the edge and an arrow shows where it was going (as the web does)
+            val m = len * 0.55f
+            val bh = wPx * page.graph.boxH / page.graph.boxW
+            val want = Offset(raw.x.coerceIn(m, wPx - m), raw.y.coerceIn(m, bh - m))
+            offBoard[i] = if (want != raw) raw - want else null
             if (dist(c.pos, want) < 1f) return@forEachIndexed
             if (motion) {
                 Flying.plan(c, want, withFrameMillis { it }, density.density)
@@ -476,6 +484,12 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                             jetAt(atlas, c.pos, c.heading, len, flames = flames, t = now / 1000f, motion = motion, alt = c.alt)
                         }
                         if (phase != Phase.Idle) badge(Offset(c.pos.x + g.cell * 0.42f, c.pos.y - g.cell * 0.42f), phase == Phase.Correct, s)
+                        offBoard[i]?.let { d ->
+                            val u1 = Offset(d.x / hypot(d.x, d.y), d.y / hypot(d.x, d.y))
+                            val tip = c.pos + u1 * (len * 0.95f)
+                            val side = Offset(-u1.y, u1.x) * (len * 0.2f)
+                            drawPath(Path().apply { moveTo(tip.x, tip.y); lineTo(tip.x - u1.x * len * 0.35f + side.x, tip.y - u1.y * len * 0.35f + side.y); lineTo(tip.x - u1.x * len * 0.35f - side.x, tip.y - u1.y * len * 0.35f - side.y); close() }, SlotColors.MintMark)
+                        }
                     }
                     // the rings go on top: a machine on its target never hides it
                     if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
@@ -531,7 +545,7 @@ private fun ActionRow(page: LessonPage, flow: LessonFlow, recap: Boolean, u: Dp)
         Spacer(Modifier.height(6.dp))
         val shape = RoundedCornerShape(28.dp)
         Row(
-            Modifier.height(56.dp).clip(shape).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.86f), Color.White.copy(alpha = 0.58f))))
+            Modifier.height(72.dp).clip(shape).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.86f), Color.White.copy(alpha = 0.58f))))
                 .border(1.dp, Brush.verticalGradient(listOf(Color.White, Color(0x33FFFFFF))), shape).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -563,12 +577,16 @@ private fun Slot(i: Int, flow: LessonFlow, u: Dp) {
     val ring by androidx.compose.animation.animateColorAsState(if (active) SlotColors.mark(i) else Color.Transparent, tween(120), label = "ring")
     val shape = RoundedCornerShape(12.dp)
     val interaction = remember { MutableInteractionSource() }
-    Box(
-        Modifier.size(48.dp, 40.dp).clip(shape).background(SlotColors.fill(i)).border(2.dp, ring, shape)
-            .clickable(interaction, null, enabled = !flow.locked, role = Role.Button) { flow.tapSlot(i); LessonSounds.play(Cue.Tick) }
-            .semantics { contentDescription = "Slot ${i + 1}, ${v ?: "empty"}" }.testTag("slot-$i"),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = 22.sp, lineHeight = 22.sp, maxLines = 1, color = SlotColors.ink(i))
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(48.dp, 40.dp).clip(shape).background(SlotColors.fill(i)).border(2.dp, ring, shape)
+                .clickable(interaction, null, enabled = !flow.locked, role = Role.Button) { flow.tapSlot(i); LessonSounds.play(Cue.Tick) }
+                .semantics { contentDescription = "Slot ${i + 1}, ${v ?: "empty"}" }.testTag("slot-$i"),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (v != null) Text(signed(v), fontFamily = FontFamily.Monospace, fontSize = 22.sp, lineHeight = 22.sp, maxLines = 1, color = SlotColors.ink(i))
+        }
+        // which number is which: a is across (right), b is up
+        Text(if (i == 0) "→" else "↑", fontSize = 12.sp, lineHeight = 12.sp, color = SlotColors.mark(i).copy(alpha = 0.8f), modifier = Modifier.clearAndSetSemantics {})
     }
 }

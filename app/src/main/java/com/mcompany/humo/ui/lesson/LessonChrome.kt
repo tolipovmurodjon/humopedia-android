@@ -148,11 +148,12 @@ internal fun FeedbackSheet(spec: SheetSpec, bottomInset: Dp, translateRow: Boole
     val density = androidx.compose.ui.platform.LocalDensity.current
     val threshold = with(density) { 48.dp.toPx() }
     val ink = if (spec.calm) Color(0xFF4A5159) else if (spec.ok) Chrome.MintInk else Chrome.YellowInk
-    val bg = if (spec.calm) Color(0xFFF1F3F4) else if (spec.ok) Color(0xFFE3F7EC) else Color(0xFFFFF3D6)
+    // baked glass: a tinted vertical wash, near opaque so it covers the Check bar, and a lit top rim
+    val bg = if (spec.calm) Brush.verticalGradient(listOf(Color(0xFFEEF1F3), Color(0xFFF8FAFB))) else if (spec.ok) Brush.verticalGradient(listOf(Color(0xFFD6F4E5), Color(0xFFF1FBF6))) else Brush.verticalGradient(listOf(Color(0xFFFFEBB8), Color(0xFFFFF8E3)))
     val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     Column(
         Modifier.fillMaxWidth().testTag("feedback-panel").semantics { stateDescription = if (expanded) "expanded" else "peek" }
-            .clip(shape).background(bg)
+            .clip(shape).background(bg).border(1.dp, Brush.verticalGradient(listOf(Color.White, Color(0x00FFFFFF))), shape)
             .draggable(
                 orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
                 state = androidx.compose.foundation.gestures.rememberDraggableState { dragged += it },
@@ -237,7 +238,7 @@ internal fun ProgressTrack(progress: Float, modifier: Modifier = Modifier) {
 }
 
 /** One reveal step of the bubble: a word every 330 ms, so the text keeps the pace of his voice (Boss: "natural real-time"). */
-private const val WORD_MS = 330L
+private const val WORD_MS = 55L
 
 /**
  * Humo at the top of the page with his bubble. The bubble shows exactly what Humo says now (the task, then his reply), replaced in
@@ -257,7 +258,7 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
     LaunchedEffect(text) {
         if (!humo.alive || text in humo.revealed) return@LaunchedEffect
         shown = 0
-        delay(180)
+        delay(60)
         while (shown < words && cutAt < 0) { shown++; delay(WORD_MS) }
         if (shown >= words) humo.revealed.add(text)
     }

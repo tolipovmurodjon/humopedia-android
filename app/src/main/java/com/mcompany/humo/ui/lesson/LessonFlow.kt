@@ -236,8 +236,21 @@ class LessonFlow(val lesson: LessonContent = L11) {
                 if (ok && s is Screen.Page && solved.add(s.i)) { sparks += L11.SPARKS_PER_PAGE; sparkBurst++; gain = true }
             }
         }
+        if (!ok) misses++
         return ok
     }
+
+    /** Misses on this page. The bulb shows the method until the third miss, then the answer. */
+    var misses by mutableIntStateOf(0); private set
+
+    /** The bulb: the method only (the start is ringed) before the ladder allows the answer; after a right answer or the third miss, the worked answer. */
+    fun hint() {
+        val p = page ?: return
+        if (misses >= 3 || phase == Phase.Correct) { showHow = true; return }
+        marks = listOf(p.points[0])
+        remark = "Count right first, then up."; remarkN++
+    }
+    fun clearRemark() { remark = null }
 
     /** Humo says [text] in the bubble (a plain remark: no verdict colours). */
     fun say(text: String) { verdict = text; bubble = text; chat.hear(text) }
@@ -324,6 +337,8 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     private fun show(s: Screen) {
         screen = s
+        remark = null
+        misses = 0
         flying = false
         demoBusy = false
         phase = Phase.Idle

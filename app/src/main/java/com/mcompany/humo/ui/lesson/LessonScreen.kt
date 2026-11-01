@@ -512,6 +512,9 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
         val cue = flow.remark ?: return@LaunchedEffect
         if (flow.inSkill || demo || !humo.alive || !voice.on) return@LaunchedEffect
         humo.talking = true; voice.say(cue); humo.talking = false
+        // a cue or praise is transient: the bubble goes back to the task after 2 s
+        delay(2000)
+        flow.clearRemark()
     }
     val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else if (!flow.inSkill) flow.verdict ?: flow.remark ?: promptText else promptText
     val askHumo: (() -> Unit)? = if (flow.inSkill || demo) null else { { LessonSounds.play(Cue.Tick); flow.chat.openClean() } }
@@ -599,7 +602,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                             }
                             key == "go" -> ButtonBar(bottomInset) { Chunky("CONTINUE", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
                             else -> ButtonBar(bottomInset) {
-                                if (translateRow) Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
+                                if (translateRow) Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.hint() }
                                 Chunky("CHECK", Kind.Primary, flow.canCheck, Modifier.weight(if (translateRow) 3f else 1f)) { check() }
                             }
                         }

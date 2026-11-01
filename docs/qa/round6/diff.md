@@ -160,3 +160,13 @@ Not done: one language per run. There is no language setting in the app (one `va
 ## Round 6i (alpha15)
 
 - Icon buttons (bulb, question mark): were a dark tint with a dark glyph (read as black). Now a white capsule, a mint-ink (#1C7E69) glyph (4.9:1 on white), a 30 % mint-ink rim and lip, and the same press-down as the primary button. Pure black text on the board (Play, given numbers) is now #1B1F24; the axes and labels of Brilliant's graph keep their black. The close cross is #4A4F57. The tutor's mic and send buttons were not opened in this pass.
+
+## Round 6j: child loop, round 1 (alpha15)
+
+- HIGH 1 stale bubble: the move cue stayed in `flow.remark` after the slide changed. `show()` now clears it, and a cue or praise goes after 2 s. Test: `LessonBubbleAndHintTest.everySlideOpensWithItsOwnTask`.
+- HIGH 2 the hint gave the answer: the bulb on a translate page opened the worked answer. Now it rings the start and says "Count right first, then up." until the third miss; after a right answer or the third miss it shows the answer. Test in the same file.
+- MED off-board jet: the target is clamped to the board edge and a mint arrow shows the way it was going.
+- MED bulb black: alpha15's light capsule with a mint-ink glyph.
+- MED x and y: a small blue arrow right under slot a and a mint arrow up under slot b.
+- LOW: task reveal 55 ms a word (about 0.6 s a line), the sheet is a tinted glass wash with a lit rim.
+- MED frames (drag p50 34 ms, 3-jet flight 40 % janky, 400 ms stall on Check): perf_v2 from alpha14 is the only change so far; the phone run decides. Cold start 2.69 s: not worked yet. The softlock re-test is pending; watchdog and test stay.
