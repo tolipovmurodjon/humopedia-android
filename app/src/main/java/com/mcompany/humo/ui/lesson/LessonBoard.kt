@@ -52,7 +52,7 @@ internal class BoardGeo(val spec: GraphSpec, val s: Float) {
 }
 
 /** The axes, grid, ticks and labels of a Brilliant graph (spec §3: axes 1.5 px with arrow heads, grid 10 % black). */
-internal fun DrawScope.graph(g: BoardGeo, text: TextMeasurer, dragging: Boolean = false) {
+internal fun DrawScope.graph(g: BoardGeo, text: TextMeasurer) {
     val sp = g.spec
     val s = g.s
     // Brilliant's axes run 30 px past the last whole number and, on a board with negatives, 20 px before the first;
@@ -65,7 +65,6 @@ internal fun DrawScope.graph(g: BoardGeo, text: TextMeasurer, dragging: Boolean 
     val gy = sp.yMax + 0.5f
     for (i in sp.xMin..sp.xMax) if (i != 0) drawLine(BoardColors.Grid, g.px(i.toFloat(), y0), g.px(i.toFloat(), gy), 1f * s)
     for (j in sp.yMin..sp.yMax) if (j != 0) drawLine(BoardColors.Grid, g.px(x0, j.toFloat()), g.px(gx, j.toFloat()), 1f * s)
-    if (dragging) for (i in sp.xMin..sp.xMax) for (j in sp.yMin..sp.yMax) drawCircle(BoardColors.NodeDot, 2f * s, g.px(Node(i, j)))
     val ax = g.px(sp.xMax + over, 0f)
     val ay = g.px(0f, sp.yMax + over)
     val bx = g.px(if (sp.xMin < 0) sp.xMin - under else 0f, 0f)
@@ -74,7 +73,7 @@ internal fun DrawScope.graph(g: BoardGeo, text: TextMeasurer, dragging: Boolean 
     drawLine(BoardColors.Axis, by, ay, 1.5f * s)
     drawPath(Path().apply { moveTo(ax.x + 1f * s, ax.y); lineTo(ax.x - 10.5f * s, ax.y - 5f * s); lineTo(ax.x - 10.5f * s, ax.y + 5f * s); close() }, BoardColors.Axis)
     drawPath(Path().apply { moveTo(ay.x, ay.y - 1f * s); lineTo(ay.x - 5f * s, ay.y + 10.5f * s); lineTo(ay.x + 5f * s, ay.y + 10.5f * s); close() }, BoardColors.Axis)
-    val style = TextStyle(fontFamily = LessonType.Figtree, fontSize = (16f * s / density).sp / fontScale, color = BoardColors.Label)
+    val style = TextStyle(fontFamily = LessonType.Figtree, fontSize = (13f * s / density).sp / fontScale, color = BoardColors.Label)
     for (i in sp.xMin..sp.xMax) {
         if (i == 0) continue
         val p = g.px(i.toFloat(), 0f)

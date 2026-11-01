@@ -42,21 +42,11 @@ internal object LessonLines {
         else "Look at the teal squares. What do you notice?"
 
     fun showMe(page: LessonPage, machine: String): String =
-        if (page.kind == PageKind.Translate) "Compare each $machine with its ring. Fix the difference, then try again."
-        else "Compare the two squares. Move it the difference, then try again."
+        if (page.kind == PageKind.Translate) "Match each ring. Then try again."
+        else "Move it onto the square."
 
-    /** The worked-explanation card (Show me how): the move written out with this page's own numbers. */
-    fun how(page: LessonPage, machine: String): String {
-        val m = page.move
-        val first = page.points[0]
-        return if (page.kind == PageKind.Drag) {
-            "The $machine starts at (${first.x}, ${first.y}). Move it ${steps(m.x, if (m.x >= 0) "right" else "left")}: x goes from ${first.x} to ${first.x + m.x}. " +
-                "Move it ${steps(m.y, if (m.y >= 0) "up" else "down")}: y goes from ${first.y} to ${first.y + m.y}. It lands on (${first.x + m.x}, ${first.y + m.y})."
-        } else {
-            "Each $machine moves ${steps(m.x, if (m.x >= 0) "right" else "left")} and ${steps(m.y, if (m.y >= 0) "up" else "down")}, so the translation is (${m.x}, ${m.y}). " +
-                "For example, (${first.x}, ${first.y}) moves to (${first.x + m.x}, ${first.y + m.y})."
-        }
-    }
+    /** The worked-explanation card (Show me how): one short line, the move's own numbers (Boss: drawing beats talking). */
+    fun how(page: LessonPage, @Suppress("UNUSED_PARAMETER") machine: String): String = demoRight(page.move)
 
     /** The bold line on top of the card. */
     fun howTitle(page: LessonPage): String = "translate by (${page.move.x}, ${page.move.y})"

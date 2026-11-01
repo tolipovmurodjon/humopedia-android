@@ -112,17 +112,16 @@ internal fun Modifier.chromeGlass(radius: Dp, tint: Tint = Tint.Clear): Modifier
     return this.then(surface).border(1.25.dp, PaneRim, shape)
 }
 
-/** The floating glass bar that holds the lesson's main buttons (Check, Continue). */
+/** The row that holds the lesson's main buttons (Check, Continue): the buttons only, each one shape, no box under them. */
 @Composable
-internal fun GlassDock(bottomInset: Dp, content: @Composable RowScope.() -> Unit) {
+internal fun ButtonBar(bottomInset: Dp, content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("dock").chromeGlass(28.dp)
-            .padding(12.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp + bottomInset).testTag("dock"),
         horizontalArrangement = Arrangement.spacedBy(12.dp), content = content,
     )
 }
 
-/** The verdict panel: mint glass with a tick for right, amber glass with a cross for wrong (never red); a small flag top right. */
+/** The verdict panel: mint glass with a tick for right, amber glass with a cross for wrong (never red); a short label, a small flag top right. What Humo says is in his bubble, not here. */
 @Composable
 internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() -> Unit)?, buttons: @Composable RowScope.() -> Unit) {
     val ink = if (ok) Chrome.MintInk else Chrome.YellowInk
@@ -157,26 +156,37 @@ internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() 
     }
 }
 
+/** The close button: a 44 dp round glass button with a clean dark-grey cross (same family as the other glass controls). */
+@Composable
+internal fun CloseButton(onClick: () -> Unit) {
+    Box(
+        Modifier.size(44.dp).chromeGlass(22.dp).clip(CircleShape)
+            .clickable(role = Role.Button, onClickLabel = "Exit lesson", onClick = onClick).semantics { contentDescription = "Exit lesson" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(16.dp)) {
+            val w = 2.6.dp.toPx()
+            drawLine(Color(0xFF4A4F57), Offset(0f, 0f), Offset(size.width, size.height), w, StrokeCap.Round)
+            drawLine(Color(0xFF4A4F57), Offset(size.width, 0f), Offset(0f, size.height), w, StrokeCap.Round)
+        }
+    }
+}
+
 /**
- * The progress track (Boss's pick "1 Boost"): a baked glass groove (a soft white fill, a lit top rim, no live backdrop: it
- * is 16 dp high and always on screen), mint filling it, and the SR-71 sitting on the tip of the fill.
+ * The progress bar (Boss: like Duolingo's): 16 dp thick and round, a clean green fill with a lit stripe along its top, in a baked
+ * glass groove (no live backdrop: it is always on screen). No jet and no icon on the tip; the caller animates [progress].
  */
 @Composable
-internal fun ProgressTrack(progress: Float, fly: Boolean, modifier: Modifier = Modifier) {
-    val atlas = if (fly) rememberJetAtlas() else null
+internal fun ProgressTrack(progress: Float, modifier: Modifier = Modifier) {
     val shape = CircleShape
-    Box(modifier.height(16.dp)) {
     Box(
-        Modifier.matchParentSize().clip(shape).background(Brush.verticalGradient(listOf(Color(0x990F1630).copy(alpha = 0.10f), Color.White.copy(alpha = 0.55f))))
+        modifier.height(16.dp).clip(shape).background(Brush.verticalGradient(listOf(Color(0x1F0F1630), Color.White.copy(alpha = 0.55f))))
             .border(1.dp, Brush.verticalGradient(listOf(Color.White, Color(0x33FFFFFF))), shape)
             .semantics { contentDescription = "Lesson progress ${(progress * 100).toInt()} %" },
     ) {
-        Box(Modifier.fillMaxWidth(progress.coerceAtLeast(0.04f)).height(16.dp).clip(shape).background(Brush.horizontalGradient(listOf(Glass.Mint2, Chrome.Mint))))
-    }
-    if (atlas != null) Canvas(Modifier.matchParentSize()) {
-        val x = (size.width * progress.coerceAtLeast(0.04f)).coerceAtLeast(14.dp.toPx())
-        jetAt(atlas, Offset(x - 6.dp.toPx(), size.height / 2f), 0f, 30.dp.toPx(), 0f, 0f, false, shadow = false)
-    }
+        Box(Modifier.fillMaxWidth(progress.coerceIn(0.04f, 1f)).height(16.dp).clip(shape).background(Chrome.Mint)) {
+            Box(Modifier.padding(start = 6.dp, end = 6.dp, top = 3.dp).fillMaxWidth().height(4.dp).clip(shape).background(Color.White.copy(alpha = 0.38f)))
+        }
     }
 }
 
@@ -184,10 +194,11 @@ internal fun ProgressTrack(progress: Float, fly: Boolean, modifier: Modifier = M
 private const val WORD_MS = 330L
 
 /**
- * Humo at the top of the page with his bubble: the bubble IS the task line (Boss's pick). Humo is small and has no label or
- * button chrome; tapping him opens the tutor ([onTap] null = not tappable, as in the skill check). The words appear one by
- * one while he talks; without motion (screenshot tests, reduced motion) the whole line is there at once. Digits and *letters*
- * are in the maths serif.
+ * Humo at the top of the page with his bubble. The bubble shows exactly what Humo says now (the task, then his reply), replaced in
+ * place; there is no second text box. Humo is 76 dp (60 dp on short phones), no label, no button chrome; tapping him opens the tutor
+ * ([onTap] null = not tappable, as in the skill check). The words appear one by one while he talks; without motion (screenshot
+ * tests, reduced motion) the whole line is there at once. Numbers and the words steps, right, left, up, down are tinted mint, normal
+ * weight; digits and *letters* are in the maths serif.
  */
 @Composable
 internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
@@ -201,36 +212,47 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
     }
     Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         val tap = if (onTap != null) Modifier.clickable(role = Role.Button, onClickLabel = "Ask Humo", onClick = onTap) else Modifier
-        Humo(humo, tap.size(if (compact) 50.dp else 62.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
-        Spacer(Modifier.width(10.dp))
-        val shape = RoundedCornerShape(20.dp)
-        Box(Modifier.weight(1f).clip(shape).background(Chrome.Line).testTag("humo-bubble")) {
-            Box(Modifier.fillMaxWidth().padding(bottom = 3.dp).clip(shape).background(Color.White).border(1.5.dp, Chrome.Line, shape).padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp)) {
-                Text(
-                    task(text, shown),
-                    style = TextStyle(fontFamily = LessonType.Figtree, fontSize = if (compact) 16.sp else 18.sp, lineHeight = if (compact) 22.sp else 25.sp, fontWeight = FontWeight.Normal, color = Chrome.Ink),
-                    modifier = Modifier.semantics { heading(); contentDescription = text.replace("*", "") },
-                )
-            }
+        Humo(humo, tap.size(if (compact) 60.dp else 76.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
+        Spacer(Modifier.width(14.dp))
+        val shape = RoundedCornerShape(16.dp)
+        Box(
+            Modifier.weight(1f).testTag("humo-bubble").drawBehind {
+                // the small tail toward Humo
+                val cy = size.height / 2f
+                val t = 8.dp.toPx()
+                drawPath(Path().apply { moveTo(1f, cy - t); lineTo(-t, cy); lineTo(1f, cy + t); close() }, Color.White.copy(alpha = 0.92f))
+            }.clip(shape).background(Color.White.copy(alpha = 0.92f)).border(0.75.dp, Color.White, shape)
+                .padding(horizontal = 18.dp, vertical = if (compact) 12.dp else 16.dp),
+        ) {
+            Text(
+                task(text, shown),
+                style = TextStyle(fontFamily = LessonType.Figtree, fontSize = if (compact) 16.sp else 18.sp, lineHeight = if (compact) 23.sp else 26.sp, fontWeight = FontWeight.Normal, color = Chrome.Ink),
+                modifier = Modifier.semantics { heading(); contentDescription = text.replace("*", "") },
+            )
         }
     }
 }
 
-/** The task as styled text: digits and *letters* in the maths serif; every word after the [shown]th is invisible but still takes its room. */
+private val KeyWords = Regex("\\d+|\\b(steps?|right|left|up|down)\\b")
+
+/** The line as styled text: numbers and direction words tinted, digits and *letters* in the maths serif; every word after the [shown]th is invisible but still takes its room. */
 private fun task(text: String, shown: Int): AnnotatedString {
     val maths = SpanStyle(fontFamily = FontFamily.Serif)
+    val raw = text.replace("**", "")
+    val tinted = BooleanArray(raw.length).also { t -> KeyWords.findAll(raw).forEach { m -> for (i in m.range) t[i] = true } }
     var words = 0
     var inWord = false
     return buildAnnotatedString {
         var italic = false
-        for (ch in text.replace("**", "")) {
+        for ((i, ch) in raw.withIndex()) {
             if (ch == '*') { italic = !italic; continue }
             if (ch.isWhitespace()) { if (inWord) { words++; inWord = false } } else inWord = true
-            val style = when {
+            var style = when {
                 italic -> maths.copy(fontStyle = FontStyle.Italic)
                 ch.isDigit() -> maths
                 else -> SpanStyle()
             }
+            if (tinted[i]) style = style.copy(color = Chrome.MintInk)
             val hide = words >= shown && !ch.isWhitespace()
             withStyle(if (hide) style.copy(color = Color.Transparent) else style) { append(ch) }
         }
@@ -270,23 +292,27 @@ internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifie
     }
 }
 
-/** One key: a white face on a thick edge that the face presses into. "undo" and "tick" draw their icons. */
+/** One key as ONE shape: a white face over a solid lip, drawn by this node; the face presses into the lip. "undo" and the minus draw their icons. */
 @Composable
 private fun PadKey(modifier: Modifier, keyHeight: Dp, enabled: Boolean, tag: String, label: String, on: Boolean = false, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = RoundedCornerShape(14.dp)
     val edge = Color(0xFFD5DDD9)
     Box(
         modifier.height(keyHeight).testTag(tag).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = when (label) { "undo" -> "Undo"; "tick" -> "Done"; else -> "Key $label" } },
-        propagateMinConstraints = true,
+            .semantics { contentDescription = when (label) { "undo" -> "Undo"; "tick" -> "Done"; else -> "Key $label" } }
+            .drawBehind {
+                val lip = 3.dp.toPx()
+                val r = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx())
+                val face = Size(size.width, size.height - lip)
+                val dy = if (pressed) lip else 0f
+                if (!pressed) drawRoundRect(edge, Offset(0f, lip), face, r)
+                drawRoundRect(if (on) Chrome.PanelGood else Color.White, Offset(0f, dy), face, r)
+                drawRoundRect(if (on) Chrome.Mint else Chrome.Line, Offset(0.75.dp.toPx(), dy + 0.75.dp.toPx()), Size(face.width - 1.5.dp.toPx(), face.height - 1.5.dp.toPx()), r, style = Stroke(1.5.dp.toPx()))
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.matchParentSize().padding(top = 3.dp).clip(shape).background(edge))
-        Box(
-            Modifier.height(keyHeight - 3.dp).offset(y = if (pressed) 3.dp else 0.dp).clip(shape).background(if (on) Chrome.PanelGood else Color.White).border(1.5.dp, if (on) Chrome.Mint else Chrome.Line, shape),
-            contentAlignment = Alignment.Center,
-        ) {
+        Box(Modifier.padding(bottom = 3.dp).offset(y = if (pressed) 3.dp else 0.dp), contentAlignment = Alignment.Center) {
             when (label) {
                 "undo" -> Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
@@ -298,12 +324,12 @@ private fun PadKey(modifier: Modifier, keyHeight: Dp, enabled: Boolean, tag: Str
                         lineTo(11f * k, 20f * k)
                     }, Chrome.Ink, style = st)
                 }
-                "−" -> Canvas(Modifier.size(22.dp)) { drawLine(Chrome.Ink, Offset(4.dp.toPx(), size.height / 2f), Offset(size.width - 4.dp.toPx(), size.height / 2f), 3.dp.toPx(), StrokeCap.Round) }
                 "tick" -> Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
                     drawPath(Path().apply { moveTo(4f * k, 12.5f * k); lineTo(9.5f * k, 18f * k); lineTo(20f * k, 6f * k) }, Chrome.MintInk, style = Stroke(3f * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
-                else -> Text(label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = Chrome.Ink)
+                "\u2212" -> Canvas(Modifier.size(22.dp)) { drawLine(Chrome.Ink, Offset(4.dp.toPx(), size.height / 2f), Offset(size.width - 4.dp.toPx(), size.height / 2f), 3.dp.toPx(), StrokeCap.Round) }
+                else -> Text(label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium, fontSize = 22.sp, color = Chrome.Ink)
             }
         }
     }

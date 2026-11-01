@@ -63,3 +63,30 @@ Start and wrong try on each page type (drag P1, translate P4-P6, explainer P3, r
 
 - CI keeps one debug key (`build.yml`, `smoke.yml`): `~/.android/debug.keystore` comes from `actions/cache` with the fixed key `humo-debug-keystore-v1`; a miss lets Gradle make it once and the job saves it. It is never printed, uploaded or committed; the release keystore is untouched. A build step prints only the certificate SHA-256 of the debug APK. GitHub drops a cache unused for 7 days, so `build.yml` also runs every Monday 04:17 UTC (a scheduled run only fires from the default branch, so it starts once this is merged to main). A cache saved on a feature branch is not readable from other branches until a run on main saves it.
 - First frame: the lesson draws its chrome flat for the first three frames and turns the glass on after (`LessonScreen.kt` `glassOn`, `LessonChrome.kt` `LocalLessonGlass`), as the shell does. The guard is back at 900 ms warm. The smoke now logs the `HumoPerf` lines so the trace is in the evidence.
+
+## Round 6c: Boss's notes on alpha11 (N1-N8) and the A05s measurements (R1-R4)
+
+| Note | What changed | Where |
+|---|---|---|
+| N1 close | 44 dp round glass button, clean dark-grey cross | `LessonChrome.kt` `CloseButton` |
+| N2 progress | 16 dp round bar, flat mint fill with a lit top stripe, glass groove, spring fill; no jet, no icon | `ProgressTrack`, `LessonScreen.kt` `TopBar` |
+| N3 Humo | 76 dp, 60 dp under 700 dp tall | `HumoHeader` |
+| N4 buttons | Every button is one node: face plus solid lip drawn together; the glass box under Check and Continue is gone; keys follow the same rule | `Chunky`, `PadKey`, `ButtonBar` |
+| N5 sheets | Bottom layer, tutor and quit sheet slide up on a spring (damping 0.82, stiffness 380), no fade. 60 fps on the A05s is not proven by CI | `LessonScreen.kt` |
+| N6 bubble | The bubble holds what Humo says (task, then his verdict line) and is replaced in place; the panel keeps only an icon, "Correct!" or "Not quite", and the buttons. White 92 % bubble, 16 dp radius, small tail, no heavy border. Numbers and steps/right/left/up/down tinted mint, normal weight | `HumoHeader`, `PageView` |
+| N7 praise | The 8-line pool already ran "never the same twice" in the bubble with Emma's clips (`LessonFlow.fresh`); unchanged | |
+| N8 drawing | Fix-it replay: marks and labels only, one line in the bubble at the end. Show me says "Match each ring. Then try again." / "Move it onto the square."; the how card says "Right 4, then up 1." | `runDemo`, `LessonLines.showMe`, `how` |
+| R1 drag | Could not be found by reading: the mapping is right at k = 1 and the old tests passed. New `LessonDragTrackingTest` injects a screen-space path and holds the jet within half a cell at every step on 360x800, 320x568 and 360x640 (scaled boards). The board now exposes the point's live cell as `stateDescription` | `LessonBoards.kt`, `LessonDragTrackingTest.kt` |
+| R2 drag fps | The graph (text measuring included) was redrawn on every pointer frame. It now has its own canvas that reads no state; only the jet canvas redraws. Not measured on the A05s | `LessonBoards.kt` |
+| R3 | Cold start 2.3-2.5 s on the A05s noted; not changed in this commit | |
+| R4 | Labels in sentence case, medium weight, no letter spacing; axis labels 13 sp (were 16 x scale); the grid has no node dots; the page ground is white with a 30 % mint wash | `Chunky`, `LessonBoard.kt`, `AuroraBackground(wash)` |
+
+### alpha12 against the web phone layout (from `9ead2965`, not measured pixel by pixel)
+
+- Progress: the web phone still has the boost jet on the bar; alpha12 has none (Boss, N2).
+- Check bar: the web bar is a glass bar; alpha12 has bare 3D buttons (Boss, N4).
+- Verdict: the web shows its line in Humo's bubble and a glass panel; alpha12 shows the line in the bubble and a short label in the panel.
+- Jet pulse on a right answer (web `boostJet`): not in native.
+- The web's tutor sheet never rises above the translate row (`sheetRoom`); native shrinks the board to fit above the sheet instead.
+- The web truncates a long task to 2.4 s of reveal and ties reveals to the clip length (up to 4.2 s); native uses 330 ms a word.
+- The web's board marks are 1-3 word labels; native matches ("4 steps", "up").

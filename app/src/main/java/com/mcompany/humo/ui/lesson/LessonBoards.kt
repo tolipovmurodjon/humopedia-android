@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -196,9 +197,13 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
 
     val moved = flow.dragAt?.let { it != page.points[0] } ?: false
     val described = "Graph. The point is at ${flow.dragAt ?: page.points[0]}."
-    Canvas(
+    Box(
         Modifier.width(width).height(width * (page.graph.boxH / page.graph.boxW)).testTag("board")
-            .semantics { contentDescription = described }
+            .semantics {
+                contentDescription = described
+                // where the point is right now, in cells, so a test can hold it against the finger
+                stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)}" }
+            }
             .pointerInput(page, fly, wPx) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -248,8 +253,10 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                 }
             },
     ) {
+        // The graph never changes while a finger moves: its own canvas reads no state, so only the jet's canvas redraws per frame.
+        Canvas(Modifier.matchParentSize()) { graph(g, text) }
+        Canvas(Modifier.matchParentSize()) {
         tick.longValue
-        graph(g, text, dragging)
         humoMarks(g, flow.marks)
         val s = g.s
         val p = handle.value
@@ -279,6 +286,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
             val dot = when { ok -> BoardColors.Green; bad -> BoardColors.Yellow; else -> BoardColors.Blue }
             dragHandle(p, dot, dotR * s, s, halo = !ok)
             if (ok || bad) badge(Offset(p.x, p.y - (if (ok) 21f else 36f) * s), ok, s)
+        }
         }
     }
 }
@@ -421,9 +429,10 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                 if (!recap) append(". Targets at ${page.targets.joinToString(", ")}")
                 append('.')
             }
-            Canvas(Modifier.width(width).height(frameH).testTag("board").semantics { contentDescription = described }) {
+            Box(Modifier.width(width).height(frameH).testTag("board").semantics { contentDescription = described }) {
+            Canvas(Modifier.matchParentSize()) { translate(2f * s, 12f * s) { graph(g, text) } }
+            Canvas(Modifier.matchParentSize()) {
                 translate(2f * s, 12f * s) {
-                    graph(g, text)
                     humoMarks(g, flow.marks)
                     humoBraces(g, flow.braces, text)
                     val now = tick.longValue
@@ -450,6 +459,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                     // the rings go on top: a machine on its target never hides it
                     if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
                 }
+            }
             }
             ActionRow(page, flow, recap, u)
         }

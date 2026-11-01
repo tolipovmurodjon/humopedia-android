@@ -49,13 +49,13 @@ val LocalPageBackdrop = staticCompositionLocalOf<Backdrop?> { null }
  * clouds sit under the glass bar so it always has colour to bend. Built once per size change, free while scrolling.
  */
 @Composable
-fun AuroraBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+fun AuroraBackground(modifier: Modifier = Modifier, wash: Float = 1f, content: @Composable BoxScope.() -> Unit) {
     val page = rememberLayerBackdrop()
     Box(modifier) {
         Box(
             Modifier.matchParentSize()
                 .layerBackdrop(page)
-                .background(Glass.Page)
+                .background(androidx.compose.ui.graphics.lerp(Color.White, Glass.Page, wash))
                 .drawWithCache {
                     val grain = ShaderBrush(ImageShader(Grain.bitmap, TileMode.Repeated, TileMode.Repeated))
                     fun glow(x: Float, y: Float, r: Float, c: Color) = Brush.radialGradient(
@@ -64,10 +64,10 @@ fun AuroraBackground(modifier: Modifier = Modifier, content: @Composable BoxScop
                         radius = size.maxDimension * r,
                     )
                     val clouds = listOf(
-                        glow(0.04f, 0.02f, 0.40f, Glass.Mint1.copy(alpha = 0.70f)),
-                        glow(0.95f, 0.10f, 0.30f, Glass.TealCloud.copy(alpha = 0.45f)),
-                        glow(0.96f, 0.97f, 0.42f, Glass.Mint2.copy(alpha = 0.55f)),
-                        glow(0.08f, 0.99f, 0.34f, Glass.Brand.copy(alpha = 0.38f)),
+                        glow(0.04f, 0.02f, 0.40f, Glass.Mint1.copy(alpha = wash * 0.70f)),
+                        glow(0.95f, 0.10f, 0.30f, Glass.TealCloud.copy(alpha = wash * 0.45f)),
+                        glow(0.96f, 0.97f, 0.42f, Glass.Mint2.copy(alpha = wash * 0.55f)),
+                        glow(0.08f, 0.99f, 0.34f, Glass.Brand.copy(alpha = wash * 0.38f)),
                     )
                     onDrawBehind {
                         clouds.forEach { drawRect(it) }

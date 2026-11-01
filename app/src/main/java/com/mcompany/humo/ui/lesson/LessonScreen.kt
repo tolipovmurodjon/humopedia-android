@@ -3,7 +3,15 @@ package com.mcompany.humo.ui.lesson
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -168,7 +176,7 @@ fun LessonPlayer(
         glassOn = true
         android.util.Log.i("HumoPerf", "lesson-glass-on ms=${android.os.SystemClock.elapsedRealtime() - t0}")
     }
-    CompositionLocalProvider(LocalLessonGlass provides glassOn) { AuroraBackground(Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalLessonGlass provides glassOn) { AuroraBackground(Modifier.fillMaxSize(), wash = 0.3f) {
         Box(
             Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -178,7 +186,7 @@ fun LessonPlayer(
         ) {
             Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = if (bare) bottomInset else 0.dp)) {
                 if (!atBye) Box {
-                    TopBar(flow, theme == LessonTheme.Fly, onClose = close)
+                    TopBar(flow, onClose = close)
                     // the tutor dims the page, but never while Humo draws on the board: then the board must be seen as it is
                     if (flow.chat.open && flow.marks.isEmpty() && !bare) Box(Modifier.matchParentSize().background(Chrome.Scrim))
                 }
@@ -207,9 +215,11 @@ private fun androidx.compose.foundation.layout.BoxScope.QuitSheet(humo: HumoStat
         humo.talking = false
         humo.face = HumoFace.Sad
     }
+    val shown = remember { MutableTransitionState(false).apply { targetState = true } }
     Box(Modifier.matchParentSize().background(Chrome.Scrim).pointerInput(Unit) { detectTapGestures { } })
+    AnimatedVisibility(shown, Modifier.align(Alignment.BottomCenter), enter = slideInVertically(if (humo.alive) spring<IntOffset>(dampingRatio = 0.82f, stiffness = 380f) else tween(0)) { it }) {
     Column(
-        Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("quit-sheet")
+        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("quit-sheet")
             .chromeGlass(28.dp).padding(top = 18.dp, bottom = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -224,6 +234,7 @@ private fun androidx.compose.foundation.layout.BoxScope.QuitSheet(humo: HumoStat
             "END LESSON", Modifier.clickable(role = Role.Button, onClick = onEnd).padding(horizontal = 24.dp, vertical = 14.dp),
             fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, letterSpacing = 0.8.sp, color = Chrome.Muted,
         )
+    }
     }
 }
 
@@ -268,22 +279,14 @@ private fun HumoMoods(flow: LessonFlow, humo: HumoState, voice: HumoVoice) {
     }
 }
 
-/** The top bar: a close cross and the glass progress track with the jet on its tip. Nothing else (Boss: no XP while learning). */
+/** The top bar: a 44 dp glass close button and a thick progress bar that fills smoothly (no jet, no icon). No XP while learning. */
 @Composable
-private fun TopBar(flow: LessonFlow, fly: Boolean, onClose: () -> Unit) {
-    val p by animateFloatAsState(flow.progress, tween(400, easing = BrilliantEase), label = "progress")
-    Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Exit lesson", onClick = onClose).semantics { contentDescription = "Exit lesson" },
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.size(22.dp)) {
-                drawLine(Chrome.Close, Offset(0f, 0f), Offset(size.width, size.height), 3.dp.toPx(), StrokeCap.Round)
-                drawLine(Chrome.Close, Offset(size.width, 0f), Offset(0f, size.height), 3.dp.toPx(), StrokeCap.Round)
-            }
-        }
+private fun TopBar(flow: LessonFlow, onClose: () -> Unit) {
+    val p by animateFloatAsState(flow.progress, spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessLow), label = "progress")
+    Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        CloseButton(onClose)
         Spacer(Modifier.width(14.dp))
-        ProgressTrack(p, fly, Modifier.weight(1f))
+        ProgressTrack(p, Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
     }
 }
@@ -318,38 +321,44 @@ private fun androidx.compose.foundation.layout.ColumnScope.LessonBody(
 private data class BtnSpec(val label: String, val kind: Kind, val enabled: Boolean = true, val onClick: () -> Unit)
 
 /**
- * Duolingo's button: solid, rounded 16 dp, bold capitals with letter spacing, a 4 dp darker edge under it that the face
- * presses into while held. Disabled is flat light grey with a lighter label. [caps] false is for the tutor's chips.
+ * Duolingo's 3D button as ONE shape (Boss, 2026-11-01: never a box layered over a button): a rounded face and a solid 4 dp lip
+ * under it, both drawn by this one node; the face presses into the lip while held. Disabled is flat light grey. The label is
+ * sentence case, medium weight, no letter spacing (the web phone's Check).
  */
 @Composable
 internal fun Chunky(
-    label: String, kind: Kind, enabled: Boolean, modifier: Modifier = Modifier, caps: Boolean = true,
+    label: String, kind: Kind, enabled: Boolean, modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null, onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = RoundedCornerShape(16.dp)
     val (face, edge, ink) = when {
         !enabled -> Triple(Chrome.OffFace, Chrome.OffFace, Chrome.OffText)
         kind == Kind.Primary -> Triple(Chrome.Mint, Chrome.MintEdge, Color.White)
         kind == Kind.Warn -> Triple(Chrome.Yellow, Chrome.YellowEdge, Color(0xFF4A3600))
         else -> Triple(Color.White, Chrome.Line, Chrome.MintInk)
     }
+    val sink = !enabled || pressed
     // propagateMinConstraints: a button given an exact width (a weight, fillMaxWidth) fills it; otherwise it wraps its label.
-    Box(modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick), propagateMinConstraints = true) {
-        if (enabled) Box(Modifier.matchParentSize().padding(top = 4.dp).clip(shape).background(edge))
-        Box(
-            Modifier.height(48.dp).offset(y = if (!enabled || pressed) 4.dp else 0.dp).clip(shape).background(face)
-                .then(if (kind == Kind.Secondary && enabled) Modifier.border(2.dp, edge, shape) else Modifier),
-            contentAlignment = Alignment.Center,
-        ) {
-            // The label shrinks until it fits its button (a narrow phone, a big font): never cut, never wrapped.
-            var fit by remember(label) { mutableFloatStateOf(1f) }
+    Box(
+        modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick).drawBehind {
+            val lip = 4.dp.toPx()
+            val r = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+            val faceSize = androidx.compose.ui.geometry.Size(size.width, size.height - lip)
+            if (!sink) drawRoundRect(edge, Offset(0f, lip), faceSize, r)
+            drawRoundRect(face, Offset(0f, if (sink) lip else 0f), faceSize, r)
+            if (kind == Kind.Secondary && enabled) drawRoundRect(edge, Offset(1.dp.toPx(), (if (sink) lip else 0f) + 1.dp.toPx()), androidx.compose.ui.geometry.Size(faceSize.width - 2.dp.toPx(), faceSize.height - 2.dp.toPx()), r, style = Stroke(2.dp.toPx()))
+        },
+        propagateMinConstraints = true,
+    ) {
+        // The label shrinks until it fits its button (a narrow phone, a big font): never cut, never wrapped.
+        var fit by remember(label) { mutableFloatStateOf(1f) }
+        Box(Modifier.padding(bottom = 4.dp).offset(y = if (sink) 4.dp else 0.dp), contentAlignment = Alignment.Center) {
             Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 leading?.invoke()
                 Text(
-                    if (caps) label.uppercase() else label, fontFamily = LessonType.Figtree, fontWeight = if (caps) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    fontSize = (if (caps) 15.sp else 17.sp) * fit, letterSpacing = if (caps) 0.8.sp else 0.sp, color = ink, maxLines = 1, softWrap = false,
+                    label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium,
+                    fontSize = 17.sp * fit, color = ink, maxLines = 1, softWrap = false,
                     onTextLayout = { if (it.didOverflowWidth && fit > 0.45f) fit *= 0.92f },
                 )
             }
@@ -381,22 +390,21 @@ private suspend fun runDemo(flow: LessonFlow, motion: Boolean) {
     suspend fun say(t: String) { flow.say(t); nap((t.split(' ').size * 380L + 500L).coerceAtLeast(1300L)) }
     val s0 = p.points[0]
     val m = p.move
+    // Drawing, not talking (Boss): the start is ringed, two short labels grow along the run, the learner's try flies and is ringed,
+    // then the right move flies. One line in the bubble, at the end.
     flow.marks = listOf(s0)
-    say(flow.fresh(L11.fx("fixLook2")))
+    nap(900)
     flow.braces = listOf(Brace(s0, Node(s0.x + m.x, s0.y), LessonLines.steps(m.x, "right").substringBeforeLast(' ')))
-    nap(700)
+    nap(900)
     if (m.y != 0) flow.braces = flow.braces + Brace(Node(s0.x + m.x, s0.y), Node(s0.x + m.x, s0.y + m.y), if (m.y > 0) "up" else "down")
-    say(LessonLines.demoRight(m))
+    nap(900)
     val mine = flow.demoMine
     if (mine != null) {
         flow.demoSet(mine); nap(1500)
         flow.marks = listOf(s0, s0 + mine)
-        say(LessonLines.youMoved(mine))
-        flow.demoSet(m)
-    } else {
-        say(flow.fresh(L11.fx("fixNone")))
-        flow.demoSet(m)
+        nap(900)
     }
+    flow.demoSet(m)
     nap(1500)
     flow.marks = emptyList()
     say(flow.fresh(L11.fx("fixThen")))
@@ -465,7 +473,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val keypad = page.kind == PageKind.Translate && !tutorOpen
     val negatives = page.tiles.any { it < 0 }
     val promptText = if (fly) Words.machine(page.prompt) else page.prompt
-    val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else promptText
+    val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else if (!flow.inSkill) flow.verdict ?: promptText else promptText
     val askHumo: (() -> Unit)? = if (flow.inSkill || demo) null else { { LessonSounds.play(Cue.Tick); flow.chat.openClean() } }
     // the room under the page for the glass bar, so the verdict panel (drawn over it) never moves the board
     val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
@@ -506,22 +514,27 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             if (keypad) {
                 Keypad(flow, negatives, keyHeight, Modifier.padding(bottom = if (compact) 4.dp else 8.dp)) { LessonSounds.play(Cue.Tick); check() }
             }
-            if (tutorOpen) {
+            AnimatedVisibility(
+                visible = tutorOpen,
+                enter = slideInVertically(if (motion) spring<IntOffset>(dampingRatio = 0.82f, stiffness = 380f) else tween(0)) { it },
+                exit = slideOutVertically(tween(if (motion) 170 else 0)) { it },
+            ) {
                 TutorSheet(
                     flow, page, fly, humo, voice, bottomInset = bottomInset, modifier = Modifier,
                     onTryAgain = { LessonSounds.play(Cue.Tick); flow.tryAgain() }, onContinue = { if (flow.phase == Phase.Correct) flow.next() },
                 )
-            } else Spacer(Modifier.height(dockRoom))
+            }
+            if (!tutorOpen) Spacer(Modifier.height(dockRoom))
         }
         if (!tutorOpen) Box(Modifier.align(Alignment.BottomCenter)) {
             AnimatedContent(
                 targetState = barKey,
-                transitionSpec = { (slideInVertically(tween(if (motion) 220 else 0, easing = BrilliantEase)) { it / 2 } + fadeIn(tween(if (motion) 160 else 0))).togetherWith(fadeOut(tween(0))) },
+                transitionSpec = { slideInVertically(if (motion) spring<IntOffset>(dampingRatio = 0.82f, stiffness = 380f) else tween(0)) { it }.togetherWith(ExitTransition.None) },
                 label = "bottom",
             ) { key ->
                 when {
-                    key == "how" -> GlassDock(bottomInset) { Chunky("Continue lesson", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
-                    key.startsWith("demo") -> GlassDock(bottomInset) { Chunky("Continue", Kind.Primary, !flow.demoBusy, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
+                    key == "how" -> ButtonBar(bottomInset) { Chunky("Continue lesson", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
+                    key.startsWith("demo") -> ButtonBar(bottomInset) { Chunky("Continue", Kind.Primary, !flow.demoBusy, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
                     key.startsWith("skill-") -> {
                         val j = (flow.screen as Screen.Skill).j
                         val ok = flow.skillResults[j] == true
@@ -530,26 +543,26 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                             Chunky(if (last) "Finish" else "Continue", if (ok) Kind.Primary else Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
                         }
                     }
-                    key == "skill" -> GlassDock(bottomInset) {
+                    key == "skill" -> ButtonBar(bottomInset) {
                         Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f)) { LessonSounds.play(Cue.Skip); flow.dontKnow() }
                         Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(1f)) { check() }
                     }
-                    key == "go" -> GlassDock(bottomInset) { Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
-                    key == "right" -> GlassPanel(true, flow.verdict.orEmpty(), bottomInset, onFlag = { reporting = true }) {
+                    key == "go" -> ButtonBar(bottomInset) { Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
+                    key == "right" -> GlassPanel(true, "Correct!", bottomInset, onFlag = { reporting = true }) {
                         Chunky("Show me how", Kind.Secondary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); flow.showHow = true }
                         Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
                     }
-                    key == "fixright" -> GlassPanel(true, flow.verdict.orEmpty(), bottomInset, onFlag = null) {
+                    key == "fixright" -> GlassPanel(true, "Correct!", bottomInset, onFlag = null) {
                         Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
                     }
-                    key == "fixwrong" -> GlassPanel(false, flow.verdict.orEmpty(), bottomInset, onFlag = null) {
+                    key == "fixwrong" -> GlassPanel(false, "Not quite", bottomInset, onFlag = null) {
                         Chunky("Continue", Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
                     }
-                    key == "wrong" -> GlassPanel(false, flow.verdict ?: LessonLines.REVIEW, bottomInset, onFlag = { reporting = true }) {
+                    key == "wrong" -> GlassPanel(false, "Not quite", bottomInset, onFlag = { reporting = true }) {
                         Chunky("Get help", Kind.Secondary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
                         Chunky("Try again", Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); flow.tryAgain() }
                     }
-                    else -> GlassDock(bottomInset) { Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(1f)) { check() } }
+                    else -> ButtonBar(bottomInset) { Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(1f)) { check() } }
                 }
             }
         }
@@ -615,7 +628,7 @@ private fun CenterScreen(humo: HumoState, big: (@Composable () -> Unit)?, title:
             }
         }
         if (foot != null) Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) {
-            GlassDock(0.dp) { Chunky(foot.label, foot.kind, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); foot.onClick() } }
+            ButtonBar(0.dp) { Chunky(foot.label, foot.kind, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); foot.onClick() } }
         }
     }
 }

@@ -29,15 +29,8 @@ const why = (p) => p.explain ? plain(p.explain) + SENSE : 'Check first. Then I w
 const look = (p) => p.kind === 'Translate'
   ? 'Look at the teal squares. What do you notice?'
   : 'Look at the teal squares. What do you notice?';
-const showMe = (p) => p.kind === 'Translate'
-  ? `Compare each ${M} with its ring. Fix the difference, then try again.`
-  : `Compare the two squares. Move it the difference, then try again.`;
-const how = (p) => {
-  const [mx, my] = p.move, [fx, fy] = p.points[0];
-  return p.kind === 'Drag'
-    ? `The ${M} starts at (${fx}, ${fy}). Move it ${steps(mx, mx >= 0 ? 'right' : 'left')}: x goes from ${fx} to ${fx + mx}. Move it ${steps(my, my >= 0 ? 'up' : 'down')}: y goes from ${fy} to ${fy + my}. It lands on (${fx + mx}, ${fy + my}).`
-    : `Each ${M} moves ${steps(mx, mx >= 0 ? 'right' : 'left')} and ${steps(my, my >= 0 ? 'up' : 'down')}, so the translation is (${mx}, ${my}). For example, (${fx}, ${fy}) moves to (${fx + mx}, ${fy + my}).`;
-};
+const showMe = (p) => p.kind === 'Translate' ? 'Match each ring. Then try again.' : 'Move it onto the square.';
+const how = (p) => { const [mx, my] = p.move; return my ? `Right ${mx}, then up ${my}.` : `Right ${mx}. Nothing up.`; };
 
 const lines = new Set();
 for (const p of data.pages.filter((q) => !q.skill)) if (data.coach[p.id]) lines.add(data.coach[p.id]);

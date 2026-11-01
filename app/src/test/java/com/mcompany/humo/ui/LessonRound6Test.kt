@@ -39,7 +39,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Round 6 (Boss's picked mobile design): a child plays all of L1.1: a wrong try on each kind of page, the amber and mint
- * glass panels, GET HELP and Humo's sheet (it covers the Check bar and the board stays above it), SHOW ME HOW, the skill
+ * glass panels, Get help and Humo's sheet (it covers the Check bar and the board stays above it), Show me how, the skill
  * check with a miss, Humo's fix-it round (replay, two fresh problems, a miss, a new pair, the pass), a clean 3 of 3, the quit
  * sheet and "See you soon". At 360x800, 390x844, 412x915 and at 1.5x font. Shots: build/outputs/roborazzi/round6.
  */
@@ -93,27 +93,27 @@ class LessonRound6Test {
         fun solve() { act { val m = flow.page!!.move; flow.tapTile(m.x); flow.tapTile(m.y); flow.check() }; settle() }
         compose.onNodeWithContentDescription("0 sparks").assertDoesNotExist()
 
-        // P1: drag. A wrong try, the amber panel, GET HELP (Humo marks the board), a chip, DONE, TRY AGAIN, right, SHOW ME HOW.
+        // P1: drag. A wrong try, the amber panel, Get help (Humo marks the board), a chip, Done, Try again, right, Show me how.
         shot("P1-start")
         act { flow.dropAt(Node(1, 5)) }
         act { flow.check() }; settle()
         shot("P1-wrong")
-        click("GET HELP"); settle()
+        click("Get help"); settle()
         assertTrue("Humo draws squares on the board", flow.marks.isNotEmpty())
         assertBoardAboveSheet(tag)
         assertSheetCoversBar(tag)
         shot("P1-tutor-draws")
         click("Show me"); settle()
         shot("P1-tutor-show-me")
-        click("DONE")
-        click("TRY AGAIN")
+        click("Done")
+        click("Try again")
         act { flow.dropAt(Node(5, 3)); flow.check() }; settle()
         assertEquals(15, flow.sparks)
         shot("P1-right")
-        click("SHOW ME HOW"); settle()
+        click("Show me how"); settle()
         compose.onNodeWithTag("how-card").assertIsDisplayed()
         shot("P1-show-me-how")
-        click("CONTINUE LESSON")
+        click("Continue lesson")
         shot("P2-start")
 
         // P3: the explainer, and Humo's sheet on a page nobody got wrong (he is tapped, not a button with a word).
@@ -124,7 +124,7 @@ class LessonRound6Test {
         shot("P3-tutor")
         click("Give me a hint"); settle()
         shot("P3-tutor-hint")
-        click("DONE")
+        click("Done")
 
         // P4-P6: the keypad, a wrong try each.
         for (i in 3..5) {
@@ -137,7 +137,7 @@ class LessonRound6Test {
             shot("P${i + 1}-both-numbers")
             act { flow.check() }; settle()
             shot("P${i + 1}-wrong")
-            click("TRY AGAIN")
+            click("Try again")
             solve()
             shot("P${i + 1}-right")
         }
@@ -148,54 +148,54 @@ class LessonRound6Test {
         act { flow.beginSkillSplash() }
         compose.onNodeWithText("Show what you know").assertIsDisplayed()
         shot("SC-gate")
-        click("CONTINUE")
+        click("Continue")
         shot("SC1-start")
         act { flow.tapTile(0); flow.tapTile(0) }
-        click("CHECK"); settle()
+        click("Check"); settle()
         compose.onNodeWithText("Incorrect").assertIsDisplayed()
         shot("SC1-wrong")
-        click("CONTINUE")
-        click("SHOW ME"); settle()
+        click("Continue")
+        click("Show me"); settle()
         compose.onNodeWithText("Here's how it goes.").assertIsDisplayed()
         shot("SC2-show-me")
-        click("CONTINUE")
+        click("Continue")
         act { flow.tapTile(flow.page!!.move.x); flow.tapTile(flow.page!!.move.y) }
-        click("CHECK"); settle()
+        click("Check"); settle()
         compose.onNodeWithText("Correct!").assertIsDisplayed()
         shot("SC3-right")
-        click("FINISH")
+        click("Finish")
 
         // Fix-it: never a fail screen. Humo replays the miss, two fresh problems, a miss, a new pair, the pass.
         compose.onNodeWithText("Almost! Let's fix one.").assertIsDisplayed()
         shot("fix-intro")
-        click("FIX IT WITH HUMO"); settle()
+        click("Fix it with Humo"); settle()
         assertEquals(Screen.Demo, flow.screen)
         shot("fix-demo")
-        click("CONTINUE")
+        click("Continue")
         shot("fix-1-start")
         act { flow.tapTile(0); flow.tapTile(0); flow.check() }; settle()
         shot("fix-1-wrong")
-        click("CONTINUE")
+        click("Continue")
         solve()
         shot("fix-2-right")
-        click("CONTINUE"); settle()
+        click("Continue"); settle()
         assertEquals("a miss replays and serves a new pair", Screen.Demo, flow.screen)
         shot("fix-demo-again")
-        click("CONTINUE")
-        solve(); click("CONTINUE")
+        click("Continue")
+        solve(); click("Continue")
         solve()
         shot("fix-4-right")
-        click("CONTINUE")
+        click("Continue")
         assertEquals(Screen.End, flow.screen)
         compose.onNodeWithText("Lesson complete").assertIsDisplayed()
         shot("end-after-fix")
 
         // A clean 3 of 3: the Score, then the end (the jet pass runs with motion; the Mach 3 frames are in LessonScreenshotTest).
         act { flow.restart(); flow.startSkill() }
-        repeat(3) { solve(); click(if (it == 2) "FINISH" else "CONTINUE") }
+        repeat(3) { solve(); click(if (it == 2) "Finish" else "Continue") }
         compose.onNodeWithText("Perfect!").assertIsDisplayed()
         shot("score-perfect")
-        click("CONTINUE")
+        click("Continue")
         shot("end-perfect")
 
         // The quit sheet and the calm goodbye.
