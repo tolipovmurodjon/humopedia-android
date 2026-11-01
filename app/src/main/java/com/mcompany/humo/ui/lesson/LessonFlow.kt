@@ -251,6 +251,8 @@ class LessonFlow(val lesson: LessonContent = L11) {
         remark = "Count right first, then up."; remarkN++
     }
     fun clearRemark() { remark = null }
+    /** A big number sent the jet off the board: Humo jokes about it and points to a smaller number. */
+    fun farMiss() { remark = fresh(LessonLines.farJokes); remarkN++ }
 
     /** Humo says [text] in the bubble (a plain remark: no verdict colours). */
     fun say(text: String) { verdict = text; bubble = text; chat.hear(text) }
@@ -363,3 +365,6 @@ internal fun previewMove(s: Slots): Node? = when {
 
 /** How far from the jet's centre a finger still grabs it (px): at least 56 dp across, or most of the sprite on the fly layer. */
 internal fun grabRadius(densityPx: Float, spritePx: Float, fly: Boolean): Float = maxOf(40f * densityPx, if (fly) spritePx * 0.7f else 0f)
+
+/** A target more than three cells past the board's edge: the jet flies out of the screen instead of stopping at the edge. */
+internal fun isFarOffBoard(x: Float, y: Float, w: Float, h: Float, cell: Float): Boolean = maxOf(maxOf(-x, x - w), maxOf(-y, y - h)) > cell * 3f

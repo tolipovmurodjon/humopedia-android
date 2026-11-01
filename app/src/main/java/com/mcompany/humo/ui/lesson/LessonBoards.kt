@@ -71,6 +71,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -371,6 +372,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
 
     // One machine per point. A board opened already checked (review, state restore) has them landed; otherwise they wait
     // at their start. The recap's ride the points exactly.
+    val farRaw = remember(page) { androidx.compose.runtime.mutableStateListOf<Offset?>().also { l -> repeat(page.points.size) { l.add(null) } } }
     val offBoard = remember(page) { androidx.compose.runtime.mutableStateListOf<Offset?>().also { l -> repeat(page.points.size) { l.add(null) } } }
     val crafts = remember(page, wPx) {
         page.points.map { p ->
@@ -399,8 +401,11 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             // a target past the board edge: the machine stops at the edge and an arrow shows where it was going (as the web does)
             val m = len * 0.55f
             val bh = wPx * page.graph.boxH / page.graph.boxW
-            val want = Offset(raw.x.coerceIn(m, wPx - m), raw.y.coerceIn(m, bh - m))
-            offBoard[i] = if (want != raw) raw - want else null
+            val far = isFarOffBoard(raw.x, raw.y, wPx, bh, g.cell)
+            // a big number: no clamp, the jet leaves the screen (an edge arrow shows where) and banks back in; a near miss stays on the board
+            val want = if (far) raw else Offset(raw.x.coerceIn(m, wPx - m), raw.y.coerceIn(m, bh - m))
+            offBoard[i] = if (!far && want != raw) raw - want else null
+            farRaw[i] = if (far) raw else null
             if (dist(c.pos, want) < 1f) return@forEachIndexed
             if (motion) {
                 Flying.plan(c, want, withFrameMillis { it }, density.density)
@@ -408,6 +413,14 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             } else { c.deg = Flying.bearing(c.pos, want); c.pos = want }
         }
         if (launched) { LessonSounds.play(Cue.Whoosh); wake.intValue++ }
+        if (launched && farRaw.any { it != null }) {
+            settleFlights(crafts, wake)
+            delay(450)
+            flow.farMiss()
+            crafts.forEachIndexed { i, c -> if (farRaw[i] != null) Flying.plan(c, g.px(page.points[i]), withFrameMillis { it }, density.density) }
+            farRaw.indices.forEach { farRaw[it] = null }
+            wake.intValue++
+        }
     }
     // Check only grades: it waits for a preview flight still in the air, then the player grades.
     DisposableEffect(deck, crafts) {
@@ -485,6 +498,18 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                             jetAt(atlas, c.pos, c.heading, len, flames = flames, t = now / 1000f, motion = motion, alt = c.alt)
                         }
                         if (phase != Phase.Idle) badge(Offset(c.pos.x + g.cell * 0.42f, c.pos.y - g.cell * 0.42f), phase == Phase.Correct, s)
+                        farRaw[i]?.let { raw ->
+                            // the jet is out of the screen: an arrow on the edge shows where, with how far
+                            if (c.flight == null && dist(c.pos, raw) < 2f) {
+                                val e = Offset(raw.x.coerceIn(len * 0.55f, size.width - len * 0.55f), raw.y.coerceIn(len * 0.55f, size.height - len * 0.55f))
+                                val dx = raw.x - e.x; val dy = raw.y - e.y
+                                val dl = hypot(dx, dy).coerceAtLeast(1f)
+                                val u1 = Offset(dx / dl, dy / dl)
+                                val side = Offset(-u1.y, u1.x) * (len * 0.2f)
+                                drawPath(Path().apply { moveTo(e.x + u1.x * len * 0.5f, e.y + u1.y * len * 0.5f); lineTo(e.x + side.x, e.y + side.y); lineTo(e.x - side.x, e.y - side.y); close() }, SlotColors.MintMark)
+                                label(text, "${(dl / g.cell).roundToInt()} away", Offset(e.x - u1.x * len * 0.6f, e.y - u1.y * len * 0.6f), TextStyle(fontFamily = LessonType.Figtree, fontSize = (14f * s / density).sp, color = SlotColors.MintInk))
+                            }
+                        }
                         offBoard[i]?.let { d ->
                             val u1 = Offset(d.x / hypot(d.x, d.y), d.y / hypot(d.x, d.y))
                             val tip = c.pos + u1 * (len * 0.95f)

@@ -1,6 +1,7 @@
 package com.mcompany.humo.ui
 
 import com.mcompany.humo.ui.lesson.L11
+import com.mcompany.humo.ui.lesson.isFarOffBoard
 import com.mcompany.humo.ui.lesson.LessonFlow
 import com.mcompany.humo.ui.lesson.Node
 import com.mcompany.humo.ui.lesson.Screen
@@ -52,5 +53,15 @@ class LessonBubbleAndHintTest {
     @Test fun jetGrabAreaIsGenerous() {
         assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 10f, false) >= 120f)
         assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 400f, true) >= 280f)
+    }
+
+    /** N16: a big number sends the jet off the screen; a near miss stays on the board. Humo's joke never repeats twice in a row. */
+    @Test fun bigNumbersLeaveTheScreenAndTheJokeVaries() {
+        assertTrue(isFarOffBoard(12f * 40f + 50f, 100f, 350f, 330f, 40f))
+        assertFalse(isFarOffBoard(380f, 100f, 350f, 330f, 40f))
+        val flow = LessonFlow(L11)
+        flow.goTo(Screen.Page(3))
+        var last: String? = null
+        repeat(8) { flow.farMiss(); assertTrue(flow.remark != last); last = flow.remark }
     }
 }

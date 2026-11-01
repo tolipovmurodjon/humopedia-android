@@ -38,7 +38,7 @@ data.praise.forEach((t) => lines.add(t));
 ['There we go.', 'Ooh, nice.', 'Nice move.', 'Got it.', 'Okay, I see.'].forEach((t) => lines.add(t));
 ["Ok, let's get into it.", "Ok, let's go. What do you need?",
   'Right adds to x, up adds to y. Ready for the next one?', 'Nice. Fix it and try again.', 'Sure. Take your time.',
-  'Check first. Then I will show you why.', 'I would like to hear you. Tap Allow.', 'Say it another way?', 'Leaving so soon? Your spot is saved. Come back when you are ready.', 'I need to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
+  'Check first. Then I will show you why.', 'I would like to hear you. Tap Allow.', 'Whoa, that one is halfway to Samarkand. Try a smaller number.', 'Bye bye, jet! It left the planet. Try a smaller number.', 'That is a very long flight. Try a smaller number.', 'Ooh, it left the building. Try a smaller number.', 'Say it another way?', 'Leaving so soon? Your spot is saved. Come back when you are ready.', 'I need to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));
 // Humo's wrong-try pools (player.js linePools), every slip from 3 short to 3 too far, and what the fix-it replay says
 const linePools = (ex, ey) => {
   const xs = `${Math.abs(ex)} ${ex > 0 ? 'too far' : 'short'}`, ys = `${Math.abs(ey)} ${ey > 0 ? 'too far' : 'short'}`;
