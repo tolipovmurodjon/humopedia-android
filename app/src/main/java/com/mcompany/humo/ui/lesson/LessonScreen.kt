@@ -517,6 +517,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val keypad = page.kind == PageKind.Translate && !tutorOpen
     val negatives = page.tiles.any { it < 0 }
     val promptText = if (fly) Words.machine(page.prompt) else page.prompt
+    // more than 5 s with no input on a page: a hesitation, for the playtest log
+    LaunchedEffect(flow.screen, flow.slots, flow.dragAt, flow.phase) { delay(5000); PlaytestLog.log("hesitation", page.id) }
     // A move: Humo says one short cue (his bubble shows it; a touch cuts it off).
     LaunchedEffect(flow.remarkN) {
         val cue = flow.remark ?: return@LaunchedEffect
@@ -634,7 +636,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                         onFlag = if (spec.flag) ({ reporting = true }) else null,
                         secondary = spec.secondary?.let { icon ->
                             { m -> Chunky(if (icon == ChunkyIcon.Bulb) "Why?" else "Get help", Kind.Secondary, true, m, icon = icon) {
-                                if (icon == ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true } else { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
+                                if (icon == ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true } else { LessonSounds.play(Cue.Tick); PlaytestLog.log("help_tap", page.id); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
                             } }
                         },
                     )

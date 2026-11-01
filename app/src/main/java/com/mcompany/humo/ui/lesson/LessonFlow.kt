@@ -183,7 +183,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** Humo's short cue after a move: shown in his bubble in place of the task until the next page or try. */
     var remark by mutableStateOf<String?>(null); private set
     var remarkN by mutableIntStateOf(0); private set
-    fun tapTile(v: Int) { if (!locked) slots = slots.place(v) }
+    fun tapTile(v: Int) { if (!locked) { slots = slots.place(v); previews++ } }
     fun tapSlot(i: Int) { if (!locked) slots = slots.select(i) }
     fun startOver() { if (!locked) { dragAt = null; slots = page?.let { Slots.start(it) } ?: Slots() } }
     /** The keypad's undo: the number in the slot just filled goes, and that slot is active again. */
@@ -215,6 +215,8 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** Returns true when right. A skill item never shows a verdict: it is recorded and the screen moves on. */
     fun check(): Boolean {
         val p = page ?: return false
+        if (previews > 0) PlaytestLog.log("preview_count", p.id, previews)
+        previews = 0
         val ok = isRight(p)
         when (val s = screen) {
             is Screen.Skill -> {
@@ -248,6 +250,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** The bulb: the method only (the start is ringed) before the ladder allows the answer; after a right answer or the third miss, the worked answer. */
     fun hint() {
         val p = page ?: return
+        PlaytestLog.log("help_tap", pid())
         if (misses >= 3 || phase == Phase.Correct) { showHow = true; return }
         marks = listOf(p.points[0])
         remark = "Count right first, then up."; remarkN++
@@ -264,6 +267,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     /** Try again clears the verdict, Humo's marks and (on a translate page) both numbers, so the machines fly home. */
     fun tryAgain() {
+        PlaytestLog.log("retry", pid())
         remark = null; phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList(); braces = emptyList(); showHow = false
         val p = page
         if (p?.kind == PageKind.Translate) slots = Slots.start(p)
@@ -325,13 +329,14 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     /** "Restart lesson" on the end card: back to page 1 with nothing earned. */
     fun restart() {
+        PlaytestLog.log("replay", pid())
         sparks = 0; solved.clear(); said.clear(); small = false; endLine = null; fixN = 0; mine.clear()
         for (i in skillResults.indices) skillResults[i] = null
         show(Screen.Page(0))
     }
     fun finish() = show(Screen.End)
     /** END LESSON with no screen to go back to. */
-    fun bye() { before = screen; show(Screen.Bye) }
+    fun bye() { PlaytestLog.log("quit_point", pid()); before = screen; show(Screen.Bye) }
     private var before: Screen? = null
     /** "Back to lesson" on the goodbye: the page the learner left, fresh. */
     fun resume() = show(before?.takeIf { it !is Screen.Bye } ?: Screen.Page(0))
@@ -339,7 +344,15 @@ class LessonFlow(val lesson: LessonContent = L11) {
     /** Back to page [i] (tests and the end card's replay). */
     fun goTo(s: Screen) = show(s)
 
+    private fun pid(): String = page?.id ?: screen.toString()
+    private var shownAt = System.currentTimeMillis()
+    private var previews = 0L
+
     private fun show(s: Screen) {
+        val now = System.currentTimeMillis()
+        if (screen is Screen.Page || screen is Screen.Skill || screen is Screen.Fix) PlaytestLog.log("page_time", pid(), now - shownAt)
+        if (s is Screen.Sky) PlaytestLog.log("one_more", "sky")
+        shownAt = now
         screen = s
         remark = null
         misses = 0
