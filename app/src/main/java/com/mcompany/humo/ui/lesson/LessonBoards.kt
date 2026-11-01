@@ -512,7 +512,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                                 val u1 = Offset(dx / dl, dy / dl)
                                 val side = Offset(-u1.y, u1.x) * (len * 0.2f)
                                 drawPath(Path().apply { moveTo(e.x + u1.x * len * 0.5f, e.y + u1.y * len * 0.5f); lineTo(e.x + side.x, e.y + side.y); lineTo(e.x - side.x, e.y - side.y); close() }, SlotColors.MintMark)
-                                label(text, "${(dl / g.cell).roundToInt()} away", Offset(e.x - u1.x * len * 0.6f, e.y - u1.y * len * 0.6f), TextStyle(fontFamily = LessonType.Figtree, fontSize = (14f * s / density).sp, color = SlotColors.MintInk))
+                                label(text, "${(dl / g.cell).roundToInt()} away", Offset(e.x - u1.x * len * 0.6f, e.y - u1.y * len * 0.6f), TextStyle(fontFamily = LessonType.Figtree, fontSize = (14f * s / this.density).sp, color = SlotColors.MintInk))
                             }
                         }
                         offBoard[i]?.let { d ->
