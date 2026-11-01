@@ -14,7 +14,7 @@ import kotlin.math.sin
  * a public repo). Each matches the character of Brilliant's cue as measured (docs/qa/l11-spec.md §9): length, pitch
  * direction and a soft envelope. Clean tones only, no noise, no buzz (Boss: "I hate buzzy sounds").
  */
-enum class Cue { Correct, Incorrect, Tick, Toggle, Start, Complete, Whoosh, Boom, DragStart, DragEnd, Continue, Skip, Failed, XpStart, XpStop }
+enum class Cue { Correct, Incorrect, Tick, Toggle, Start, Complete, Whoosh, Boom, DragStart, DragEnd, Continue, Skip, Failed, Hint }
 
 object LessonSounds {
     private const val RATE = 44_100
@@ -39,7 +39,7 @@ object LessonSounds {
         Cue.DragEnd -> listOf(Note(900.0, 0.0, 0.04, 0.35, rise = 0.001))
         Cue.Continue, Cue.Skip -> listOf(Note(1800.0, 0.0, 0.04, 0.35, rise = 0.001))
         Cue.Failed -> listOf(Note(261.6, 0.0, 0.2, 0.5), Note(220.0, 0.14, 0.24, 0.5), Note(196.0, 0.3, 0.3, 0.5))
-        Cue.XpStart, Cue.XpStop -> listOf(Note(1318.5, 0.0, 0.05, 0.3, rise = 0.001))
+        Cue.Hint -> listOf(Note(1318.5, 0.0, 0.05, 0.3, rise = 0.001))
         Cue.Whoosh, Cue.Boom -> emptyList()
     }
 
@@ -108,29 +108,32 @@ object LessonSounds {
         return ShortArray(out.size) { (out[it] / peak * 0.9 * loud * Short.MAX_VALUE).toInt().toShort() }
     }
 
-    // Brilliant's real sounds ride in the DEBUG source set only (app/src/debug/assets/sounds, Boss's decision 2026-10-31); a cue
-    // whose file is in the build plays from a preloaded SoundPool. The release build has no such files and plays our synth.
+    // The sound set is one folder, assets/sounds, with manifest.json (event -> file): Boss swaps in his own set by replacing that folder.
+    // Every cue whose file is there plays from a SoundPool preloaded at lesson start (under 20 ms); the rest play our synth.
     private var pool: android.media.SoundPool? = null
     private val packIds = HashMap<Cue, Int>()
     private val packReady = HashSet<Int>()
+    private val lastAt = HashMap<Cue, Long>()
+    internal val packFiles = HashMap<Cue, String>()
 
-    internal fun packName(cue: Cue): String? = when (cue) {
-        Cue.Correct -> "correct"; Cue.Incorrect -> "incorrect"; Cue.Tick -> "lightweight-choice"; Cue.Toggle -> "toggle-on"
-        Cue.DragStart -> "drag-started"; Cue.DragEnd -> "drag-released"; Cue.Continue -> "continue"; Cue.Skip -> "skip"
-        Cue.Failed -> "lesson-failed"; Cue.XpStart -> "tutor-xp-countup-start"; Cue.XpStop -> "tutor-xp-countup-stop"
-        Cue.Start, Cue.Complete, Cue.Whoosh, Cue.Boom -> null
+    /** The manifest's event -> file table. */
+    internal fun parseManifest(json: String): Map<Cue, String> {
+        val events = org.json.JSONObject(json).getJSONObject("events")
+        return events.keys().asSequence().associate { Cue.valueOf(it) to events.getString(it) }
     }
 
-    /** Preloads whichever of those files this build holds, once at start; call it off the main thread. */
+    /** Preloads every file the manifest names, once at start; call it off the main thread. */
     @Synchronized
     fun loadLocalPack(context: android.content.Context) {
         if (pool != null) return
         val have = context.assets.list("sounds")?.toSet().orEmpty()
-        val found = Cue.entries.mapNotNull { c -> packName(c)?.takeIf { "$it.mp3" in have }?.let { c to it } }
+        if ("manifest.json" !in have) return
+        val table = parseManifest(context.assets.open("sounds/manifest.json").bufferedReader().use { it.readText() })
+        val found = table.filterValues { "$it.mp3" in have }
         if (found.isEmpty()) return
         val sp = android.media.SoundPool.Builder().setMaxStreams(4).setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build()
         sp.setOnLoadCompleteListener { _, id, status -> if (status == 0) synchronized(this) { packReady.add(id) } }
-        found.forEach { (c, n) -> context.assets.openFd("sounds/$n.mp3").use { packIds[c] = sp.load(it, 1) } }
+        found.forEach { (c, n) -> context.assets.openFd("sounds/$n.mp3").use { packIds[c] = sp.load(it, 1) }; packFiles[c] = n }
         pool = sp
     }
 
@@ -156,7 +159,16 @@ object LessonSounds {
     @Synchronized
     fun play(cue: Cue) {
         if (muted) return
-        packIds[cue]?.takeIf { it in packReady }?.let { id -> pool?.play(id, 1f, 1f, 1, 0, 1f); return }
+        // one event, one sound: the same cue twice inside 35 ms is the same event
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - (lastAt[cue] ?: -1000L) < 35L) return
+        lastAt[cue] = now
+        packIds[cue]?.takeIf { it in packReady }?.let { id ->
+            pool?.play(id, 1f, 1f, 1, 0, 1f)
+            android.util.Log.i("HumoSound", "cue=$cue file=${packFiles[cue]}")
+            return
+        }
+        android.util.Log.i("HumoSound", "cue=$cue file=synth")
         runCatching {
             val t = track(cue)
             if (t.playState == AudioTrack.PLAYSTATE_PLAYING) t.stop()

@@ -273,7 +273,7 @@ internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifie
     fun digit(d: Int) {
         flow.tapTile(if (minus) -d else d)
         minus = false
-        LessonSounds.play(Cue.Tick)
+        LessonSounds.play(Cue.Toggle)
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
     }
     Column(modifier.padding(horizontal = 16.dp).alpha(if (live) 1f else 0.32f).testTag("keypad"), verticalArrangement = Arrangement.spacedBy(if (keyHeight < 40.dp) 6.dp else 8.dp)) {
@@ -282,9 +282,9 @@ internal fun Keypad(flow: LessonFlow, negatives: Boolean, keyHeight: Dp, modifie
         for (row in keys.chunked(if (keyHeight < 36.dp) 4 else 3)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (k in row) when (k) {
-                    "undo" -> PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Tick) }
+                    "undo" -> PadKey(Modifier.weight(1f), keyHeight, live, "undo", "undo") { flow.undo(); LessonSounds.play(Cue.Toggle) }
                     "tick" -> PadKey(Modifier.weight(1f), keyHeight, live && flow.canCheck, "tick", "tick") { onCheck() }
-                    "−" -> PadKey(Modifier.weight(1f), keyHeight, live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Tick) }
+                    "−" -> PadKey(Modifier.weight(1f), keyHeight, live, "minus", "−", on = minus) { minus = !minus; LessonSounds.play(Cue.Toggle) }
                     else -> PadKey(Modifier.weight(1f), keyHeight, live, "tile-$k", k) { digit(k.toInt()) }
                 }
             }

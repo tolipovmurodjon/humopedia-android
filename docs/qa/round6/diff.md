@@ -90,3 +90,25 @@ Start and wrong try on each page type (drag P1, translate P4-P6, explainer P3, r
 - The web's tutor sheet never rises above the translate row (`sheetRoom`); native shrinks the board to fit above the sheet instead.
 - The web truncates a long task to 2.4 s of reveal and ties reveals to the clip length (up to 4.2 s); native uses 330 ms a word.
 - The web's board marks are 1-3 word labels; native matches ("4 steps", "up").
+
+## Round 6d: sounds (N9), button rows (N10), one place for actions (N11)
+
+Sound table (native event -> Brilliant file, identical to the web player's `engine.js` NAMES; `LessonSoundTableTest` holds the two equal):
+
+| Event | Native cue | File |
+|---|---|---|
+| a node crossed in a drag, a keypad tap | Toggle | toggle-on |
+| jet grabbed | DragStart | drag-started |
+| jet dropped | DragEnd | drag-released |
+| right answer | Correct | correct |
+| wrong on a lesson page | Failed | lesson-failed |
+| wrong in the skill check or fix-it | Incorrect | incorrect |
+| Try again, Get help, Ask Humo, end-of-screen button | Tick | lightweight-choice |
+| Show me how | Hint | hint |
+| Show me (skill check) | Skip | skip |
+| Continue | Continue | continue |
+
+The web plays nothing for the Check press, the panel slide, quit or the tutor sheet; native matches (no extra sounds). Skill-check pass and the Mach 3 pass keep our own synth start/complete/whoosh cues (the web uses its own tone for them too). One folder `app/src/main/assets/sounds` with `manifest.json` (event -> file) is the whole set: Boss's own set is a folder swap. Every file is preloaded into one SoundPool at lesson start; a repeat of the same cue within 35 ms is dropped; every play logs `HumoSound cue=... file=...` and the smoke prints the count per cue. Both builds carry the files; `release.yml` refuses the production track while the manifest says `"set": "brilliant"` (internal, test and the GitHub APK pass).
+
+N10: Show me, Show me how and Get help are icon buttons (bulb, bulb, question mark; description and text kept for screen readers) taking 1/4 of the row; Check, Continue and Try again take 3/4.
+N11: every bare screen (gate, fix intro, score, end, See you soon) puts its buttons in the same bottom bar as Check, secondary above, the primary lowest. The quit sheet holds End lesson above Keep learning at the same bottom. `LessonRound6Test` asserts each lowest button is within 4 dp of Check's bottom.

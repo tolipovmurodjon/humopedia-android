@@ -112,7 +112,7 @@ class ShellScreenshotTest {
         shot("03b-lesson")
         compose.onNodeWithContentDescription("Exit lesson").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("END LESSON").performClick()
+        compose.onNodeWithText("End lesson").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("See you soon").assertIsDisplayed()
         compose.onNodeWithText("Done").performClick()

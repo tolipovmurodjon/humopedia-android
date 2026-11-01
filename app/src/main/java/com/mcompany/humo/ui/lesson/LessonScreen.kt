@@ -83,6 +83,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -219,7 +220,7 @@ private fun androidx.compose.foundation.layout.BoxScope.QuitSheet(humo: HumoStat
     Box(Modifier.matchParentSize().background(Chrome.Scrim).pointerInput(Unit) { detectTapGestures { } })
     AnimatedVisibility(shown, Modifier.align(Alignment.BottomCenter), enter = slideInVertically(if (humo.alive) spring<IntOffset>(dampingRatio = 0.82f, stiffness = 380f) else tween(0)) { it }) {
     Column(
-        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("quit-sheet")
+        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 4.dp + bottomInset).testTag("quit-sheet")
             .chromeGlass(28.dp).padding(top = 18.dp, bottom = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -229,11 +230,9 @@ private fun androidx.compose.foundation.layout.BoxScope.QuitSheet(humo: HumoStat
             Speech(LessonLines.QUIT, Modifier.weight(1f))
         }
         Spacer(Modifier.height(14.dp))
+        Chunky("End lesson", Kind.Secondary, true, Modifier.fillMaxWidth().padding(horizontal = 18.dp), onClick = onEnd)
+        Spacer(Modifier.height(12.dp))
         Chunky("Keep learning", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 18.dp), onClick = onKeep)
-        Text(
-            "END LESSON", Modifier.clickable(role = Role.Button, onClick = onEnd).padding(horizontal = 24.dp, vertical = 14.dp),
-            fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, letterSpacing = 0.8.sp, color = Chrome.Muted,
-        )
     }
     }
 }
@@ -326,9 +325,35 @@ private data class BtnSpec(val label: String, val kind: Kind, val enabled: Boole
  * sentence case, medium weight, no letter spacing (the web phone's Check).
  */
 @Composable
+internal enum class ChunkyIcon { Bulb, Help }
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawChunkyIcon(icon: ChunkyIcon, ink: Color) {
+    val k = size.width / 24f
+    val st = Stroke(2.2f * k, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    when (icon) {
+        ChunkyIcon.Bulb -> {
+            drawPath(Path().apply {
+                moveTo(9f * k, 18f * k); cubicTo(9f * k, 15f * k, 6f * k, 14f * k, 6f * k, 10f * k)
+                cubicTo(6f * k, 6.5f * k, 8.7f * k, 4f * k, 12f * k, 4f * k); cubicTo(15.3f * k, 4f * k, 18f * k, 6.5f * k, 18f * k, 10f * k)
+                cubicTo(18f * k, 14f * k, 15f * k, 15f * k, 15f * k, 18f * k); close()
+            }, ink, style = st)
+            drawLine(ink, Offset(9.5f * k, 21f * k), Offset(14.5f * k, 21f * k), 2.2f * k, StrokeCap.Round)
+        }
+        ChunkyIcon.Help -> {
+            drawCircle(ink, 9.5f * k, Offset(12f * k, 12f * k), style = st)
+            drawPath(Path().apply {
+                moveTo(9.3f * k, 9.5f * k); cubicTo(9.5f * k, 6.8f * k, 14.5f * k, 6.8f * k, 14.7f * k, 9.6f * k)
+                cubicTo(14.8f * k, 11.8f * k, 12f * k, 11.8f * k, 12f * k, 14f * k)
+            }, ink, style = st)
+            drawCircle(ink, 1.2f * k, Offset(12f * k, 17.2f * k))
+        }
+    }
+}
+
+@Composable
 internal fun Chunky(
     label: String, kind: Kind, enabled: Boolean, modifier: Modifier = Modifier,
-    leading: (@Composable () -> Unit)? = null, onClick: () -> Unit,
+    leading: (@Composable () -> Unit)? = null, icon: ChunkyIcon? = null, onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -341,7 +366,8 @@ internal fun Chunky(
     val sink = !enabled || pressed
     // propagateMinConstraints: a button given an exact width (a weight, fillMaxWidth) fills it; otherwise it wraps its label.
     Box(
-        modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick).drawBehind {
+        modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
+            .then(if (icon != null) Modifier.semantics { contentDescription = label; text = androidx.compose.ui.text.AnnotatedString(label) } else Modifier).drawBehind {
             val lip = 4.dp.toPx()
             val r = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
             val faceSize = androidx.compose.ui.geometry.Size(size.width, size.height - lip)
@@ -354,7 +380,8 @@ internal fun Chunky(
         // The label shrinks until it fits its button (a narrow phone, a big font): never cut, never wrapped.
         var fit by remember(label) { mutableFloatStateOf(1f) }
         Box(Modifier.padding(bottom = 4.dp).offset(y = if (sink) 4.dp else 0.dp), contentAlignment = Alignment.Center) {
-            Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (icon != null) Canvas(Modifier.size(26.dp)) { drawChunkyIcon(icon, ink) }
+            else Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 leading?.invoke()
                 Text(
                     label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium,
@@ -437,7 +464,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             try { deck.fly() } finally { flow.flying = false }
             val ok = flow.check()
             if (ok) { LessonSounds.play(Cue.Correct); haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
-            else { LessonSounds.play(Cue.Incorrect); haptics.performHapticFeedback(HapticFeedbackType.Reject) }
+            else { LessonSounds.play(if (flow.inSkill || flow.screen is Screen.Fix) Cue.Incorrect else Cue.Failed); haptics.performHapticFeedback(HapticFeedbackType.Reject) }
         }
     }
     // Humo reads the task itself when a page opens (spoken text = written text); the teacher line waits in the tutor sheet.
@@ -544,13 +571,13 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                         }
                     }
                     key == "skill" -> ButtonBar(bottomInset) {
-                        Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f)) { LessonSounds.play(Cue.Skip); flow.dontKnow() }
-                        Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(1f)) { check() }
+                        Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Skip); flow.dontKnow() }
+                        Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(3f)) { check() }
                     }
                     key == "go" -> ButtonBar(bottomInset) { Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
                     key == "right" -> GlassPanel(true, "Correct!", bottomInset, onFlag = { reporting = true }) {
-                        Chunky("Show me how", Kind.Secondary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); flow.showHow = true }
-                        Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
+                        Chunky("Show me how", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
+                        Chunky("Continue", Kind.Primary, true, Modifier.weight(3f)) { LessonSounds.play(Cue.Continue); flow.next() }
                     }
                     key == "fixright" -> GlassPanel(true, "Correct!", bottomInset, onFlag = null) {
                         Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
@@ -559,8 +586,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                         Chunky("Continue", Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
                     }
                     key == "wrong" -> GlassPanel(false, "Not quite", bottomInset, onFlag = { reporting = true }) {
-                        Chunky("Get help", Kind.Secondary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
-                        Chunky("Try again", Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); flow.tryAgain() }
+                        Chunky("Get help", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Help) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
+                        Chunky("Try again", Kind.Warn, true, Modifier.weight(3f)) { LessonSounds.play(Cue.Tick); flow.tryAgain() }
                     }
                     else -> ButtonBar(bottomInset) { Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(1f)) { check() } }
                 }
@@ -621,14 +648,13 @@ private fun CenterScreen(humo: HumoState, big: (@Composable () -> Unit)?, title:
                 Spacer(Modifier.height(8.dp))
                 Text(line, fontFamily = LessonType.Figtree, fontSize = 17.sp, color = Chrome.Muted, textAlign = TextAlign.Center)
             }
-            if (buttons.isNotEmpty()) Spacer(Modifier.height(34.dp))
-            buttons.forEachIndexed { i, b ->
-                if (i > 0) Spacer(Modifier.height(14.dp))
-                Chunky(b.label, b.kind, b.enabled, Modifier.widthIn(max = 320.dp).fillMaxWidth()) { LessonSounds.play(Cue.Tick); b.onClick() }
-            }
         }
-        if (foot != null) Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) {
-            ButtonBar(0.dp) { Chunky(foot.label, foot.kind, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Tick); foot.onClick() } }
+        // One position for actions, app-wide: the same bar as Check, secondary above, the primary action lowest (thumb zone).
+        val all = buttons + listOfNotNull(foot)
+        if (all.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp).testTag("dock"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            all.sortedBy { if (it.kind == Kind.Primary) 1 else 0 }.forEach { b ->
+                Chunky(b.label, b.kind, b.enabled, Modifier.fillMaxWidth().testTag("primary-" + (b.kind == Kind.Primary))) { LessonSounds.play(Cue.Tick); b.onClick() }
+            }
         }
     }
 }

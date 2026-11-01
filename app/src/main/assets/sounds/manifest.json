@@ -1,0 +1,15 @@
+{
+  "set": "brilliant",
+  "events": {
+    "Toggle": "toggle-on",
+    "DragStart": "drag-started",
+    "DragEnd": "drag-released",
+    "Correct": "correct",
+    "Failed": "lesson-failed",
+    "Incorrect": "incorrect",
+    "Tick": "lightweight-choice",
+    "Hint": "hint",
+    "Skip": "skip",
+    "Continue": "continue"
+  }
+}

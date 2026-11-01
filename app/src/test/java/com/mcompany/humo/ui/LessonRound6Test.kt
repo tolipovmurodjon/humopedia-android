@@ -92,6 +92,15 @@ class LessonRound6Test {
         fun click(label: String) { compose.onNodeWithText(label).performClick(); compose.waitForIdle() }
         fun solve() { act { val m = flow.page!!.move; flow.tapTile(m.x); flow.tapTile(m.y); flow.check() }; settle() }
         compose.onNodeWithContentDescription("0 sparks").assertDoesNotExist()
+        // N11: one position for actions. Check's bottom is the reference; every other screen's lowest button sits within 4 dp of it.
+        val dp = compose.density.density
+        val checkBottom = compose.onNodeWithText("Check").fetchSemanticsNode().boundsInRoot.bottom / dp
+        fun actionAtCheck(what: String, label: String? = null) {
+            val bottom = if (label != null) compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot.bottom / dp
+            else compose.onAllNodes(androidx.compose.ui.test.hasTestTag("primary-true").or(androidx.compose.ui.test.hasTestTag("primary-false")))
+                .fetchSemanticsNodes().maxOf { it.boundsInRoot.bottom } / dp
+            assertTrue("$what: its lowest button ends at $bottom dp, Check ends at $checkBottom dp", kotlin.math.abs(bottom - checkBottom) <= 4f)
+        }
 
         // P1: drag. A wrong try, the amber panel, Get help (Humo marks the board), a chip, Done, Try again, right, Show me how.
         shot("P1-start")
@@ -148,6 +157,7 @@ class LessonRound6Test {
         act { flow.beginSkillSplash() }
         compose.onNodeWithText("Show what you know").assertIsDisplayed()
         shot("SC-gate")
+        actionAtCheck("gate")
         click("Continue")
         shot("SC1-start")
         act { flow.tapTile(0); flow.tapTile(0) }
@@ -168,6 +178,7 @@ class LessonRound6Test {
         // Fix-it: never a fail screen. Humo replays the miss, two fresh problems, a miss, a new pair, the pass.
         compose.onNodeWithText("Almost! Let's fix one.").assertIsDisplayed()
         shot("fix-intro")
+        actionAtCheck("fix intro")
         click("Fix it with Humo"); settle()
         assertEquals(Screen.Demo, flow.screen)
         shot("fix-demo")
@@ -195,16 +206,20 @@ class LessonRound6Test {
         repeat(3) { solve(); click(if (it == 2) "Finish" else "Continue") }
         compose.onNodeWithText("Perfect!").assertIsDisplayed()
         shot("score-perfect")
+        actionAtCheck("score")
         click("Continue")
         shot("end-perfect")
+        actionAtCheck("end")
 
         // The quit sheet and the calm goodbye.
         act { flow.restart() }
         compose.onNodeWithContentDescription("Exit lesson").performClick(); compose.waitForIdle()
         shot("quit-sheet")
-        click("END LESSON")
+        actionAtCheck("quit sheet", "Keep learning")
+        click("End lesson")
         compose.onNodeWithText("See you soon").assertIsDisplayed()
         shot("see-you-soon")
+        actionAtCheck("see you soon")
     }
 
     @Test fun childAt390() = child("390")

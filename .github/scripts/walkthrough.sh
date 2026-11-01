@@ -147,7 +147,7 @@ perf_cold() {
   log "HumoPerf lines ($mode): $($T adb logcat -d -s HumoPerf:I | sed "s/.*HumoPerf: //" | paste -sd ";" -)"
   log "PERF $mode: cold start (am start -W TotalTime) = ${total:-?} ms; tap on the island to the lesson's first drawn frame = ${lesson:-?} ms"
   echo "$mode $total $lesson" >> "$OUT/perf.txt"
-  $T adb shell input keyevent 4; sleep 1; tap "END LESSON"; sleep 1
+  $T adb shell input keyevent 4; sleep 1; tap "End lesson"; sleep 1
 }
 perf_cold nowarm
 perf_cold warm
@@ -200,8 +200,8 @@ ANIM() { $T adb shell settings put global animator_duration_scale "$1"; }
 tap "Lesson 1.1, Translating Points, current"; shot lesson
 has "Move the SR-71 4 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
-has "Keep learning"; has "END LESSON"
-tap "END LESSON"; waitfor "See you soon" 10; shot see-you-soon; has "Your spot is saved."; tap "Back to lesson"; sleep 1.5
+has "Keep learning"; has "End lesson"
+tap "End lesson"; waitfor "See you soon" 10; shot see-you-soon; has "Your spot is saved."; tap "Back to lesson"; sleep 1.5
 $T adb shell input keyevent 4; shot leave-asks-again 0.8
 tap "Keep learning"; sleep 1
 
@@ -388,4 +388,5 @@ log "-- the requests the whole journey sent (first launch, 3 timed starts, force
 python3 .github/scripts/fake-humo.py assert-requests "$OUT/fake-humo.log" "$VERSION" | tee -a "$WALK/steps.txt"
 [ "${PIPESTATUS[0]}" = 0 ] || fail "the fake server did not receive exactly what the journey should send"
 
+log "-- sounds played (HumoSound), by cue: $($T adb logcat -d -s HumoSound:I | grep -o "cue=[A-Za-z]* file=[a-z-]*" | sort | uniq -c | tr "\n" ";")"
 log "== walkthrough passed ($N steps)"

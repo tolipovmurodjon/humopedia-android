@@ -60,10 +60,11 @@ jobs:
           { grep -v '^storeFile' <<< "$KEYSTORE_PROPERTIES"; echo "storeFile=$RUNNER_TEMP/release.keystore"; } > keystore.properties
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > serviceAccount-play.json
-      - name: Release assets hold no Brilliant sounds
+      # Brilliant's sounds are allowed on the internal and test tracks and the GitHub test APK, never on production (Boss, 2026-11-01).
+      - name: Production refuses Brilliant sounds
+        if: github.event_name == 'workflow_dispatch' && inputs.track == 'production'
         run: |
-          ./gradlew mergeReleaseAssets
-          if [ -n "$(find app/build/intermediates -path '*assets*' -path '*elease*' -path '*sounds*' -name '*.mp3')" ]; then echo "release build contains assets/sounds"; exit 1; fi
+          if grep -q '"set": *"brilliant"' app/src/main/assets/sounds/manifest.json; then echo "the sound set is still Brilliant's: swap app/src/main/assets/sounds before production"; exit 1; fi
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
       - name: Build the Play build and the signed test APK
