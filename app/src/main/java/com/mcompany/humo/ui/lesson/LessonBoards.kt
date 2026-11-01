@@ -372,6 +372,10 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
 
     // One machine per point. A board opened already checked (review, state restore) has them landed; otherwise they wait
     // at their start. The recap's ride the points exactly.
+    // the goal pulses softly (1 to 1.08, 1.2 s) until the child acts, so it can be found without reading
+    val pulseT = androidx.compose.animation.core.rememberInfiniteTransition(label = "goal")
+    val pulseRaw by pulseT.animateFloat(1f, 1.08f, androidx.compose.animation.core.infiniteRepeatable(tween(600), androidx.compose.animation.core.RepeatMode.Reverse), label = "goal")
+    val pulse = if (motion && shown == null && !flow.locked) pulseRaw else 1f
     val farRaw = remember(page) { androidx.compose.runtime.mutableStateListOf<Offset?>().also { l -> repeat(page.points.size) { l.add(null) } } }
     val offBoard = remember(page) { androidx.compose.runtime.mutableStateListOf<Offset?>().also { l -> repeat(page.points.size) { l.add(null) } } }
     val crafts = remember(page, wPx) {
@@ -518,7 +522,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         }
                     }
                     // the rings go on top: a machine on its target never hides it
-                    if (!recap || playing) page.targets.forEach { target(g.px(it), s) }
+                    if (!recap || playing) page.targets.forEach { target(g.px(it), s * pulse) }
                 }
             }
             }

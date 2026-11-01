@@ -249,7 +249,8 @@ private const val WORD_MS = 55L
  * weight; digits and *letters* are in the maths serif.
  */
 @Composable
-internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
+internal fun HumoHeader(speech: String?, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
+    val text = speech.orEmpty()
     SideEffect { PerfCounters.header++ }
     val words = remember(text) { text.replace("*", "").trim().split(Regex("\\s+")).size }
     // a line already shown in full is shown whole again (after Try again the task is not written out a second time)
@@ -270,7 +271,7 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
         Humo(humo, tap.size(if (compact) 60.dp else 76.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
         Spacer(Modifier.width(14.dp))
         val shape = RoundedCornerShape(16.dp)
-        Box(
+        if (speech != null) Box(
             Modifier.weight(1f).testTag("humo-bubble").drawBehind {
                 // the small tail toward Humo
                 val cy = size.height / 2f
@@ -289,6 +290,16 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
 }
 
 private val KeyWords = Regex("(?<![\\w-])\\d+(?![\\w-])|\\b(steps?|right|left|up|down)\\b")
+
+/** The task, pinned above the board in one compact line, key words tinted. It never gives way to Humo's praise, jokes or hints (Boss: "I don't know where to move"). */
+@Composable
+internal fun TaskStrip(text: String) {
+    Text(
+        task(text, Int.MAX_VALUE),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).testTag("task-strip").semantics { contentDescription = "Task: ${text.replace("*", "")}" },
+        style = TextStyle(fontFamily = LessonType.Figtree, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal, color = Chrome.Ink),
+    )
+}
 
 /** The line as styled text: numbers and direction words tinted, digits and *letters* in the maths serif; every word after the [shown]th is invisible but still takes its room. */
 private fun task(text: String, shown: Int): AnnotatedString {

@@ -521,7 +521,11 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
         delay(2000)
         flow.clearRemark()
     }
-    val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else if (!flow.inSkill) flow.verdict ?: flow.remark ?: promptText else promptText
+    // Two jobs, two places: the TASK is the pinned strip above the board (it only changes with the slide); Humo's bubble is his SPEECH
+    // only (praise, a joke, a hint, the verdict line, the task while he reads it aloud) and goes away when he is quiet.
+    val speech: String? = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly)
+        else if (!flow.inSkill) flow.verdict ?: flow.remark ?: if (humo.talking) promptText else null
+        else null
     val askHumo: (() -> Unit)? = if (flow.inSkill || demo) null else { { LessonSounds.play(Cue.Tick); flow.chat.openClean() } }
     // the room under the page for the glass bar, so the verdict panel (drawn over it) never moves the board
     val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
@@ -534,7 +538,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             // Humo moves into his sheet while it is open: the board gets the room his header held
-            if (!tutorOpen) HumoHeader(headerText, humo, askHumo, compact = compact)
+            if (!tutorOpen) HumoHeader(speech, humo, askHumo, compact = compact)
+            TaskStrip(promptText)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val boardW = (maxWidth - 24.dp).coerceAtMost(460.dp)
