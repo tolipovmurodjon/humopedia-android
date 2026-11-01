@@ -278,7 +278,7 @@ num 3 0.4; num 1; tapsnap Check fix-3-flight 0.9
 waitfor "Continue" 15; press Continue 1.5
 num 2 0.4; num 3; tapsnap Check fix-4-flight 0.9
 waitfor "Continue" 15; press Continue 2
-sleep 2; shot lesson-end-fixed; has "Lesson complete"; has "Restart lesson"; has "\+135"
+sleep 2; shot lesson-end-fixed; has "Lesson complete"; has "Restart lesson"; has "135 XP earned"
 log "-- frame stats of the whole L1.1 walk (software GPU: a floor, not the truth)"
 $T adb shell dumpsys gfxinfo "$PKG" | grep -E "Total frames|Janky frames|percentile" | tee -a "$WALK/steps.txt"
 press "Exit lesson" 2; shot back-from-lesson
