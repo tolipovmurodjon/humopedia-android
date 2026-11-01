@@ -53,4 +53,12 @@ class LessonGameFeelTest {
         assertEquals(Screen.Sky, flow.screen)
         assertFalse(flow.locked && flow.canCheck)
     }
+
+    /** A1: inside the graph the finger is the jet; past the edge it moves at 35 % and stops 1.5 cells out. */
+    @Test fun rubberBandPastTheEdge() {
+        assertEquals(3f, com.mcompany.humo.ui.lesson.rubberBand(3f, 7f), 0f)
+        assertEquals(7f + 1f * 0.35f, com.mcompany.humo.ui.lesson.rubberBand(8f, 7f), 0.001f)
+        assertEquals(7f + 1.5f, com.mcompany.humo.ui.lesson.rubberBand(30f, 7f), 0.001f)
+        assertEquals(-1.5f, com.mcompany.humo.ui.lesson.rubberBand(-20f, 7f), 0.001f)
+    }
 }

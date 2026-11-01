@@ -204,6 +204,13 @@ internal fun cameraLean(x: Float, y: Float, width: Float, height: Float, margin:
     return Pair(axis(x, width), axis(y, height))
 }
 
+/** A1, open airspace: inside the graph the jet is the finger; past an edge it follows at 35 % and never more than 1.5 cells out (a rubber band). */
+internal fun rubberBand(v: Float, max: Float): Float = when {
+    v < 0f -> (v * 0.35f).coerceAtLeast(-1.5f)
+    v > max -> (max + (v - max) * 0.35f).coerceAtMost(max + 1.5f)
+    else -> v
+}
+
 /** Idea 12, the shadow ruler: dashed lines from the jet to both axes with its cell numbers, on the learning and drag pages only, never in the skill check. */
 internal fun rulerVisible(inSkill: Boolean, kind: PageKind): Boolean = !inSkill && kind == PageKind.Drag
 

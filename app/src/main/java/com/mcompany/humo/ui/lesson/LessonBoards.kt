@@ -244,7 +244,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         if (!dragged && dist(change.position, down.position) > 3.dp.toPx()) { dragged = true; dragging = true; armed = false; LessonSounds.play(Cue.DragStart) }
                         if (dragged) {
                             val (cx, cy) = g.cells(change.position + grabOffset)
-                            val p = g.px(cx.coerceIn(-0.3f, page.graph.xMax + 0.3f), cy.coerceIn(-0.3f, page.graph.yMax + 0.3f))
+                            val p = g.px(rubberBand(cx, page.graph.xMax.toFloat()), rubberBand(cy, page.graph.yMax.toFloat()))
                             // the jet is glued to the finger: the point moves at once, not on the next dispatch
                             scope.launch(start = CoroutineStart.UNDISPATCHED) { handle.snapTo(p) }
                             val n = g.snapPx(p)
