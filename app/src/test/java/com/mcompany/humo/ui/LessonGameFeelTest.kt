@@ -61,4 +61,7 @@ class LessonGameFeelTest {
         assertEquals(7f + 1.5f, com.mcompany.humo.ui.lesson.rubberBand(30f, 7f), 0.001f)
         assertEquals(-1.5f, com.mcompany.humo.ui.lesson.rubberBand(-20f, 7f), 0.001f)
     }
+
+    /** Idea 08: the jet breathes only after 5 s of nothing. */
+    @Test fun theJetWaitsFiveSeconds() { assertEquals(5000L, com.mcompany.humo.ui.lesson.IDLE_BREATH_MS) }
 }

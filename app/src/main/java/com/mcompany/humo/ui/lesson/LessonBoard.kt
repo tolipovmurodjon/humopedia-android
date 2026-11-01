@@ -204,6 +204,9 @@ internal fun cameraLean(x: Float, y: Float, width: Float, height: Float, margin:
     return Pair(axis(x, width), axis(y, height))
 }
 
+/** Idea 08: the jet waits with the child and breathes after this long with no touch. */
+internal const val IDLE_BREATH_MS = 5000L
+
 /** A1, open airspace: inside the graph the jet is the finger; past an edge it follows at 35 % and never more than 1.5 cells out (a rubber band). */
 internal fun rubberBand(v: Float, max: Float): Float = when {
     v < 0f -> (v * 0.35f).coerceAtLeast(-1.5f)

@@ -133,6 +133,12 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
     var busy by remember(page) { mutableStateOf(false) }
     val wake = remember(page) { mutableIntStateOf(0) }
     val dotR by animateFloatAsState(if (dragging) 15f else 5f, tween(if (motion) 120 else 0), label = "dot")
+    // A4: the picked-up jet lifts (about 6 % bigger, a deeper shadow) in 80 ms. Idea 08: after 5 s of nothing the jet breathes, softly.
+    val liftS = animateFloatAsState(if (dragging) 0.13f else 0f, tween(if (motion) 80 else 0), label = "lift")
+    var idle by remember(page) { mutableStateOf(false) }
+    LaunchedEffect(flow.dragAt, dragging, busy) { idle = false; delay(IDLE_BREATH_MS); idle = true }
+    val breathS = androidx.compose.animation.core.rememberInfiniteTransition(label = "breath")
+        .animateFloat(0f, 0.06f, androidx.compose.animation.core.infiniteRepeatable(tween(1100), androidx.compose.animation.core.RepeatMode.Reverse), label = "breath")
     val len = g.cell * 1.45f
     val craft = remember(page, wPx) { Craft(handle.value) }
     val tick = remember { mutableLongStateOf(0L) }
@@ -296,7 +302,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
             }
             val flames = if (motion && (busy || dragging) && craft.speed > 0.02f) max(craft.speed, 0.3f) else 0f
             val roll = ((android.os.SystemClock.uptimeMillis() - craft.rollAt) / 700f).takeIf { it in 0f..1f } ?: 0f
-            jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion, roll = roll)
+            jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion, alt = liftS.value + if (idle && motion && !dragging && !busy) breathS.value else 0f, roll = roll)
             if (armed && !busy) armedRing(at, len * 0.62f, s)
             if (ok || bad) badge(Offset(at.x, at.y - len * 0.55f - 12f * s), ok, s)
         } else {
