@@ -75,35 +75,35 @@ class LessonPhonesTest {
             compose.onRoot().captureRoboImage("build/outputs/roborazzi/phones/$tag-$name.png")
         }
 
-        state("P1-start", "Check")
+        state("P1-start", "CHECK")
         act { flow.dropAt(Node(1, 5)); flow.check() }; settle()
-        state("P1-wrong", "Get help", "Try again")
+        state("P1-wrong", "Get help", "TRY AGAIN")
         panelClearsBoard("P1-wrong")
         compose.onNodeWithText("Get help").performClick(); compose.waitForIdle(); settle()
         val board = compose.onNodeWithTag("board").fetchSemanticsNode().boundsInRoot
         val sheet = compose.onNodeWithTag("tutor-sheet").fetchSemanticsNode().boundsInRoot
         assertTrue("$tag tutor: the board ($board) must sit above the sheet ($sheet)", board.bottom <= sheet.top + 1f)
-        state("P1-tutor", "Done")
-        compose.onNodeWithText("Done").performClick(); compose.waitForIdle()
+        state("P1-tutor", "DONE")
+        compose.onNodeWithText("DONE").performClick(); compose.waitForIdle()
 
         act { flow.goTo(Screen.Page(3)) }
-        state("P4-start", "Check", tiles = listOf(0, 9))
+        state("P4-start", "CHECK", tiles = listOf(0, 9))
         act { flow.tapTile(1); flow.tapTile(2); flow.check() }; settle()
-        state("P4-wrong", "Get help", "Try again")
+        state("P4-wrong", "Get help", "TRY AGAIN")
         panelClearsBoard("P4-wrong")
         act { flow.goTo(Screen.Page(5)) }
-        state("P6-start", "Check", tiles = listOf(0, 9))
+        state("P6-start", "CHECK", tiles = listOf(0, 9))
         act { flow.goTo(Screen.Page(6)) }
-        state("P7-recap", "Continue")
+        state("P7-recap", "CONTINUE")
         act { flow.beginSkillSplash(); flow.startSkill() }
-        state("SC1-start", "Check", "Show me", tiles = listOf(0, 9))
+        state("SC1-start", "CHECK", "Show me", tiles = listOf(0, 9))
     }
 
     private fun phoneL12(tag: String, fontScale: Float = 1f) {
         val flow = player(L12, fontScale)
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
         val tray = compose.onNodeWithTag("keypad").fetchSemanticsNode().boundsInRoot
-        val check = compose.onNodeWithText("Check").fetchSemanticsNode().boundsInRoot
+        val check = compose.onNodeWithText("CHECK").fetchSemanticsNode().boundsInRoot
         assertTrue("$tag L1.2: the keypad is cut: $tray in $root", tray.bottom <= root.bottom + 1f && tray.left >= -1f)
         assertTrue("$tag L1.2: Check is off screen: $check", check.bottom <= root.bottom + 1f)
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/phones/$tag-L12-P1.png")

@@ -30,7 +30,7 @@ object ScreenChecks {
                 val read = node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action ?: continue
                 if (!read(layout)) continue
                 val result = layout.firstOrNull() ?: continue
-                // hasVisualOverflow is true for every text under Robolectric (measured: "0", "Check"), so it proves nothing here.
+                // hasVisualOverflow is true for every text under Robolectric (measured: "0", "CHECK"), so it proves nothing here.
                 // Text is cut when letters were dropped (ellipsis, lines over maxLines) or its layout is bigger than its box.
                 val ellipsized = (0 until result.lineCount).any { result.isLineEllipsized(it) }
                 val droppedLines = result.multiParagraph.didExceedMaxLines

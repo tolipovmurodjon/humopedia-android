@@ -1,6 +1,11 @@
 package com.mcompany.humo.ui.lesson
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -121,32 +126,60 @@ internal fun ButtonBar(bottomInset: Dp, content: @Composable RowScope.() -> Unit
     )
 }
 
-/** The verdict panel: mint glass with a tick for right, amber glass with a cross for wrong (never red); a short label, a small flag top right. What Humo says is in his bubble, not here. */
+internal class SheetSpec(
+    val key: String, val ok: Boolean, val calm: Boolean, val label: String, val detail: String, val kind: Kind, val primary: String,
+    val secondary: ChunkyIcon?, val flag: Boolean, val onPrimary: () -> Unit,
+)
+
+/** Counts how many times a feedback sheet has entered the composition: once per verdict, never again while it stays. For the test. */
+internal object FeedbackStats { @Volatile var enters = 0 }
+
+/**
+ * The verdict as a bottom sheet (Duolingo's): full width from the very bottom edge, a handle, the icon and the verdict, and the main
+ * button in EXACTLY the spot and size the Check button had, so the thumb never moves. Opaque, so it covers the Check bar. Drag it down
+ * for a peek (handle, verdict, button), up for the full line; a fling or a drag past 48 dp snaps to the other state. On a translate page
+ * the row is the Check row (a quarter for the icon button, three quarters for the main one); elsewhere the icon button sits in the full view.
+ */
 @Composable
-internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() -> Unit)?, calm: Boolean = false, buttons: @Composable RowScope.() -> Unit) {
-    val ink = if (calm) Color(0xFF4A5159) else if (ok) Chrome.MintInk else Chrome.YellowInk
+internal fun FeedbackSheet(spec: SheetSpec, bottomInset: Dp, translateRow: Boolean, onFlag: (() -> Unit)?, secondary: (@Composable (Modifier) -> Unit)?) {
+    androidx.compose.runtime.DisposableEffect(Unit) { FeedbackStats.enters++; onDispose { } }
+    var expanded by remember(spec.key) { androidx.compose.runtime.mutableStateOf(false) }
+    var dragged by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val threshold = with(density) { 48.dp.toPx() }
+    val ink = if (spec.calm) Color(0xFF4A5159) else if (spec.ok) Chrome.MintInk else Chrome.YellowInk
+    val bg = if (spec.calm) Color(0xFFF1F3F4) else if (spec.ok) Color(0xFFE3F7EC) else Color(0xFFFFF3D6)
+    val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     Column(
-        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("feedback-panel")
-            .chromeGlass(28.dp, if (calm) Tint.Clear else if (ok) Tint.Mint else Tint.Amber).padding(start = 18.dp, end = 8.dp, top = 16.dp, bottom = 14.dp),
+        Modifier.fillMaxWidth().testTag("feedback-panel").semantics { stateDescription = if (expanded) "expanded" else "peek" }
+            .clip(shape).background(bg)
+            .draggable(
+                orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                state = androidx.compose.foundation.gestures.rememberDraggableState { dragged += it },
+                onDragStarted = { dragged = 0f },
+                onDragStopped = { v ->
+                    if (v < -400f || dragged < -threshold) expanded = true else if (v > 400f || dragged > threshold) expanded = false
+                    dragged = 0f
+                },
+            )
+            .animateContentSize(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp).size(36.dp, 4.dp).clip(CircleShape).background(ink.copy(alpha = 0.28f)))
+        Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Canvas(Modifier.size(34.dp)) {
                 val k = size.width / 34f
-                if (ok) {
+                if (spec.ok) {
                     drawCircle(Chrome.Mint, size.minDimension / 2f)
                     drawPath(Path().apply { moveTo(9f * k, 17.5f * k); lineTo(14.5f * k, 23f * k); lineTo(25f * k, 11f * k) }, Color.White, style = Stroke(3.6f * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                } else if (calm) {
-                    drawCircle(Color(0xFF8A929A), size.minDimension / 2f)
-                    drawLine(Color.White, Offset(11f * k, 11f * k), Offset(23f * k, 23f * k), 3.6f * k, StrokeCap.Round)
-                    drawLine(Color.White, Offset(23f * k, 11f * k), Offset(11f * k, 23f * k), 3.6f * k, StrokeCap.Round)
                 } else {
-                    drawCircle(Chrome.Yellow, size.minDimension / 2f)
-                    drawLine(Color(0xFF4A3600), Offset(11f * k, 11f * k), Offset(23f * k, 23f * k), 3.6f * k, StrokeCap.Round)
-                    drawLine(Color(0xFF4A3600), Offset(23f * k, 11f * k), Offset(11f * k, 23f * k), 3.6f * k, StrokeCap.Round)
+                    drawCircle(if (spec.calm) Color(0xFF8A929A) else Chrome.Yellow, size.minDimension / 2f)
+                    val x = if (spec.calm) Color.White else Color(0xFF4A3600)
+                    drawLine(x, Offset(11f * k, 11f * k), Offset(23f * k, 23f * k), 3.6f * k, StrokeCap.Round)
+                    drawLine(x, Offset(23f * k, 11f * k), Offset(11f * k, 23f * k), 3.6f * k, StrokeCap.Round)
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Text(text, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, lineHeight = 24.sp, color = ink)
+            Text(spec.label, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 26.sp, color = ink)
             if (onFlag != null) Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Report this page", onClick = onFlag).semantics { contentDescription = "Report this page" }, contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
@@ -155,10 +188,18 @@ internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() 
                 }
             }
         }
+        if (expanded) {
+            Text(spec.detail, Modifier.padding(start = 66.dp, end = 20.dp, top = 6.dp), fontFamily = LessonType.Figtree, fontSize = 16.sp, lineHeight = 23.sp, color = ink)
+            if (!translateRow && secondary != null) Box(Modifier.padding(start = 16.dp, top = 12.dp).width(96.dp)) { secondary(Modifier.fillMaxWidth()) }
+        }
         Spacer(Modifier.height(14.dp))
-        Row(Modifier.padding(end = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), content = buttons)
+        Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp + bottomInset).testTag("sheet-buttons"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (translateRow) Box(Modifier.weight(1f)) { secondary?.invoke(Modifier.fillMaxWidth()) }
+            Chunky(spec.primary, spec.kind, true, Modifier.weight(if (translateRow) 3f else 1f), onClick = spec.onPrimary)
+        }
     }
 }
+
 
 /** The close button: a 44 dp round glass button with a clean dark-grey cross (same family as the other glass controls). */
 @Composable

@@ -200,10 +200,10 @@ ANIM() { $T adb shell settings put global animator_duration_scale "$1"; }
 tap "Lesson 1.1, Translating Points, current"; shot lesson
 has "Move the SR-71 4 steps to the right and 1 up."
 $T adb shell input keyevent 4; shot leave-asks 0.8
-has "Keep learning"; has "End lesson"
+has "CONTINUE"; has "End lesson"
 tap "End lesson"; waitfor "See you soon" 10; shot see-you-soon; has "Your spot is saved."; tap "Back to lesson"; sleep 1.5
 $T adb shell input keyevent 4; shot leave-asks-again 0.8
-tap "Keep learning"; sleep 1
+tap "CONTINUE"; sleep 1
 
 log "-- play L1.1 to the end like a child: one wrong try on every graded page"
 # The board's corners from the UI tree; Brilliant's graph geometry (docs/qa/l11-spec.md §3): origin (48, 308), cell
@@ -219,65 +219,65 @@ shot P1-start; has "Move the SR-71 4 steps to the right and 1 up."
 has "Ask Humo"
 $T adb shell dumpsys gfxinfo "$PKG" reset > /dev/null
 $T adb logcat -c
-drag 1 2 2 5; press Check; shot P1-wrong 1.3
-has "Try again"
-press "Get help" 2.5; shot P1-tutor; has "Done"; has "Show me"
+drag 1 2 2 5; press CHECK; shot P1-wrong 1.3
+has "TRY AGAIN"
+press "Get help" 2.5; shot P1-tutor; has "DONE"; has "Show me"
 press "Show me" 2.5; shot P1-tutor-show-me
-press Done 1
-press "Try again"; drag 2 5 5 3; press Check; shot P1-correct 1.3
+press DONE 1
+press "TRY AGAIN"; drag 2 5 5 3; press CHECK; shot P1-correct 1.3
 ticks=$($T adb logcat -d -s HumoSound:I | grep -c 'cue=Toggle')
 log "HumoSound: $ticks drag ticks (cue=Toggle) over the two P1 drags; $($T adb logcat -d -s HumoSound:I | grep -c 'cue=DragStart') pickups, $($T adb logcat -d -s HumoSound:I | grep -c 'cue=DragEnd') drops"
 [ "$ticks" -ge 4 ] || fail "a P1 drag logged only $ticks tick sounds (need 4 or more)"
 has "Nice, that.s it!"
-press "Why[?]"; shot P1-show-me-how; has "Continue lesson"; press "Continue lesson"
+press "Why[?]"; shot P1-show-me-how; has "CONTINUE"; press "CONTINUE"
 shot P2-start
 log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
 tapnode 2 4; snap P2-armed 0.5
 board; shoot_after $(npx 6 0) P2-tapfly-a 0.5 P2-tapfly-b 0.7
 sleep 5; shot P2-landed 0.5
-press Check; shot P2-wrong 1.3
-has "Try again"
-press "Try again"; drag 6 0 6 5; press Check; shot P2-correct 1.3
-has "Continue"; press Continue
-shot P3; press "Ask Humo" 2.5; shot P3-tutor; press "Give me a hint" 2.5; shot P3-tutor-hint; press Done 1; press Continue
+press CHECK; shot P2-wrong 1.3
+has "TRY AGAIN"
+press "TRY AGAIN"; drag 6 0 6 5; press CHECK; shot P2-correct 1.3
+has "CONTINUE"; press CONTINUE
+shot P3; press "Ask Humo" 2.5; shot P3-tutor; press "Give me a hint" 2.5; shot P3-tutor-hint; press DONE 1; press CONTINUE
 for P in "P4 1 2 1 3" "P5 3 2 2 1" "P6 3 2 4 2"; do
   set -- $P
   shot "$1-start" 0.5
-  num $2 0.4; num $3; tapsnap Check "$1-flight" 0.9
-  waitfor "Try again" 15; shot "$1-wrong" 1.3
-  has "Try again"
-  press "Get help" 2.5; shot "$1-tutor"; press Done 1
-  press "Try again" 1
-  num $4 0.4; num $5; tapsnap Check "$1-flight-2" 0.9
-  waitfor "Continue" 15; shot "$1-correct"
-  press Continue
+  num $2 0.4; num $3; tapsnap CHECK "$1-flight" 0.9
+  waitfor "TRY AGAIN" 15; shot "$1-wrong" 1.3
+  has "TRY AGAIN"
+  press "Get help" 2.5; shot "$1-tutor"; press DONE 1
+  press "TRY AGAIN" 1
+  num $4 0.4; num $5; tapsnap CHECK "$1-flight-2" 0.9
+  waitfor "CONTINUE" 15; shot "$1-correct"
+  press CONTINUE
 done
-shot P7; press Play 1.5; press Continue
+shot P7; press Play 1.5; press CONTINUE
 # The splash waits for Continue (as the web player does); then the first item shows. The skill check has no Humo and no
 # tutor: a wrong item, an "I don't know" item and a right one, each with its feedback panel.
-shot skill-splash 0.3; has "Show what you know"; press Continue 1.5; shot skill-SC1 0.5; has "Show me"
-num 3 0.4; num 1; tapsnap Check skill-SC1-flight 0.9
+shot skill-splash 0.3; has "Show what you know"; press CONTINUE 1.5; shot skill-SC1 0.5; has "Show me"
+num 3 0.4; num 1; tapsnap CHECK skill-SC1-flight 0.9
 waitfor "Incorrect" 15; shot skill-SC1-wrong 1.0
-press Continue 1.5
+press CONTINUE 1.5
 press "Show me" 1.5; waitfor "Here(&apos;|.)s how it goes\." 15; shot skill-SC2-idk 3.0
-press Continue 1.5
-num 5 0.4; num 2; tapsnap Check skill-SC3-flight 0.9
+press CONTINUE 1.5
+num 5 0.4; num 2; tapsnap CHECK skill-SC3-flight 0.9
 waitfor "Correct!" 15; shot skill-SC3-right 1.0
-has "Finish"; press Finish 1.5
+has "FINISH"; press FINISH 1.5
 # The gate: a miss is never a fail screen. Humo says "Almost! Let's fix one.", replays the miss on the board, serves two
 # fresh problems; one wrong sends him to replay it and serve a new pair; two right pass without the jet pass.
 waitfor "Almost! Let.s fix one\." 20; shot fix-intro; has "Fix it with Humo"
 press "Fix it with Humo" 2.5; shot fix-demo-a 0.5; sleep 3; shot fix-demo-b 0.5
-press Continue 1.5; shot fix-1-start
-num 0 0.4; num 0; tapsnap Check fix-1-flight 0.9
-waitfor "Continue" 15; shot fix-1-wrong; press Continue 1.5
-num 3 0.4; num 0; tapsnap Check fix-2-flight 0.9
-waitfor "Continue" 15; shot fix-2-right; press Continue 2.5
-shot fix-demo-again 0.5; sleep 2; press Continue 1.5
-num 3 0.4; num 1; tapsnap Check fix-3-flight 0.9
-waitfor "Continue" 15; press Continue 1.5
-num 2 0.4; num 3; tapsnap Check fix-4-flight 0.9
-waitfor "Continue" 15; press Continue 2
+press CONTINUE 1.5; shot fix-1-start
+num 0 0.4; num 0; tapsnap CHECK fix-1-flight 0.9
+waitfor "CONTINUE" 15; shot fix-1-wrong; press CONTINUE 1.5
+num 3 0.4; num 0; tapsnap CHECK fix-2-flight 0.9
+waitfor "CONTINUE" 15; shot fix-2-right; press CONTINUE 2.5
+shot fix-demo-again 0.5; sleep 2; press CONTINUE 1.5
+num 3 0.4; num 1; tapsnap CHECK fix-3-flight 0.9
+waitfor "CONTINUE" 15; press CONTINUE 1.5
+num 2 0.4; num 3; tapsnap CHECK fix-4-flight 0.9
+waitfor "CONTINUE" 15; press CONTINUE 2
 sleep 2; shot lesson-end-fixed; has "Lesson complete"; has "Restart lesson"; has "135 XP earned"
 log "-- frame stats of the whole L1.1 walk (software GPU: a floor, not the truth)"
 $T adb shell dumpsys gfxinfo "$PKG" | grep -E "Total frames|Janky frames|percentile" | tee -a "$WALK/steps.txt"
@@ -292,20 +292,20 @@ tap "Lesson 1.2, Negative Translations, current"; shot l12-lesson
 has "Complete the translation to send the SR-71s to the targets."
 for P in "P1 -5 2" "P2 -5 -4" "P3" "P4 -5 -1" "P5 -5 3" "P6 -5 -3" "P7"; do
   set -- $P
-  if [ $# -eq 1 ]; then shot "l12-$1"; press Play 1.5; press Continue; continue; fi
-  num $2; tapsnap Check "l12-$1-flight" 0.9
-  waitfor "Try again" 15; shot "l12-$1-wrong"
-  press "Try again" 1.5
-  num $3; press Check 0.1
-  waitfor "Continue" 15; shot "l12-$1-correct"
-  press Continue
+  if [ $# -eq 1 ]; then shot "l12-$1"; press Play 1.5; press CONTINUE; continue; fi
+  num $2; tapsnap CHECK "l12-$1-flight" 0.9
+  waitfor "TRY AGAIN" 15; shot "l12-$1-wrong"
+  press "TRY AGAIN" 1.5
+  num $3; press CHECK 0.1
+  waitfor "CONTINUE" 15; shot "l12-$1-correct"
+  press CONTINUE
 done
-press Continue 1.5; shot l12-SC1; has "Show me"
-num -2; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
-num 3; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
-num -2 0.4; num 0; press Check 0.1; waitfor "Correct!" 15; press Finish 1.5
+press CONTINUE 1.5; shot l12-SC1; has "Show me"
+num -2; press CHECK 0.1; waitfor "Correct!" 15; press CONTINUE 1.5
+num 3; press CHECK 0.1; waitfor "Correct!" 15; press CONTINUE 1.5
+num -2 0.4; num 0; press CHECK 0.1; waitfor "Correct!" 15; press FINISH 1.5
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
-tapsnap Continue l12-mach3 1.6; sleep 4; shot l12-end; has "Lesson complete"; has "120 XP earned"
+tapsnap CONTINUE l12-mach3 1.6; sleep 4; shot l12-end; has "Lesson complete"; has "120 XP earned"
 press "Exit lesson" 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
@@ -380,8 +380,8 @@ log "-- best effort, never fails the run: L1.2 replayed with animations ON, as o
   tap "Takrorlash"; sleep 4
   $T adb shell dumpsys gfxinfo "$PKG" reset > /dev/null
   num -5 0.4
-  tapsnap Check motion-L12-P1-takeoff 0.6 motion-L12-P1-cruise 1.0
-  waitfor "Try again" 25
+  tapsnap CHECK motion-L12-P1-takeoff 0.6 motion-L12-P1-cruise 1.0
+  waitfor "TRY AGAIN" 25
   shot motion-L12-P1-landed
   log "-- glass frame stats with animations ON (software GPU: a floor, not the truth)"
   $T adb shell dumpsys gfxinfo "$PKG" | grep -E "Total frames|Janky frames|percentile" | tee -a "$WALK/steps.txt"

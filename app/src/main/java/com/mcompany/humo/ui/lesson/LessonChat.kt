@@ -225,7 +225,7 @@ internal fun TutorSheet(
         }
         AskPill(question, { question = it }, mic.listening, mic.level, Modifier.padding(horizontal = 16.dp), onMic = ::micTapped, onCancel = { mic.cancel(); question = "" }, onSend = { q -> if (mic.listening) mic.stop() else { question = ""; typed(q) } })
         Spacer(Modifier.height(12.dp))
-        Chunky("Done", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 20.dp), onClick = ::close)
+        Chunky("DONE", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 20.dp), onClick = ::close)
     }
 }
 

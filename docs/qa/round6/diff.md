@@ -140,3 +140,11 @@ Likely causes of the drag and flight jank, from reading the code (not measured),
 Cold start: Application.onCreate used to create the notification channel, install App Check and subscribe to the push topic before any frame. These now run on a background thread after the first frame (`HumoApp.startAfterFirstFrame`). The lesson warm-up and the sound preload were already off the main thread. Not measured on a phone; the emulator number was 4.5 s.
 
 Not done: one language per run. There is no language setting in the app (one `values` folder, the shell strings are Uzbek in code), so it needs a decision on where the setting lives.
+
+## Round 6g (alpha14): N14, N15 and one-word buttons
+
+- N14: every button is 56 dp; the primary ones (CHECK, CONTINUE, TRY AGAIN, FINISH, DONE) are capitals, extra-bold 17 sp, 0.06 em spacing, on a solid lip. The bulb stays at a quarter of the row.
+- N15, the cause of the flip: the bottom layer was one `AnimatedContent` keyed by a string that held `canCheck` and `flying`. Pressing Check flipped `flying`, which changed the key and slid the whole bar in; the verdict then changed it again: two slides per answer. The Check bar is now keyed `check` whatever `canCheck` and `flying` are, and the verdict is its own `FeedbackSheet` in an `AnimatedVisibility` that depends only on "is there a verdict".
+- The sheet: edge to edge from the bottom, opaque so it covers the Check bar, one spring (damping 0.85, medium stiffness), a handle, draggable between a peek (verdict and button) and the full line with a fling or a 48 dp drag; its main button is in the exact place and size of CHECK. `LessonFeedbackSheetTest` counts the enters (1 per verdict), compares the rects (within 2 dp), asserts CHECK is gone while the sheet is up, and swipes between the two states.
+- Labels: "Continue lesson", "Keep learning" and "Fix it with Humo" are all CONTINUE; a source-scan test requires every primary label to be capitals and at most two words.
+- Not checked: Duolingo's sheet reference folder was not opened; the sheet's look (colours, handle) is mine.

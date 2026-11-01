@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.semantics.heading
@@ -235,7 +236,7 @@ private fun androidx.compose.foundation.layout.BoxScope.QuitSheet(humo: HumoStat
         Spacer(Modifier.height(14.dp))
         Chunky("End lesson", Kind.Secondary, true, Modifier.fillMaxWidth().padding(horizontal = 18.dp), onClick = onEnd)
         Spacer(Modifier.height(12.dp))
-        Chunky("Keep learning", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 18.dp), onClick = onKeep)
+        Chunky("CONTINUE", Kind.Primary, true, Modifier.fillMaxWidth().padding(horizontal = 18.dp), onClick = onKeep)
     }
     }
 }
@@ -369,7 +370,7 @@ internal fun Chunky(
     val sink = !enabled || pressed
     // propagateMinConstraints: a button given an exact width (a weight, fillMaxWidth) fills it; otherwise it wraps its label.
     Box(
-        modifier.height(52.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
+        modifier.height(56.dp).clickable(interaction, null, enabled = enabled, role = Role.Button, onClick = onClick)
             .then(if (icon != null) Modifier.semantics { contentDescription = label; text = androidx.compose.ui.text.AnnotatedString(label) } else Modifier).drawBehind {
             val lip = 4.dp.toPx()
             val r = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
@@ -387,8 +388,8 @@ internal fun Chunky(
             else Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 leading?.invoke()
                 Text(
-                    label, fontFamily = LessonType.Figtree, fontWeight = FontWeight.Medium,
-                    fontSize = 17.sp * fit, color = ink, maxLines = 1, softWrap = false,
+                    label, fontFamily = LessonType.Figtree, fontWeight = if (kind == Kind.Secondary) FontWeight.Medium else FontWeight.ExtraBold,
+                    fontSize = 17.sp * fit, letterSpacing = if (kind == Kind.Secondary) 0.sp else 1.02.sp, color = ink, maxLines = 1, softWrap = false,
                     onTextLayout = { if (it.didOverflowWidth && fit > 0.45f) fit *= 0.92f },
                 )
             }
@@ -562,46 +563,60 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             }
             if (!tutorOpen) Spacer(Modifier.height(dockRoom))
         }
-        if (!tutorOpen) Box(Modifier.align(Alignment.BottomCenter)) {
-            AnimatedContent(
-                targetState = barKey,
-                transitionSpec = { slideInVertically(if (motion) spring<IntOffset>(dampingRatio = 0.82f, stiffness = 380f) else tween(0)) { it }.togetherWith(ExitTransition.None) },
-                label = "bottom",
-            ) { key ->
-                when {
-                    key == "how" -> ButtonBar(bottomInset) { Chunky("Continue lesson", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
-                    key.startsWith("demo") -> ButtonBar(bottomInset) { Chunky("Continue", Kind.Primary, !flow.demoBusy, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
-                    key.startsWith("skill-") -> {
-                        val j = (flow.screen as Screen.Skill).j
-                        val ok = flow.skillResults[j] == true
-                        val last = j == flow.skill.size - 1
-                        GlassPanel(ok, flow.verdict.orEmpty(), bottomInset, onFlag = { reporting = true }, calm = !ok) {
-                            Chunky(if (last) "Finish" else "Continue", if (ok) Kind.Primary else Kind.Dark, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
+        if (!tutorOpen) {
+            val skillJ = (flow.screen as? Screen.Skill)?.j
+            val sheet: SheetSpec? = when {
+                barKey.startsWith("skill-") && skillJ != null -> {
+                    val ok = flow.skillResults[skillJ] == true
+                    SheetSpec("skill-$skillJ", ok, !ok, if (ok) "Correct!" else "Incorrect", flow.verdict.orEmpty(), if (ok) Kind.Primary else Kind.Dark, if (skillJ == flow.skill.size - 1) "FINISH" else "CONTINUE", null, true) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
+                }
+                barKey == "right" -> SheetSpec("right", true, false, "Correct!", flow.verdict.orEmpty(), Kind.Primary, "CONTINUE", ChunkyIcon.Bulb, true) { LessonSounds.play(Cue.Continue); flow.next() }
+                barKey == "fixright" -> SheetSpec("fixright", true, false, "Correct!", flow.verdict.orEmpty(), Kind.Primary, "CONTINUE", null, false) { LessonSounds.play(Cue.Continue); flow.next() }
+                barKey == "fixwrong" -> SheetSpec("fixwrong", false, false, "Not quite", flow.verdict.orEmpty(), Kind.Warn, "CONTINUE", null, false) { LessonSounds.play(Cue.Continue); flow.next() }
+                barKey == "wrong" -> SheetSpec("wrong", false, false, "Not quite", flow.verdict.orEmpty(), Kind.Warn, "TRY AGAIN", ChunkyIcon.Help, true) { LessonSounds.play(Cue.Tick); flow.tryAgain() }
+                else -> null
+            }
+            var lastSheet by remember { mutableStateOf<SheetSpec?>(null) }
+            if (sheet != null) lastSheet = sheet
+            val translateRow = page.kind == PageKind.Translate
+            Box(Modifier.align(Alignment.BottomCenter)) {
+                // The Check bar stays where it is; the verdict sheet slides up over it and covers it, so the thumb never moves.
+                Box(Modifier.then(if (sheet != null) Modifier.clearAndSetSemantics {} else Modifier)) {
+                    AnimatedContent(
+                        targetState = if (barKey.startsWith("check") || sheet != null) "check" else barKey,
+                        transitionSpec = { slideInVertically(if (motion) spring<IntOffset>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium) else tween(0)) { it }.togetherWith(ExitTransition.None) },
+                        label = "bottom",
+                    ) { key ->
+                        when {
+                            key == "how" -> ButtonBar(bottomInset) { Chunky("CONTINUE", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
+                            key.startsWith("demo") -> ButtonBar(bottomInset) { Chunky("CONTINUE", Kind.Primary, !flow.demoBusy, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
+                            key == "skill" -> ButtonBar(bottomInset) {
+                                Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Skip); flow.dontKnow() }
+                                Chunky("CHECK", Kind.Primary, flow.canCheck, Modifier.weight(3f)) { check() }
+                            }
+                            key == "go" -> ButtonBar(bottomInset) { Chunky("CONTINUE", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
+                            else -> ButtonBar(bottomInset) {
+                                if (translateRow) Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
+                                Chunky("CHECK", Kind.Primary, flow.canCheck, Modifier.weight(if (translateRow) 3f else 1f)) { check() }
+                            }
                         }
                     }
-                    key == "skill" -> ButtonBar(bottomInset) {
-                        Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Skip); flow.dontKnow() }
-                        Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(3f)) { check() }
-                    }
-                    key == "go" -> ButtonBar(bottomInset) { Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
-                    key == "right" -> GlassPanel(true, "Correct!", bottomInset, onFlag = { reporting = true }) {
-                        Chunky("Why?", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
-                        Chunky("Continue", Kind.Primary, true, Modifier.weight(3f)) { LessonSounds.play(Cue.Continue); flow.next() }
-                    }
-                    key == "fixright" -> GlassPanel(true, "Correct!", bottomInset, onFlag = null) {
-                        Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
-                    }
-                    key == "fixwrong" -> GlassPanel(false, "Not quite", bottomInset, onFlag = null) {
-                        Chunky("Continue", Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() }
-                    }
-                    key == "wrong" -> GlassPanel(false, "Not quite", bottomInset, onFlag = { reporting = true }) {
-                        Chunky("Get help", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Help) { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
-                        Chunky("Try again", Kind.Warn, true, Modifier.weight(3f)) { LessonSounds.play(Cue.Tick); flow.tryAgain() }
-                    }
-                    else -> ButtonBar(bottomInset) {
-                        if (page.kind == PageKind.Translate) Chunky("Show me", Kind.Secondary, !flow.flying, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
-                        Chunky("Check", Kind.Primary, flow.canCheck, Modifier.weight(if (page.kind == PageKind.Translate) 3f else 1f)) { check() }
-                    }
+                }
+                AnimatedVisibility(
+                    visible = sheet != null,
+                    enter = slideInVertically(if (motion) spring<IntOffset>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium) else tween(0)) { it },
+                    exit = slideOutVertically(tween(if (motion) 160 else 0)) { it },
+                ) {
+                    val spec = sheet ?: lastSheet
+                    if (spec != null) FeedbackSheet(
+                        spec, bottomInset, translateRow,
+                        onFlag = if (spec.flag) ({ reporting = true }) else null,
+                        secondary = spec.secondary?.let { icon ->
+                            { m -> Chunky(if (icon == ChunkyIcon.Bulb) "Why?" else "Get help", Kind.Secondary, true, m, icon = icon) {
+                                if (icon == ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true } else { LessonSounds.play(Cue.Tick); flow.chat.openWith(HumoChatState.Request.WhyWrong) }
+                            } }
+                        },
+                    )
                 }
             }
         }
@@ -685,7 +700,7 @@ private fun Medal(modifier: Modifier) {
 @Composable
 private fun SkillSplash(flow: LessonFlow, humo: HumoState) {
     LaunchedEffect(Unit) { LessonSounds.play(Cue.Start) }
-    CenterScreen(humo, null, L11.fx("gate").first(), null, emptyList(), foot = BtnSpec("Continue", Kind.Primary) { flow.startSkill() }, medal = false)
+    CenterScreen(humo, null, L11.fx("gate").first(), null, emptyList(), foot = BtnSpec("CONTINUE", Kind.Primary) { flow.startSkill() }, medal = false)
 }
 
 /** Almost! Let's fix one. A miss is never a fail screen: Humo starts the fix-it round. */
@@ -695,7 +710,7 @@ private fun FixIntroView(flow: LessonFlow, humo: HumoState) {
     LaunchedEffect(Unit) {
         if (humo.alive && voice.on) { humo.talking = true; voice.say(L11.fx("fixTitle").first()); humo.talking = false }
     }
-    CenterScreen(humo, null, L11.fx("fixTitle").first(), null, emptyList(), foot = BtnSpec(L11.fx("fixGo").first(), Kind.Primary) { flow.fixStart() }, medal = false)
+    CenterScreen(humo, null, L11.fx("fixTitle").first(), null, emptyList(), foot = BtnSpec("CONTINUE", Kind.Primary) { flow.fixStart() }, medal = false)
 }
 
 @Composable
@@ -712,7 +727,7 @@ private fun ScoreView(flow: LessonFlow, humo: HumoState) {
             }
         },
         title = L11.scoreTitle(n, total), line = null,
-        buttons = listOf(BtnSpec("Continue", Kind.Primary) { flow.finish() }),
+        buttons = listOf(BtnSpec("CONTINUE", Kind.Primary) { flow.finish() }),
     )
 }
 
@@ -738,6 +753,6 @@ private fun EndView(flow: LessonFlow, humo: HumoState) {
 private fun ByeView(flow: LessonFlow, humo: HumoState, onExit: () -> Unit) {
     CenterScreen(
         humo, null, "See you soon", "Your spot is saved.",
-        listOf(BtnSpec("Done", Kind.Primary) { onExit() }, BtnSpec("Back to lesson", Kind.Secondary) { flow.resume() }), medal = false,
+        listOf(BtnSpec("DONE", Kind.Primary) { onExit() }, BtnSpec("Back to lesson", Kind.Secondary) { flow.resume() }), medal = false,
     )
 }

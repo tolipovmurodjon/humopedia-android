@@ -94,7 +94,7 @@ class LessonRound6Test {
         compose.onNodeWithContentDescription("0 sparks").assertDoesNotExist()
         // N11: one position for actions. Check's bottom is the reference; every other screen's lowest button sits within 4 dp of it.
         val dp = compose.density.density
-        val checkBottom = compose.onNodeWithText("Check").fetchSemanticsNode().boundsInRoot.bottom / dp
+        val checkBottom = compose.onNodeWithText("CHECK").fetchSemanticsNode().boundsInRoot.bottom / dp
         fun actionAtCheck(what: String, label: String? = null) {
             val bottom = if (label != null) compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot.bottom / dp
             else compose.onAllNodes(androidx.compose.ui.test.hasTestTag("primary-true").or(androidx.compose.ui.test.hasTestTag("primary-false")))
@@ -114,15 +114,15 @@ class LessonRound6Test {
         shot("P1-tutor-draws")
         click("Show me"); settle()
         shot("P1-tutor-show-me")
-        click("Done")
-        click("Try again")
+        click("DONE")
+        click("TRY AGAIN")
         act { flow.dropAt(Node(5, 3)); flow.check() }; settle()
         assertEquals(15, flow.sparks)
         shot("P1-right")
         click("Why?"); settle()
         compose.onNodeWithTag("how-card").assertIsDisplayed()
         shot("P1-show-me-how")
-        click("Continue lesson")
+        click("CONTINUE")
         shot("P2-start")
 
         // P3: the explainer, and Humo's sheet on a page nobody got wrong (he is tapped, not a button with a word).
@@ -133,7 +133,7 @@ class LessonRound6Test {
         shot("P3-tutor")
         click("Give me a hint"); settle()
         shot("P3-tutor-hint")
-        click("Done")
+        click("DONE")
 
         // P4-P6: the keypad, a wrong try each.
         for (i in 3..5) {
@@ -146,7 +146,7 @@ class LessonRound6Test {
             shot("P${i + 1}-both-numbers")
             act { flow.check() }; settle()
             shot("P${i + 1}-wrong")
-            click("Try again")
+            click("TRY AGAIN")
             solve()
             shot("P${i + 1}-right")
         }
@@ -158,22 +158,22 @@ class LessonRound6Test {
         compose.onNodeWithText("Show what you know").assertIsDisplayed()
         shot("SC-gate")
         actionAtCheck("gate")
-        click("Continue")
+        click("CONTINUE")
         shot("SC1-start")
         act { flow.tapTile(0); flow.tapTile(0) }
-        click("Check"); settle()
+        click("CHECK"); settle()
         compose.onNodeWithText("Incorrect").assertIsDisplayed()
         shot("SC1-wrong")
-        click("Continue")
+        click("CONTINUE")
         click("Show me"); settle()
         compose.onNodeWithText("Here's how it goes.").assertIsDisplayed()
         shot("SC2-show-me")
-        click("Continue")
+        click("CONTINUE")
         act { flow.tapTile(flow.page!!.move.x); flow.tapTile(flow.page!!.move.y) }
-        click("Check"); settle()
+        click("CHECK"); settle()
         compose.onNodeWithText("Correct!").assertIsDisplayed()
         shot("SC3-right")
-        click("Finish")
+        click("FINISH")
 
         // Fix-it: never a fail screen. Humo replays the miss, two fresh problems, a miss, a new pair, the pass.
         compose.onNodeWithText("Almost! Let's fix one.").assertIsDisplayed()
@@ -182,32 +182,32 @@ class LessonRound6Test {
         click("Fix it with Humo"); settle()
         assertEquals(Screen.Demo, flow.screen)
         shot("fix-demo")
-        click("Continue")
+        click("CONTINUE")
         shot("fix-1-start")
         act { flow.tapTile(0); flow.tapTile(0); flow.check() }; settle()
         shot("fix-1-wrong")
-        click("Continue")
+        click("CONTINUE")
         solve()
         shot("fix-2-right")
-        click("Continue"); settle()
+        click("CONTINUE"); settle()
         assertEquals("a miss replays and serves a new pair", Screen.Demo, flow.screen)
         shot("fix-demo-again")
-        click("Continue")
-        solve(); click("Continue")
+        click("CONTINUE")
+        solve(); click("CONTINUE")
         solve()
         shot("fix-4-right")
-        click("Continue")
+        click("CONTINUE")
         assertEquals(Screen.End, flow.screen)
         compose.onNodeWithText("Lesson complete").assertIsDisplayed()
         shot("end-after-fix")
 
         // A clean 3 of 3: the Score, then the end (the jet pass runs with motion; the Mach 3 frames are in LessonScreenshotTest).
         act { flow.restart(); flow.startSkill() }
-        repeat(3) { solve(); click(if (it == 2) "Finish" else "Continue") }
+        repeat(3) { solve(); click(if (it == 2) "FINISH" else "CONTINUE") }
         compose.onNodeWithText("Perfect!").assertIsDisplayed()
         shot("score-perfect")
         actionAtCheck("score")
-        click("Continue")
+        click("CONTINUE")
         shot("end-perfect")
         actionAtCheck("end")
 
@@ -215,7 +215,7 @@ class LessonRound6Test {
         act { flow.restart() }
         compose.onNodeWithContentDescription("Exit lesson").performClick(); compose.waitForIdle()
         shot("quit-sheet")
-        actionAtCheck("quit sheet", "Keep learning")
+        actionAtCheck("quit sheet", "CONTINUE")
         click("End lesson")
         compose.onNodeWithText("See you soon").assertIsDisplayed()
         shot("see-you-soon")

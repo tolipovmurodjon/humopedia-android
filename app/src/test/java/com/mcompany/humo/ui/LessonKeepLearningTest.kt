@@ -38,8 +38,8 @@ class LessonKeepLearningTest {
         val before = listOf(flow.dragAt, flow.phase, flow.verdict, flow.screen, flow.chat.open)
         assertEquals(Phase.Wrong, flow.phase)
         compose.onNodeWithContentDescription("Exit lesson").performClick(); compose.waitForIdle()
-        compose.onNodeWithText("Keep learning").performClick(); compose.waitForIdle()
+        compose.onNodeWithText("CONTINUE").performClick(); compose.waitForIdle()
         assertEquals(before, listOf(flow.dragAt, flow.phase, flow.verdict, flow.screen, flow.chat.open))
-        compose.onNodeWithText("Try again").assertExists("the Try again button is gone after Keep learning")
+        compose.onNodeWithText("TRY AGAIN").assertExists("the Try again button is gone after Keep learning")
     }
 }
