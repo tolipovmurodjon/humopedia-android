@@ -131,7 +131,7 @@ object LessonSounds {
         val table = parseManifest(context.assets.open("sounds/manifest.json").bufferedReader().use { it.readText() })
         val found = table.filterValues { "$it.mp3" in have }
         if (found.isEmpty()) return
-        val sp = android.media.SoundPool.Builder().setMaxStreams(4).setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build()
+        val sp = android.media.SoundPool.Builder().setMaxStreams(4).setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build()
         sp.setOnLoadCompleteListener { _, id, status -> if (status == 0) synchronized(this) { packReady.add(id) } }
         found.forEach { (c, n) -> context.assets.openFd("sounds/$n.mp3").use { packIds[c] = sp.load(it, 1) }; packFiles[c] = n }
         pool = sp
@@ -147,12 +147,12 @@ object LessonSounds {
     private fun track(cue: Cue): AudioTrack = tracks[cue] ?: run {
         val data = if (cue == Cue.Whoosh) whooshPcm(false) else if (cue == Cue.Boom) whooshPcm(true) else pcm(cue)
         AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
             .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
             .setTransferMode(AudioTrack.MODE_STATIC)
             .setBufferSizeInBytes(data.size * 2)
             .build()
-            .also { it.write(data, 0, data.size); it.setVolume(0.4f); tracks[cue] = it }
+            .also { it.write(data, 0, data.size); it.setVolume(0.8f); tracks[cue] = it }
     }
 
     /** A missing audio device never blocks a lesson: the picture and the haptic still answer. */

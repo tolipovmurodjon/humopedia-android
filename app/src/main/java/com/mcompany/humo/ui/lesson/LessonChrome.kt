@@ -213,7 +213,7 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
         delay(180)
         while (shown < words && cutAt < 0) { shown++; delay(WORD_MS) }
     }
-    val spoken = if (cutAt >= 0) text.replace("*", "").trim().split(Regex("\s+")).take(cutAt).joinToString(" ") else text
+    val spoken = if (cutAt >= 0) text.replace("*", "").trim().split(Regex("\\s+")).take(cutAt).joinToString(" ") else text
     Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         val tap = if (onTap != null) Modifier.clickable(role = Role.Button, onClickLabel = "Ask Humo", onClick = onTap) else Modifier
         Humo(humo, tap.size(if (compact) 60.dp else 76.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
