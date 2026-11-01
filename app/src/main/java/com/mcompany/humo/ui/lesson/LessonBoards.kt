@@ -293,6 +293,24 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
     }
 }
 
+/**
+ * Waits until no machine is mid-flight. If nothing moves for 3 s while a flight is still set (a lost wake-up, a cancelled launch) the
+ * flight is landed where it was going and the frame loop is woken: no input lock may outlive its animation (alpha13 soft-lock on fix-it).
+ */
+internal suspend fun settleFlights(crafts: List<Craft>, wake: androidx.compose.runtime.MutableIntState) {
+    var lastPos = crafts.map { it.pos }
+    var movedAt = withFrameMillis { it }
+    while (crafts.any { it.flight != null }) {
+        val now = withFrameMillis { it }
+        val pos = crafts.map { it.pos }
+        if (pos != lastPos) { lastPos = pos; movedAt = now }
+        else if (now - movedAt > 3000) {
+            crafts.forEach { c -> c.flight?.let { f -> c.pos = f.to; c.flight = null; c.speed = 0f; c.alt = 0f } }
+            wake.intValue++
+        }
+    }
+}
+
 /** P3's still figure. */
 @Composable
 internal fun FigureBoard(page: LessonPage, fly: Boolean, width: Dp) {
@@ -370,7 +388,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
     // the move, and clearing a number sends them home. A new change waits for the flight in the air, so quick taps never fight.
     LaunchedEffect(shown, atlas != null) {
         if (recap || atlas == null) return@LaunchedEffect
-        while (crafts.any { it.flight != null }) withFrameMillis { }
+        settleFlights(crafts, wake)
         var launched = false
         crafts.forEachIndexed { i, c ->
             val want = g.px(if (shown != null) page.points[i] + shown else page.points[i])
@@ -384,7 +402,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
     }
     // Check only grades: it waits for a preview flight still in the air, then the player grades.
     DisposableEffect(deck, crafts) {
-        deck.launcher = { while (crafts.any { it.flight != null }) withFrameMillis { } }
+        deck.launcher = { settleFlights(crafts, wake) }
         onDispose { deck.launcher = null }
     }
     LaunchedEffect(page, fly, motion) {
@@ -418,7 +436,8 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             }
             last = -1L
             val seen = wake.intValue
-            snapshotFlow { wake.intValue }.first { it != seen }
+            // A flight planned between the last frame and this read would be missed by the wake count alone: look at the crafts too.
+            snapshotFlow { wake.intValue }.first { it != seen || crafts.any { c -> c.flight != null } }
         }
     }
 

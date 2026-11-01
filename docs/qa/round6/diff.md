@@ -148,3 +148,11 @@ Not done: one language per run. There is no language setting in the app (one `va
 - The sheet: edge to edge from the bottom, opaque so it covers the Check bar, one spring (damping 0.85, medium stiffness), a handle, draggable between a peek (verdict and button) and the full line with a fling or a 48 dp drag; its main button is in the exact place and size of CHECK. `LessonFeedbackSheetTest` counts the enters (1 per verdict), compares the rects (within 2 dp), asserts CHECK is gone while the sheet is up, and swipes between the two states.
 - Labels: "Continue lesson", "Keep learning" and "Fix it with Humo" are all CONTINUE; a source-scan test requires every primary label to be capitals and at most two words.
 - Not checked: Duolingo's sheet reference folder was not opened; the sheet's look (colours, handle) is mine.
+
+## Round 6h (alpha14): A1 soft-lock and the audit items
+
+- A1 cause (found by reading, not reproduced): the machines' frame loop goes to sleep when nothing moves and wakes on a counter. A flight planned after the loop's last frame but before it read the counter was never seen, so the flight stayed "in the air" forever, Check and the keypad stayed locked (`flying`). Fixes: the loop also wakes when any craft still has a flight, and `settleFlights` lands a flight that has not moved for 3 s. `LessonFixItPathTest` plays a miss on fix problem 1, then problem 2 and the replayed pair, at flow level (it cannot reproduce the timing race).
+- A4: a bubble line already written out is shown whole the next time (Try again).
+- A5: icon buttons are a soft dark tint with a darker edge, visible on every ground (alpha13: white on white); 56 dp tall.
+- Audit: disabled CHECK label #7A7A7A on #E5E5E5 (3.4:1); key lip is the slot ink at 40 %; digits are highlighted only as whole tokens ("SR-71s" stays whole); Humo's drawing replay is about 2.4 s.
+- Not done: the mic question with Humo's reason (needs the talk pill's permission flow), fix-it lines capped at 8 words (needs new voice clips), the measured 26 fps baseline in `phone-perf.sh`.

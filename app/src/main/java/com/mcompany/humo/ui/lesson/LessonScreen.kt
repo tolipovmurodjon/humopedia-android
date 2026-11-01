@@ -123,7 +123,7 @@ internal object Chrome {
     val PanelGood = Color(0xFFD9F5E6)
     val PanelBad = Color(0xFFFFF0B8)
     val OffFace = Color(0xFFE5E5E5)
-    val OffText = Color(0xFFAFAFAF)
+    val OffText = Color(0xFF7A7A7A)
     val Muted = Color(0xFF6B7079)
     val Close = Color(0xFF9A9A9A)
     val Medal = Color(0xFF6170EC)
@@ -365,6 +365,8 @@ internal fun Chunky(
         kind == Kind.Primary -> Triple(Chrome.Mint, Chrome.MintEdge, Color.White)
         kind == Kind.Warn -> Triple(Chrome.Yellow, Chrome.YellowEdge, Color(0xFF4A3600))
         kind == Kind.Dark -> Triple(Color(0xFF2B2F33), Color(0xFF15181A), Color.White)
+        // an icon button is a soft dark tint, so it reads on white, mint, amber and grey grounds alike (alpha13: white on white)
+        icon != null -> Triple(Color(0x1A000000), Color(0x2E000000), Chrome.Ink)
         else -> Triple(Color.White, Chrome.Line, Chrome.MintInk)
     }
     val sink = !enabled || pressed
@@ -424,19 +426,19 @@ private suspend fun runDemo(flow: LessonFlow, motion: Boolean) {
     // Drawing, not talking (Boss): the start is ringed, two short labels grow along the run, the learner's try flies and is ringed,
     // then the right move flies. One line in the bubble, at the end.
     flow.marks = listOf(s0)
-    nap(900)
+    nap(400)
     flow.braces = listOf(Brace(s0, Node(s0.x + m.x, s0.y), LessonLines.steps(m.x, "right").substringBeforeLast(' ')))
-    nap(900)
+    nap(400)
     if (m.y != 0) flow.braces = flow.braces + Brace(Node(s0.x + m.x, s0.y), Node(s0.x + m.x, s0.y + m.y), if (m.y > 0) "up" else "down")
-    nap(900)
+    nap(400)
     val mine = flow.demoMine
     if (mine != null) {
-        flow.demoSet(mine); nap(1500)
+        flow.demoSet(mine); nap(500)
         flow.marks = listOf(s0, s0 + mine)
-        nap(900)
+        nap(250)
     }
     flow.demoSet(m)
-    nap(1500)
+    nap(450)
     flow.marks = emptyList()
     say(flow.fresh(L11.fx("fixThen")))
     flow.demoBusy = false
