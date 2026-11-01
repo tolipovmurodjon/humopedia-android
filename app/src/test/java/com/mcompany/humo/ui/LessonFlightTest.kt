@@ -23,11 +23,11 @@ class LessonFlightTest {
         val c = Craft(Offset(100f, 400f))
         val to = Offset(300f, 200f)
         val ms = Flying.plan(c, to, 0L, density = 2.6f)
-        assertTrue("2 to 3.6 s, was $ms", ms in 2000L..3600L)
+        assertTrue("0.4 to 1.1 s (A6), was $ms", ms in 420L..1100L)
         var peak = 0f
         var landed = false
         var t = 0L
-        while (!landed && t < 5000L) {
+        while (!landed && t < 3000L) {
             t += 16
             landed = Flying.fly(c, t, 16f, cell = 40f)
             peak = maxOf(peak, c.alt)
