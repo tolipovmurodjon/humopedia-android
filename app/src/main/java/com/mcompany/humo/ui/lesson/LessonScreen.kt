@@ -417,20 +417,22 @@ private fun FitColumn(fit: Boolean, avail: Int, content: @Composable () -> Unit)
 }
 
 /** Humo's replay of a missed problem (player.js `demo`): he rings the start, counts right then up with short labels on the graph, shows what the learner did, then flies the right move. */
-private suspend fun runDemo(flow: LessonFlow, motion: Boolean) {
+private suspend fun runDemo(flow: LessonFlow, motion: Boolean, voice: HumoVoice) {
     val p = flow.page ?: return
     flow.demoBusy = true
     suspend fun nap(ms: Long) { if (motion) delay(ms) }
-    suspend fun say(t: String) { flow.say(t); nap((t.split(' ').size * 380L + 500L).coerceAtLeast(1300L)) }
     val s0 = p.points[0]
     val m = p.move
     // Drawing, not talking (Boss): the start is ringed, two short labels grow along the run, the learner's try flies and is ringed,
     // then the right move flies. One line in the bubble, at the end.
     flow.marks = listOf(s0)
+    LessonSounds.play(Cue.Toggle)
     nap(400)
     flow.braces = listOf(Brace(s0, Node(s0.x + m.x, s0.y), LessonLines.steps(m.x, "right").substringBeforeLast(' ')))
+    LessonSounds.play(Cue.Toggle)
     nap(400)
     if (m.y != 0) flow.braces = flow.braces + Brace(Node(s0.x + m.x, s0.y), Node(s0.x + m.x, s0.y + m.y), if (m.y > 0) "up" else "down")
+    LessonSounds.play(Cue.Toggle)
     nap(400)
     val mine = flow.demoMine
     if (mine != null) {
@@ -439,9 +441,12 @@ private suspend fun runDemo(flow: LessonFlow, motion: Boolean) {
         nap(250)
     }
     flow.demoSet(m)
+    LessonSounds.play(Cue.Whoosh)
     nap(450)
     flow.marks = emptyList()
-    say(flow.fresh(L11.fx("fixThen")))
+    val line = flow.fresh(L11.fx("fixThen"))
+    flow.say(line)
+    if (motion && voice.on) voice.say(line) else nap(1300)
     flow.demoBusy = false
 }
 
@@ -477,7 +482,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     // Humo reads the task itself when a page opens (spoken text = written text); the teacher line waits in the tutor sheet.
     LaunchedEffect(flow.screen) {
         flow.chat.open = false
-        if (demo) runDemo(flow, motion) else if (!flow.inSkill) flow.chat.hear(LessonLines.plain(page.prompt, fly))
+        if (demo) runDemo(flow, motion, voice) else if (!flow.inSkill) flow.chat.hear(LessonLines.plain(page.prompt, fly))
     }
     // The panel shows the verdict at once; Humo's voice follows: 0.5 s after a right answer, 0.65 s after a wrong one (Brilliant's frame study).
     LaunchedEffect(flow.verdict, flow.phase) {

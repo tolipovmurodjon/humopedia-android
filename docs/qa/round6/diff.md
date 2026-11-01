@@ -179,3 +179,10 @@ Not done: one language per run. There is no language setting in the app (one `va
 - Cold start: the app now logs `app-oncreate`, `activity-oncreate` and `first-frame since process start` (all `HumoPerf`), and the smoke prints them. Nothing is moved yet; the numbers decide.
 - Drag and flight: a debug counter logs, every 2 s, how many times the board, Humo and the bubble were drawn or composed (`HumoPerf counts`). The smoke prints it; the top two causes are fixed from those numbers in the next round.
 - Not done: one language per run (the app has no language setting; this needs a design decision), first frame under 500 ms (not traced), cold start 1.5 s.
+
+## Round 6l (alpha17): Boss's top notes
+
+- Jet grab: a finger within 40 dp of the jet (56 dp across or more, 70 % of the sprite on the big one) grabs it; a drag starts after 3 dp instead of the system slop. The jet already follows the finger 1:1 (the point is snapped to the finger, the picture reads it each frame). `jetGrabAreaIsGenerous`.
+- Number entry: the machines fly on each digit: one number moves that leg only, both numbers move the whole move; Check only grades. This reverses the 2026-10-31 rule that a single number kept the machines still. `previewFollowsEveryDigit`. Not met: the flight itself is the calm 40-frame eased flight, not 150 ms.
+- Show me replay: every mark has a soft tick, the move has the take-off whoosh, and the closing line has Emma's voice. It is the same short drawing as before (ring, "N steps", "up", the try, the move), not a port of the web replay's every step.
+- Item 4 (first problem (2, 1) from lesson.js and the copy audit) waits for the web builder's commit; the converter and the voice bundle are not re-run.

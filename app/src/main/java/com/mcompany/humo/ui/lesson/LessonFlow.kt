@@ -171,7 +171,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     /** The translation the board shows now (points glide by it). */
     val shownMove: Node? get() = when (page?.kind) {
-        PageKind.Translate -> slots.move
+        PageKind.Translate -> previewMove(slots)
         PageKind.Recap, PageKind.Explainer -> page!!.move
         else -> null
     }
@@ -352,3 +352,14 @@ class LessonFlow(val lesson: LessonContent = L11) {
         slots = page?.let { Slots.start(it) } ?: Slots()
     }
 }
+
+/** The move a ghost jet flies to while the numbers are typed: both numbers = the move; one number = that leg alone (the other leg is 0). Null = nothing typed. */
+internal fun previewMove(s: Slots): Node? = when {
+    s.a != null && s.b != null -> Node(s.a, s.b)
+    s.a != null -> Node(s.a, 0)
+    s.b != null -> Node(0, s.b)
+    else -> null
+}
+
+/** How far from the jet's centre a finger still grabs it (px): at least 56 dp across, or most of the sprite on the fly layer. */
+internal fun grabRadius(densityPx: Float, spritePx: Float, fly: Boolean): Float = maxOf(40f * densityPx, if (fly) spritePx * 0.7f else 0f)

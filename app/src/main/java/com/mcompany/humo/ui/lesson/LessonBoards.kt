@@ -218,7 +218,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         return@awaitEachGesture
                     }
                     if (flow.locked) return@awaitEachGesture
-                    val grab = max(28.dp.toPx(), if (fly) len * 0.6f else 0f)
+                    val grab = grabRadius(density.density, len, fly)
                     if (dist(down.position, handle.value) > grab) {
                         if (fly && armed) {
                             val up = waitForUpOrCancellation() ?: return@awaitEachGesture
@@ -232,7 +232,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                     var lastNode = g.snapPx(handle.value)
                     val grabOffset = handle.value - down.position
                     drag(down.id) { change ->
-                        if (!dragged && dist(change.position, down.position) > viewConfiguration.touchSlop) { dragged = true; dragging = true; armed = false; LessonSounds.play(Cue.DragStart) }
+                        if (!dragged && dist(change.position, down.position) > 3.dp.toPx()) { dragged = true; dragging = true; armed = false; LessonSounds.play(Cue.DragStart) }
                         if (dragged) {
                             val (cx, cy) = g.cells(change.position + grabOffset)
                             val p = g.px(cx.coerceIn(-0.3f, page.graph.xMax + 0.3f), cy.coerceIn(-0.3f, page.graph.yMax + 0.3f))

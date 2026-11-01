@@ -39,4 +39,18 @@ class LessonBubbleAndHintTest {
         for (key in listOf("gate", "fixTitle", "fixLook", "fixLook2", "fixNone", "fixThen", "fixNew", "fixPass")) for (line in L11.fx(key))
             assertTrue("\"$line\" has more than 8 words", line.split(" ").size <= 8)
     }
+
+    /** Boss: on each digit a ghost jet flies to where that move lands; one number alone moves that leg only. */
+    @Test fun previewFollowsEveryDigit() {
+        assertEquals(null, com.mcompany.humo.ui.lesson.previewMove(com.mcompany.humo.ui.lesson.Slots()))
+        assertEquals(Node(2, 0), com.mcompany.humo.ui.lesson.previewMove(com.mcompany.humo.ui.lesson.Slots(a = 2)))
+        assertEquals(Node(0, 3), com.mcompany.humo.ui.lesson.previewMove(com.mcompany.humo.ui.lesson.Slots(b = 3)))
+        assertEquals(Node(2, 1), com.mcompany.humo.ui.lesson.previewMove(com.mcompany.humo.ui.lesson.Slots(a = 2, b = 1)))
+    }
+
+    /** Boss: "it is hard to move the jet": a finger within 56 dp across (40 dp radius) still grabs it, more on the big sprite. */
+    @Test fun jetGrabAreaIsGenerous() {
+        assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 10f, false) >= 120f)
+        assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 400f, true) >= 280f)
+    }
 }
