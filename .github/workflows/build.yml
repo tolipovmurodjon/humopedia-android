@@ -4,6 +4,8 @@ name: build
 # (copied from PAGEL's build.yml, 2026-10-28).
 on:
   pull_request:
+  schedule:
+    - cron: '17 4 * * 1'
   push:
     branches: [main, "feat/**", "ci/**"]
 
@@ -23,6 +25,14 @@ jobs:
         with:
           distribution: zulu
           java-version: 17
+      # One debug key for every CI run (Boss, 2026-11-01: "CI keeps one key"): without it each run signs with a fresh random key and
+      # the phone refuses the update (INSTALL_FAILED_UPDATE_INCOMPATIBLE). On a miss Gradle makes the key once and the job saves it.
+      # The file is never printed, uploaded or committed. GitHub drops a cache unused for 7 days; the weekly build keeps it warm.
+      - name: Restore the one debug key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: humo-debug-keystore-v1
       - uses: gradle/actions/setup-gradle@v4
       # roborazzi.test.record: the screenshot tests save their PNGs (app/build/outputs/roborazzi) for the artifact.
       - name: Unit tests, screenshot tests and debug build
@@ -74,6 +84,10 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
           retention-days: 7
+      - name: Which key signed the debug APK (the certificate digest only)
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/*.apk | grep 'certificate SHA-256 digest' | head -1
       - name: Keep the debug APK
         uses: actions/upload-artifact@v4
         with:

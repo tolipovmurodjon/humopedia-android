@@ -58,3 +58,8 @@ Start and wrong try on each page type (drag P1, translate P4-P6, explainer P3, r
 - Fire while dragging (`LessonBoards.kt` `flames`): the test clock moves the finger in one step.
 - Glass frame rate with animations on: the animations-on emulator phase (`walkthrough.sh`, "motion phase") now gets to the path and into L1.2 (picture `104-motion-home.png`) and presses the keys, then uiautomator cannot read the screen to tap Check while the machines fly, so no animations-on frame stats exist. The only frame stats are the animations-off walk above.
 - L1.2 has no Emma clips for its own lines.
+
+## Round 6b: one debug key, first frame
+
+- CI keeps one debug key (`build.yml`, `smoke.yml`): `~/.android/debug.keystore` comes from `actions/cache` with the fixed key `humo-debug-keystore-v1`; a miss lets Gradle make it once and the job saves it. It is never printed, uploaded or committed; the release keystore is untouched. A build step prints only the certificate SHA-256 of the debug APK. GitHub drops a cache unused for 7 days, so `build.yml` also runs every Monday 04:17 UTC (a scheduled run only fires from the default branch, so it starts once this is merged to main). A cache saved on a feature branch is not readable from other branches until a run on main saves it.
+- First frame: the lesson draws its chrome flat for the first three frames and turns the glass on after (`LessonScreen.kt` `glassOn`, `LessonChrome.kt` `LocalLessonGlass`), as the shell does. The guard is back at 900 ms warm. The smoke now logs the `HumoPerf` lines so the trace is in the evidence.

@@ -27,6 +27,14 @@ jobs:
         with:
           distribution: zulu
           java-version: 17
+      # One debug key for every CI run (Boss, 2026-11-01: "CI keeps one key"): without it each run signs with a fresh random key and
+      # the phone refuses the update (INSTALL_FAILED_UPDATE_INCOMPATIBLE). On a miss Gradle makes the key once and the job saves it.
+      # The file is never printed, uploaded or committed. GitHub drops a cache unused for 7 days; the weekly build keeps it warm.
+      - name: Restore the one debug key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: humo-debug-keystore-v1
       - uses: gradle/actions/setup-gradle@v4
       # The only build that knows the fake server: BuildConfig.SMOKE_BACKEND is empty in every other build.
       - name: Debug APK that talks to the fake server

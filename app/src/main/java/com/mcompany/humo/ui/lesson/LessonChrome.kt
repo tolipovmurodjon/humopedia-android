@@ -84,12 +84,15 @@ internal enum class Tint(val wash: Color, val glow: Color, val flat: Color) {
     Amber(Color(0xFFFFE9A3).copy(alpha = 0.90f), Color(0xFFF7C51E).copy(alpha = 0.30f), Chrome.PanelBad),
 }
 
+/** False until the lesson's first frame is on screen: the chrome is drawn flat, then the glass turns on (the shell does the same, GlassStage). */
+internal val LocalLessonGlass = androidx.compose.runtime.compositionLocalOf { true }
+
 /** Glass in the shape of a rounded rectangle; without a page behind it (or before the glass is turned on) a flat tinted pane. */
 @Composable
 internal fun Modifier.chromeGlass(radius: Dp, tint: Tint = Tint.Clear): Modifier {
     val page = LocalPageBackdrop.current
     val shape = RoundedCornerShape(radius)
-    val surface = if (page == null || !GlassStage.on) {
+    val surface = if (page == null || !GlassStage.on || !LocalLessonGlass.current) {
         Modifier.clip(shape).background(tint.flat).drawBehind {
             drawRect(Brush.radialGradient(listOf(tint.glow, Color.Transparent), center = Offset.Zero, radius = size.minDimension * 0.9f))
         }

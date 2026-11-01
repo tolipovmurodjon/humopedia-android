@@ -129,7 +129,7 @@ fi
 # ---- cold start and the lesson's first frame (Boss: "slow load"). Two cold runs of the same build: warm-up OFF (the old path,
 # everything decoded on the first tap) and ON (what ships). The numbers come from the app's own HumoPerf log line and am start -W.
 COLD_LIMIT_MS=7000
-LESSON_LIMIT_MS=3500
+LESSON_LIMIT_MS=900
 perf_cold() {
   local mode=$1
   $T adb shell am force-stop "$PKG"
@@ -144,6 +144,7 @@ perf_cold() {
   local total lesson
   total=$(grep -o 'TotalTime: [0-9]*' "$OUT/am-start-$mode.txt" | grep -o '[0-9]*$')
   lesson=$($T adb logcat -d -s HumoPerf:I | grep -o 'lesson-first-frame ms=[0-9]*' | tail -1 | grep -o '[0-9]*$')
+  log "HumoPerf lines ($mode): $($T adb logcat -d -s HumoPerf:I | sed "s/.*HumoPerf: //" | paste -sd ";" -)"
   log "PERF $mode: cold start (am start -W TotalTime) = ${total:-?} ms; tap on the island to the lesson's first drawn frame = ${lesson:-?} ms"
   echo "$mode $total $lesson" >> "$OUT/perf.txt"
   $T adb shell input keyevent 4; sleep 1; tap "END LESSON"; sleep 1

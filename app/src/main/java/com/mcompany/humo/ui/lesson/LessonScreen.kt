@@ -45,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -159,7 +160,15 @@ fun LessonPlayer(
     val bottomInset = padding.calculateBottomPadding()
     // A tap anywhere asks the Mach 3 pass for another run; the root only counts it (the Initial pass), the buttons still get it.
     val taps = remember { mutableIntStateOf(0) }
-    AuroraBackground(Modifier.fillMaxSize()) {
+    // First frame flat, glass from the third on: the lens shaders are the slow part of a cold frame on a weak GPU.
+    var glassOn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        repeat(3) { androidx.compose.runtime.withFrameNanos { } }
+        glassOn = true
+        android.util.Log.i("HumoPerf", "lesson-glass-on ms=${android.os.SystemClock.elapsedRealtime() - t0}")
+    }
+    CompositionLocalProvider(LocalLessonGlass provides glassOn) { AuroraBackground(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -178,7 +187,7 @@ fun LessonPlayer(
             if (theme == LessonTheme.Fly && motion && atEnd && !flow.small) MachPass(taps, flow.skillRight == flow.skill.size)
             if (leaving) QuitSheet(humo, voice, bottomInset, onKeep = { leaving = false }, onEnd = { leaving = false; flow.bye() })
         }
-    }
+    } }
 }
 
 /**
