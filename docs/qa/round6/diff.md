@@ -122,3 +122,21 @@ N11: every bare screen (gate, fix intro, score, end, See you soon) puts its butt
 - P4 done: the right panel's bulb button is "Why?"; the skill-check wrong panel is calm grey with a dark Continue; Humo's marks are rings; the end card reads "N XP earned" (no sparks).
 - P4 not done: one language per run (home map and lesson sheet are Uzbek, the lesson English).
 - N13 digit ink: blue #2A62CC on #EAF1FD is about 4.9:1 and mint #12755A on #E6F5EF about 4.9:1 (ring and marks keep Boss's brighter #2F6FE4 and #1C9A74).
+
+## Round 6f (alpha14): the phone run is prepared
+
+`scripts/phone-perf.sh app-debug.apk [off]` installs, plays P1 drag and the P4 Check flight, prints janky %, p50, p90, p99 per scene from `gfxinfo framestats` and pulls a 10 s perfetto trace (gfx, view, am) per scene. No Gradle. Mach 3 is not measured: there is no debug deep link to the score card yet.
+
+Likely causes of the drag and flight jank, from reading the code (not measured), ranked:
+1. The jet's shadow is five sprite draws per jet per frame, each with a colour filter (two jets: ten, plus the jets). perf_v2: two copies, same total alpha.
+2. The vapour puffs: a new object, a list removal and two path draws inside three nested transforms per puff per frame. perf_v2: one path, at most 14 alive.
+3. The board published the point's cell to the accessibility tree on every pointer move (my own R1 probe). It is now test-only; this was cheap to remove and probably the largest drag cost.
+4. The flame is a fresh radial brush and a list per jet per frame (not changed).
+5. Humo redraws while his eyes follow the jet (cut to 12 Hz in alpha13).
+6. Glass under moving parts: none left (buttons are plain shapes); the tutor and verdict panels are glass but static while a jet flies.
+7. Atlas scaling: each sprite is one source-window draw from the 64-frame atlas, no per-frame resize.
+`perf_v2` is on by default; `phone-perf.sh ... off` creates `files/perf_v2_off` (a debug build only, through run-as).
+
+Cold start: Application.onCreate used to create the notification channel, install App Check and subscribe to the push topic before any frame. These now run on a background thread after the first frame (`HumoApp.startAfterFirstFrame`). The lesson warm-up and the sound preload were already off the main thread. Not measured on a phone; the emulator number was 4.5 s.
+
+Not done: one language per run. There is no language setting in the app (one `values` folder, the shell strings are Uzbek in code), so it needs a decision on where the setting lives.

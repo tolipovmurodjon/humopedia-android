@@ -204,7 +204,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
             .semantics {
                 contentDescription = described
                 // where the point is right now, in cells, so a test can hold it against the finger
-                stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)}" }
+                if (PerfV2.boardProbe) stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)}" }
             }
             .pointerInput(page, fly, wPx) {
                 awaitEachGesture {

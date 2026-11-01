@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
     /** Push registration and the one-time notification question, never on the first frame. */
     private fun afterFirstFrame() {
         lifecycleScope.launch {
+            withContext(Dispatchers.Default) { (application as HumoApp).startAfterFirstFrame() }
             if (BuildConfig.SMOKE_BACKEND.isNotEmpty()) {
                 DailyPush.onLaunchAgainstFakeServer(application, BuildConfig.SMOKE_BACKEND, packageManager.getPackageInfo(packageName, 0).versionName.orEmpty())
             } else if (HumoApp.firebaseReady(application)) {

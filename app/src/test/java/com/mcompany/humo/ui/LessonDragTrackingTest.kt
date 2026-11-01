@@ -32,6 +32,7 @@ class LessonDragTrackingTest {
     @get:Rule val compose = createComposeRule()
 
     private fun track() {
+        com.mcompany.humo.ui.lesson.PerfV2.boardProbe = true
         val flow = LessonFlow(L11)
         compose.setContent {
             GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = {}, theme = LessonTheme.Fly, lesson = flow.lesson, flow = flow, motion = false, humoAlive = false) }

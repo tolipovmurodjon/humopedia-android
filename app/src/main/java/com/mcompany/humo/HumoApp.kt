@@ -17,6 +17,10 @@ class HumoApp : Application() {
         super.onCreate()
         // First, so a crash anywhere after this line is written to files/crashes/ (copied from PAGEL).
         CrashRecorder.install(this)
+    }
+
+    /** Everything that is not needed to draw the first frame: the push channel, App Check and the one topic. MainActivity calls it after the first frame. */
+    fun startAfterFirstFrame() {
         createReminderChannel()
         if (!firebaseReady(this)) return
         Firebase.appCheck.installAppCheckProviderFactory(appCheckProviderFactory())

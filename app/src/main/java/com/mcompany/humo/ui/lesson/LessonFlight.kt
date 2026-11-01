@@ -165,7 +165,8 @@ private val HexagonShade = Path().apply {
  * fills, no gradient shader: a shader per puff per frame is slow on a cheap GPU.
  */
 internal fun DrawScope.drawPuffs(list: List<Puff>, now: Long, r: Float) {
-    for (p in list) {
+    val v2 = PerfV2.on
+    for (p in if (v2 && list.size > 14) list.subList(list.size - 14, list.size) else list) {
         val u = ((now - p.born).toFloat() / Flying.PUFF_MS).coerceIn(0f, 1f)
         val e = 1f - (1f - u) * (1f - u)
         val k = r * (0.55f + 1.15f * e)
@@ -174,7 +175,7 @@ internal fun DrawScope.drawPuffs(list: List<Puff>, now: Long, r: Float) {
             rotate(p.spin * e, Offset.Zero) {
                 scale(k, k, Offset.Zero) {
                     drawPath(Hexagon, PuffLight, alpha = alpha)
-                    drawPath(HexagonShade, PuffShade, alpha = alpha)
+                    if (!v2) drawPath(HexagonShade, PuffShade, alpha = alpha)
                 }
             }
         }

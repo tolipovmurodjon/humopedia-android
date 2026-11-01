@@ -104,9 +104,11 @@ internal object Jet {
         val soft = (3f + 3f * altitude) * dp
         // Five faint copies a few dp apart, no offscreen layer (a layer per jet per frame starved a software GPU): each copy
         // carries a fifth of the shadow so the core adds up to [SHADOW_ALPHA] and the rim fades out.
-        val each = 1f - Math.pow(1.0 - SHADOW_ALPHA, 0.2).toFloat()
-        for (i in 0 until 5) {
-            val o = if (i == 4) Offset.Zero else Offset(soft * cos(i * PI.toFloat() / 2f), soft * sin(i * PI.toFloat() / 2f))
+        // perf_v2: two copies (a soft one and the core) instead of five; the same total alpha.
+        val copies = if (com.mcompany.humo.ui.lesson.PerfV2.on) 2 else 5
+        val each = 1f - Math.pow(1.0 - SHADOW_ALPHA, 1.0 / copies).toFloat()
+        for (i in 0 until copies) {
+            val o = if (i == copies - 1) Offset.Zero else if (copies == 2) Offset(soft * 0.7f, soft * 0.7f) else Offset(soft * cos(i * PI.toFloat() / 2f), soft * sin(i * PI.toFloat() / 2f))
             sprite(atlas, at + o, s, angleOf(f), sx, each, ShadowTint, turn = rest(heading))
         }
     }
