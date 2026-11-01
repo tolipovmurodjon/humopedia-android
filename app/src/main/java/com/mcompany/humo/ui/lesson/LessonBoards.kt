@@ -207,7 +207,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
             .semantics {
                 contentDescription = described
                 // where the point is right now, in cells, so a test can hold it against the finger
-                if (PerfV2.boardProbe) stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)}" }
+                if (PerfV2.boardProbe) stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)} puffs=${craft.puffs.size}" }
             }
             .pointerInput(page, fly, wPx) {
                 awaitEachGesture {
@@ -401,7 +401,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             // a target past the board edge: the machine stops at the edge and an arrow shows where it was going (as the web does)
             val m = len * 0.55f
             val bh = wPx * page.graph.boxH / page.graph.boxW
-            val far = isFarOffBoard(raw.x, raw.y, wPx, bh, g.cell)
+            val far = g.cells(raw).let { (cx, cy) -> isFarOffBoard(cx, cy, page.graph.xMax.toFloat(), page.graph.yMax.toFloat()) }
             // a big number: no clamp, the jet leaves the screen (an edge arrow shows where) and banks back in; a near miss stays on the board
             val want = if (far) raw else Offset(raw.x.coerceIn(m, wPx - m), raw.y.coerceIn(m, bh - m))
             offBoard[i] = if (!far && want != raw) raw - want else null

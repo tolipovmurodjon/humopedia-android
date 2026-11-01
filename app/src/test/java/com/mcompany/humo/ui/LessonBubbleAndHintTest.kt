@@ -57,8 +57,9 @@ class LessonBubbleAndHintTest {
 
     /** N16: a big number sends the jet off the screen; a near miss stays on the board. Humo's joke never repeats twice in a row. */
     @Test fun bigNumbersLeaveTheScreenAndTheJokeVaries() {
-        assertTrue(isFarOffBoard(12f * 40f + 50f, 100f, 350f, 330f, 40f))
-        assertFalse(isFarOffBoard(380f, 100f, 350f, 330f, 40f))
+        assertTrue(isFarOffBoard(8f, 3f, 7f, 7f))
+        assertTrue(isFarOffBoard(-1f, 3f, 7f, 7f))
+        assertFalse(isFarOffBoard(7f, 3f, 7f, 7f))
         val flow = LessonFlow(L11)
         flow.goTo(Screen.Page(3))
         var last: String? = null

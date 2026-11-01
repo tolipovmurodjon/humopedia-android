@@ -366,5 +366,5 @@ internal fun previewMove(s: Slots): Node? = when {
 /** How far from the jet's centre a finger still grabs it (px): at least 56 dp across, or most of the sprite on the fly layer. */
 internal fun grabRadius(densityPx: Float, spritePx: Float, fly: Boolean): Float = maxOf(40f * densityPx, if (fly) spritePx * 0.7f else 0f)
 
-/** A target more than three cells past the board's edge: the jet flies out of the screen instead of stopping at the edge. */
-internal fun isFarOffBoard(x: Float, y: Float, w: Float, h: Float, cell: Float): Boolean = maxOf(maxOf(-x, x - w), maxOf(-y, y - h)) > cell * 3f
+/** A landing outside the graph (past its last grid line by half a cell): the jet flies out of the screen instead of stopping at the edge. */
+internal fun isFarOffBoard(cx: Float, cy: Float, xMax: Float, yMax: Float): Boolean = cx < -0.5f || cx > xMax + 0.5f || cy < -0.5f || cy > yMax + 0.5f

@@ -132,7 +132,8 @@ internal object Flying {
         c.aim?.let { c.want = it }
         c.want?.let { c.deg += angDiff(c.deg, it) * min(1f, k0 * 0.5f) }
         c.pos = handle
-        c.speed = if (flying) min(1f, moved * (16.7f / dtMs) / (cell * 0.06f)) else 0f
+        // the speed decays over about 150 ms instead of dropping to 0 between two pointer events, so the smoke keeps coming while the finger moves
+        c.speed = if (flying) maxOf(min(1f, moved * (16.7f / dtMs) / (cell * 0.06f)), c.speed * 0.88f) else 0f
         puff(c, now, size, flying, rnd)
         val turning = c.aim?.let { abs(angDiff(c.deg, it)) > 1f } ?: false
         return moved > 0.5f || turning || c.puffs.isNotEmpty()
@@ -149,8 +150,9 @@ internal object Flying {
     }
 }
 
-private val PuffLight = Color(0xFFF4F6F8)
-private val PuffShade = Color(0xFFC9CED6)
+// darker than the board's near-white ground, so the trail is seen on it
+private val PuffLight = Color(0xFFDDE3E9)
+private val PuffShade = Color(0xFF9FAAB7)
 
 /** A hexagon of radius 1, the low-poly puff, and its shaded lower-right half (one light, top-left). */
 private val Hexagon = Path().apply {
@@ -175,7 +177,7 @@ internal fun DrawScope.drawPuffs(list: List<Puff>, now: Long, r: Float) {
             rotate(p.spin * e, Offset.Zero) {
                 scale(k, k, Offset.Zero) {
                     drawPath(Hexagon, PuffLight, alpha = alpha)
-                    if (!v2) drawPath(HexagonShade, PuffShade, alpha = alpha)
+                    drawPath(HexagonShade, PuffShade, alpha = alpha)
                 }
             }
         }

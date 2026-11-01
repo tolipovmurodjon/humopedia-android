@@ -44,7 +44,7 @@ class LessonDragTrackingTest {
         fun screenOf(cx: Float, cy: Float) = Offset(r.left + (spec.originX + cx * spec.cell) * k, r.top + (spec.originY - cy * spec.cell) * k)
         fun jet(): Pair<Float, Float> {
             val d = compose.onNodeWithTag("board").fetchSemanticsNode().config[SemanticsProperties.StateDescription]
-            val (x, y) = d.removePrefix("at ").split(",")
+            val (x, y) = d.removePrefix("at ").substringBefore(" puffs").split(",")
             return x.toFloat() to y.toFloat()
         }
         val path = listOf(2f to 3f, 3f to 4f, 4f to 5f, 5f to 4.5f, 5.5f to 3.5f, 5f to 3f)
