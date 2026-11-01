@@ -49,9 +49,9 @@ class LessonBubbleAndHintTest {
         assertEquals(Node(2, 1), com.mcompany.humo.ui.lesson.previewMove(com.mcompany.humo.ui.lesson.Slots(a = 2, b = 1)))
     }
 
-    /** Boss: "it is hard to move the jet": a finger within 56 dp across (40 dp radius) still grabs it, more on the big sprite. */
+    /** Boss: "it is hard to move the jet": a finger within 56 dp of the jet still grabs it, more on the big sprite. */
     @Test fun jetGrabAreaIsGenerous() {
-        assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 10f, false) >= 120f)
+        assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 10f, false) >= 168f)
         assertTrue(com.mcompany.humo.ui.lesson.grabRadius(3f, 400f, true) >= 280f)
     }
 

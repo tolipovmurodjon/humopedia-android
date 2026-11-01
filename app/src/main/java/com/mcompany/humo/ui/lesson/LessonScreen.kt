@@ -23,6 +23,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -55,6 +56,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -155,7 +159,7 @@ fun LessonPlayer(
     humoAlive: Boolean = motion,
 ) {
     var leaving by rememberSaveable { mutableStateOf(false) }
-    val atEnd = flow.screen is Screen.End
+    val atEnd = flow.screen is Screen.End || flow.screen is Screen.Sky
     val atBye = flow.screen is Screen.Bye
     val close: () -> Unit = { if (atEnd) onFinish(flow.sparks) else if (atBye) onExit() else { leaving = true } }
     BackHandler(enabled = !leaving) { close() }
@@ -316,6 +320,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LessonBody(
                 Screen.FixIntro -> FixIntroView(flow, humo)
                 Screen.End -> EndView(flow, humo)
                 Screen.Bye -> ByeView(flow, humo, onExit)
+                Screen.Sky -> SkyView(flow)
             }
         }
     }
@@ -760,7 +765,7 @@ private fun EndView(flow: LessonFlow, humo: HumoState) {
     CenterScreen(
         humo,
         big = { Text("${flow.sparks} XP earned", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp, lineHeight = 44.sp, color = Chrome.MintInk) },
-        title = "Lesson complete", line = flow.endLine, buttons = listOf(BtnSpec("Restart lesson", Kind.Secondary) { flow.restart() }),
+        title = "Lesson complete", line = flow.endLine, buttons = listOf(BtnSpec("Fly free", Kind.Secondary) { flow.goTo(Screen.Sky) }, BtnSpec("Restart lesson", Kind.Secondary) { flow.restart() }),
     )
 }
 
@@ -771,4 +776,54 @@ private fun ByeView(flow: LessonFlow, humo: HumoState, onExit: () -> Unit) {
         humo, null, "See you soon", "Your spot is saved.",
         listOf(BtnSpec("DONE", Kind.Primary) { onExit() }, BtnSpec("Back to lesson", Kind.Secondary) { flow.resume() }), medal = false,
     )
+}
+
+/**
+ * Idea 07, "Fly free": the sandbox after the lesson. The jet goes where the finger goes, over the whole screen and past the edges; a tap
+ * makes it roll; the cell it is over is written beside it as (x, y) and every cell crossed gives a soft tick. Nothing is graded.
+ */
+@Composable
+private fun SkyView(flow: LessonFlow) {
+    val atlas = com.mcompany.humo.ui.path.rememberJetAtlas()
+    val text = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val cell = with(density) { 48.dp.toPx() }
+    var pos by remember { mutableStateOf(Offset.Unspecified) }
+    var heading by remember { mutableFloatStateOf(-1.0f) }
+    var rollAt by remember { mutableLongStateOf(-10_000L) }
+    var frame by remember { mutableLongStateOf(0L) }
+    var lastCell by remember { mutableStateOf(Pair(Int.MIN_VALUE, Int.MIN_VALUE)) }
+    LaunchedEffect(Unit) { while (true) withFrameMillis { frame = it } }
+    Column(Modifier.fillMaxSize()) {
+        Canvas(
+            Modifier.weight(1f).fillMaxWidth().testTag("sky")
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { pos = it },
+                        onDrag = { change, d ->
+                            if (d.getDistance() > 1f) heading = kotlin.math.atan2(d.y, d.x)
+                            pos = change.position
+                            val c = Pair(Math.floorDiv(pos.x.toInt(), cell.toInt()), Math.floorDiv(pos.y.toInt(), cell.toInt()))
+                            if (c != lastCell) { lastCell = c; LessonSounds.play(Cue.Toggle) }
+                        },
+                    )
+                }
+                .pointerInput(Unit) { detectTapGestures(onTap = { pos = it; rollAt = android.os.SystemClock.uptimeMillis(); LessonSounds.play(Cue.Whoosh) }) },
+        ) {
+            frame
+            var x = 0f
+            while (x < size.width) { drawLine(Color(0x14000000), Offset(x, 0f), Offset(x, size.height), 1f); x += cell }
+            var y = 0f
+            while (y < size.height) { drawLine(Color(0x14000000), Offset(0f, y), Offset(size.width, y), 1f); y += cell }
+            if (pos == Offset.Unspecified) pos = Offset(size.width / 2f, size.height / 2f)
+            val len = cell * 1.45f
+            val roll = ((android.os.SystemClock.uptimeMillis() - rollAt) / 700f).takeIf { it in 0f..1f } ?: 0f
+            jetAt(atlas, pos, heading, len, flames = 0.3f, t = frame / 1000f, motion = true, roll = roll)
+            val cx = ((pos.x - cell) / cell).toInt(); val cy = ((size.height - cell - pos.y) / cell).toInt()
+            label(text, "($cx, $cy)", Offset(pos.x, pos.y - len * 0.7f), TextStyle(fontFamily = LessonType.Figtree, fontSize = 16.sp, color = SlotColors.BlueInk))
+        }
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp).testTag("dock")) {
+            Chunky("DONE", Kind.Primary, true, Modifier.fillMaxWidth().testTag("primary-true")) { LessonSounds.play(Cue.Tick); flow.finish() }
+        }
+    }
 }

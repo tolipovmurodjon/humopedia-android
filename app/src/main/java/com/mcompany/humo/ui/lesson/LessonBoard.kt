@@ -20,6 +20,7 @@ import com.mcompany.humo.ui.path.Jet.jet
 import com.mcompany.humo.ui.path.Jet.jetShadow
 import kotlin.math.atan2
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /** Brilliant's board colours, as measured (docs/qa/l11-spec.md §3-6). */
 internal object BoardColors {
@@ -184,10 +185,33 @@ internal fun DrawScope.explainer(g: BoardGeo, page: LessonPage, text: TextMeasur
 }
 
 /** The SR-71 as the point: [len] its nose-to-tail length in px; the sprite frame is 1/0.857 of that. [alt] 0 ... 1 lifts it. */
-internal fun DrawScope.jetAt(atlas: ImageBitmap, c: Offset, heading: Float, len: Float, flames: Float, t: Float, motion: Boolean, shadow: Boolean = true, alt: Float = 0f) {
+internal fun DrawScope.jetAt(atlas: ImageBitmap, c: Offset, heading: Float, len: Float, flames: Float, t: Float, motion: Boolean, shadow: Boolean = true, alt: Float = 0f, roll: Float = 0f) {
     val frame = len / 0.857f
     if (shadow) jetShadow(atlas, c, frame, heading, 0f, 0f, 0.2f + 0.8f * alt, len / 60f)
-    jet(atlas, c, frame * (1f + 0.45f * alt), heading, 0f, 0f, t, motion, flames)
+    jet(atlas, c, frame * (1f + 0.45f * alt), heading, 0f, roll, t, motion, flames)
+}
+
+/** Idea 10, the camera leans toward the jet: the board shifts up to 6 px and tilts up to 1.2 degrees the way the jet is off-centre. */
+internal fun cameraLean(x: Float, width: Float): Pair<Float, Float> {
+    val k = ((x / width - 0.5f) * 2f).coerceIn(-1f, 1f)
+    return Pair(-k * 6f, k * 1.2f)
+}
+
+/** Idea 12, the shadow ruler: dashed lines from the jet to both axes with its cell numbers, on the learning and drag pages only, never in the skill check. */
+internal fun rulerVisible(inSkill: Boolean, kind: PageKind): Boolean = !inSkill && kind == PageKind.Drag
+
+internal fun DrawScope.shadowRuler(g: BoardGeo, at: Offset, text: TextMeasurer) {
+    val s = g.s
+    val axisY = g.px(0f, 0f).y
+    val axisX = g.px(0f, 0f).x
+    val dash = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f * s, 6f * s))
+    val c = Color(0x992F6FE4)
+    drawLine(c, at, Offset(at.x, axisY), 1.5f * s, pathEffect = dash)
+    drawLine(SlotColors.MintMark.copy(alpha = 0.6f), at, Offset(axisX, at.y), 1.5f * s, pathEffect = dash)
+    val (cx, cy) = g.cells(at)
+    val style = TextStyle(fontFamily = LessonType.Figtree, fontSize = (12f * s / density).sp / fontScale, color = Color(0xFF2A62CC))
+    label(text, "${cx.roundToInt()}", Offset(at.x, axisY + 14f * s), style)
+    label(text, "${cy.roundToInt()}", Offset(axisX - 14f * s, at.y), style.copy(color = Color(0xFF12755A)))
 }
 
 /** The armed jet (tap-then-tap): one thin blue ring around it. */

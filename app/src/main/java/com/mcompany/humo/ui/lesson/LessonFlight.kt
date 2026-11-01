@@ -40,6 +40,8 @@ internal class Craft(var pos: Offset, var deg: Float = 30f) {
     var lane = 1f
     var puffAt = 0L
     var burstAt = -10_000L
+    /** Idea 09: when a tap on the landed jet started its barrel roll (uptime ms), or -10 000. */
+    var rollAt = -10_000L
     var fadeAt = -10_000L
     val puffs = ArrayList<Puff>()
     /** [deg] in the radians [Jet] uses (y down, 0 = moving right). */
@@ -71,7 +73,11 @@ internal object Flying {
     }
 
     /** A flight's length in ms for a trip of [distDp] dp: slow and calm, never over 3.6 s. */
-    fun duration(distDp: Float): Long = min(3600f, 2000f + distDp * 5f).toLong()
+    /** A6: a short flight, 420 ms plus about 110 ms a cell (a cell is about 42 dp), never over 1.1 s. */
+    fun duration(distDp: Float): Long = min(1100f, 420f + distDp * 2.6f).toLong()
+
+    /** A13 formation ripple: the lead goes first, each wingman 65 ms after the one before. */
+    fun rippleMs(index: Int): Long = 65L * index
 
     /** Altitude on the way: 0 on the ground, 1 at the top of the climb, back to 0 at touch-down. */
     fun altitude(u: Float): Float = sin(PI.toFloat() * min(1f, u * 1.05f)).coerceAtLeast(0f).pow(0.7f)

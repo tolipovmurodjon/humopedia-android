@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.hypot
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -155,7 +156,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                     val dt = if (last < 0) 16.7f else (now - last).toFloat().coerceIn(1f, 64f)
                     last = now
                     val moving = Flying.glue(craft, handle.value, dt, now, g.cell, len / 0.857f, 5f * density.density, steering = dragging || busy, flying = busy || dragging, rnd = rnd)
-                    live = moving || dragging || busy || armed
+                    live = moving || dragging || busy || armed || now - craft.rollAt < 700L
                     // Humo's eyes follow the jet at 12 Hz, not every frame: his own picture redraws when they move
                     if (now / 16 % 5 == 0L) flow.look(if (busy) humoLookAt(craft.pos.x, craft.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) else null)
                     tick.longValue = now
@@ -202,6 +203,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
     }
 
     val moved = flow.dragAt?.let { it != page.points[0] } ?: false
+    val lean by animateFloatAsState(if (motion && (dragging || busy)) 1f else 0f, tween(250), label = "lean")
     val described = "Graph. The point is at ${flow.dragAt ?: page.points[0]}."
     Box(
         Modifier.width(width).height(width * (page.graph.boxH / page.graph.boxW)).testTag("board")
@@ -209,6 +211,11 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                 contentDescription = described
                 // where the point is right now, in cells, so a test can hold it against the finger
                 if (PerfV2.boardProbe) stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)} puffs=${craft.puffs.size}" }
+            }
+            .graphicsLayer {
+                val (tx, rot) = cameraLean(handle.value.x, wPx)
+                translationX = tx * lean * density.density
+                rotationZ = rot * lean
             }
             .pointerInput(page, fly, wPx) {
                 awaitEachGesture {
@@ -253,8 +260,9 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                         LessonSounds.play(Cue.DragEnd)
                     } else if (fly) {
                         armed = !armed
+                        craft.rollAt = android.os.SystemClock.uptimeMillis()
                         wake.intValue++
-                        LessonSounds.play(Cue.Tick)
+                        LessonSounds.play(Cue.Whoosh)
                     }
                 }
             },
@@ -267,6 +275,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
         humoMarks(g, flow.marks)
         val s = g.s
         val p = handle.value
+        if (dragging && rulerVisible(flow.inSkill, page.kind)) shadowRuler(g, p, text)
         // The grey start dot shows once the machine has left it; never a dot or ring under a flying jet.
         if (atlas == null || dist(if (motion) craft.pos else p, start) > len * 0.45f) drawCircle(BoardColors.Start, 5f * s, start)
         val ok = flow.phase == Phase.Correct
@@ -286,7 +295,8 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                 drawCircle(Brush.radialGradient(0f to Color(0xFFFFF6D6), 0.4f to Color(0xFFFFB347), 1f to Color.Transparent, center = at, radius = g.cell * 0.9f * (0.3f + u)), g.cell * 0.9f * (0.3f + u), at, alpha = 0.95f * (1f - u))
             }
             val flames = if (motion && (busy || dragging) && craft.speed > 0.02f) max(craft.speed, 0.3f) else 0f
-            jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion)
+            val roll = ((android.os.SystemClock.uptimeMillis() - craft.rollAt) / 700f).takeIf { it in 0f..1f } ?: 0f
+            jetAt(atlas, at, heading, len, flames = flames, t = now / 1000f, motion = motion, roll = roll)
             if (armed && !busy) armedRing(at, len * 0.62f, s)
             if (ok || bad) badge(Offset(at.x, at.y - len * 0.55f - 12f * s), ok, s)
         } else {
@@ -413,7 +423,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
             farRaw[i] = if (far) raw else null
             if (dist(c.pos, want) < 1f) return@forEachIndexed
             if (motion) {
-                Flying.plan(c, want, withFrameMillis { it }, density.density)
+                Flying.plan(c, want, withFrameMillis { it } + Flying.rippleMs(i), density.density)
                 launched = true
             } else { c.deg = Flying.bearing(c.pos, want); c.pos = want }
         }
