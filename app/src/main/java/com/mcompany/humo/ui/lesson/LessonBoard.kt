@@ -191,10 +191,17 @@ internal fun DrawScope.jetAt(atlas: ImageBitmap, c: Offset, heading: Float, len:
     jet(atlas, c, frame * (1f + 0.45f * alt), heading, 0f, roll, t, motion, flames)
 }
 
-/** Idea 10, the camera leans toward the jet: the board shifts up to 6 px and tilts up to 1.2 degrees the way the jet is off-centre. */
-internal fun cameraLean(x: Float, width: Float): Pair<Float, Float> {
-    val k = ((x / width - 0.5f) * 2f).coerceIn(-1f, 1f)
-    return Pair(-k * 6f, k * 1.2f)
+/**
+ * Idea 10, the camera lean (Boss's favourite): a smooth translate only, at most 16 dp, no tilt, no zoom, no shake. It moves the board
+ * toward the jet only when the jet is within [margin] px of the frame edge or past it, so the jet and its badge stay in view; the
+ * layer's own transform maps the touches back, so input stays exact. Returns the offset in dp.
+ */
+internal fun cameraLean(x: Float, y: Float, width: Float, height: Float, margin: Float): Pair<Float, Float> {
+    fun axis(v: Float, size: Float): Float {
+        val over = if (v < margin) v - margin else if (v > size - margin) v - (size - margin) else 0f
+        return (-over / margin * 16f).coerceIn(-16f, 16f)
+    }
+    return Pair(axis(x, width), axis(y, height))
 }
 
 /** Idea 12, the shadow ruler: dashed lines from the jet to both axes with its cell numbers, on the learning and drag pages only, never in the skill check. */

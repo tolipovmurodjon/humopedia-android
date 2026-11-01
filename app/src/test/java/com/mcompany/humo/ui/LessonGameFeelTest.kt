@@ -28,13 +28,14 @@ class LessonGameFeelTest {
         assertEquals(130L, Flying.rippleMs(2))
     }
 
-    /** Idea 10: the camera leans toward the jet, nothing at the centre, mirrored at the sides, never more than 6 px and 1.2 degrees. */
-    @Test fun cameraLeansTowardTheJet() {
-        val (tx0, r0) = cameraLean(200f, 400f)
-        assertEquals(0f, tx0, 0.001f); assertEquals(0f, r0, 0.001f)
-        val (txL, rL) = cameraLean(0f, 400f); val (txR, rR) = cameraLean(400f, 400f)
-        assertEquals(-txL, txR, 0.001f); assertEquals(-rL, rR, 0.001f)
-        assertTrue(kotlin.math.abs(txR) <= 6f && kotlin.math.abs(rR) <= 1.2f)
+    /** Idea 10: the camera lean is a translate of at most 16 dp, only near or past the frame edge, mirrored, nothing in the middle. */
+    @Test fun cameraLeanIsATranslateNearTheEdge() {
+        assertEquals(Pair(0f, 0f), cameraLean(200f, 150f, 400f, 300f, 40f))
+        val (txL, _) = cameraLean(0f, 150f, 400f, 300f, 40f); val (txR, _) = cameraLean(400f, 150f, 400f, 300f, 40f)
+        assertEquals(-txL, txR, 0.001f)
+        assertTrue(txR < 0f && kotlin.math.abs(txR) <= 16f)
+        assertEquals(16f, cameraLean(-500f, 150f, 400f, 300f, 40f).first, 0.001f)
+        assertTrue(cameraLean(200f, 330f, 400f, 300f, 40f).second < 0f)
     }
 
     /** Idea 12: the shadow ruler is for the drag pages, never in the skill check. */

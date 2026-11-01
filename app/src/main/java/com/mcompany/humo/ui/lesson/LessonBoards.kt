@@ -213,9 +213,9 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                 if (PerfV2.boardProbe) stateDescription = g.cells(handle.value).let { "at ${"%.2f".format(java.util.Locale.US, it.first)},${"%.2f".format(java.util.Locale.US, it.second)} puffs=${craft.puffs.size}" }
             }
             .graphicsLayer {
-                val (tx, rot) = cameraLean(handle.value.x, wPx)
+                val (tx, ty) = cameraLean(handle.value.x, handle.value.y, wPx, wPx * page.graph.boxH / page.graph.boxW, g.cell)
                 translationX = tx * lean * density.density
-                rotationZ = rot * lean
+                translationY = ty * lean * density.density
             }
             .pointerInput(page, fly, wPx) {
                 awaitEachGesture {
