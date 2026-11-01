@@ -89,12 +89,16 @@ internal object LessonLines {
         if (page.graded) { add(look(page, machine)); add(showMe(page, machine)); add(how(page, machine)) }
     }
 
+    /** What Humo says when the child makes a move (never the same one twice in a row). */
+    val moveCues = listOf("There we go.", "Ooh, nice.", "Nice move.", "Got it.", "Okay, I see.")
+
     /** Every line a learner can hear in the lesson (the skill check itself is silent: no Humo there). */
     fun all(lesson: LessonContent, praise: List<String>, fly: Boolean = true): Set<String> {
         val machine = if (fly) Words.MACHINE else "point"
         return buildSet {
             lesson.pages.forEach { p -> lesson.coach[p.id]?.let(::add) }
             addAll(praise)
+            addAll(moveCues)
             for (ex in -3..3) for (ey in -3..3) if (ex != 0 || ey != 0) linePools(ex, ey, machine).let { p ->
                 addAll(if (ex != 0 && ey == 0) p.xOnly else if (ey != 0 && ex == 0) p.yOnly else p.both); addAll(p.swap); addAll(p.generic)
             }

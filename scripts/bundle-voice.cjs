@@ -35,6 +35,7 @@ const how = (p) => { const [mx, my] = p.move; return my ? `Right ${mx}, then up 
 const lines = new Set();
 for (const p of data.pages.filter((q) => !q.skill)) if (data.coach[p.id]) lines.add(data.coach[p.id]);
 data.praise.forEach((t) => lines.add(t));
+['There we go.', 'Ooh, nice.', 'Nice move.', 'Got it.', 'Okay, I see.'].forEach((t) => lines.add(t));
 ["Ok, let's get into it.", "Ok, let's go. What do you need?",
   'Right adds to x, up adds to y. Ready for the next one?', 'Nice. Fix it and try again.', 'Sure. Take your time.',
   'Check first. Then I will show you why.', 'Say it another way?', 'Leaving so soon? Your spot is saved. Come back when you are ready.', 'I need to hear you. Tap Allow, please.', 'No problem. You can type, or tap one of these.'].forEach((t) => lines.add(t));

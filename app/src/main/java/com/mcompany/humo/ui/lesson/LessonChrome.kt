@@ -204,12 +204,16 @@ private const val WORD_MS = 330L
 internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
     val words = remember(text) { text.replace("*", "").trim().split(Regex("\\s+")).size }
     var shown by remember(text) { mutableIntStateOf(if (humo.alive) 0 else words) }
+    var cutAt by remember(text) { mutableIntStateOf(-1) }
+    val hush = humo.hush
+    LaunchedEffect(hush) { if (hush > 0 && humo.alive && shown < words && cutAt < 0) cutAt = shown }
     LaunchedEffect(text) {
         if (!humo.alive) return@LaunchedEffect
         shown = 0
         delay(180)
-        while (shown < words) { shown++; delay(WORD_MS) }
+        while (shown < words && cutAt < 0) { shown++; delay(WORD_MS) }
     }
+    val spoken = if (cutAt >= 0) text.replace("*", "").trim().split(Regex("\s+")).take(cutAt).joinToString(" ") else text
     Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         val tap = if (onTap != null) Modifier.clickable(role = Role.Button, onClickLabel = "Ask Humo", onClick = onTap) else Modifier
         Humo(humo, tap.size(if (compact) 60.dp else 76.dp).semantics { contentDescription = if (onTap != null) "Ask Humo" else "Humo" })
@@ -225,7 +229,7 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
                 .padding(horizontal = 18.dp, vertical = if (compact) 12.dp else 16.dp),
         ) {
             Text(
-                task(text, shown),
+                task(spoken, if (cutAt >= 0) cutAt else shown),
                 style = TextStyle(fontFamily = LessonType.Figtree, fontSize = if (compact) 16.sp else 18.sp, lineHeight = if (compact) 23.sp else 26.sp, fontWeight = FontWeight.Normal, color = Chrome.Ink),
                 modifier = Modifier.semantics { heading(); contentDescription = text.replace("*", "") },
             )

@@ -165,6 +165,9 @@ fun LessonPlayer(
     val voice = rememberHumoVoice()
     LaunchedEffect(flow.screen) { voice.stop() }
     HumoMoods(flow, humo, voice)
+    // Moving to the next slide cuts the old slide's line at once (80 ms fade); a line the new slide starts is left alone.
+    val slideAt = remember(flow.screen) { android.os.SystemClock.elapsedRealtime() }
+    LaunchedEffect(flow.screen) { if (voice.interruptStartedBefore(slideAt)) { humo.talking = false; humo.hush++ } }
     val bare = flow.screen.let { it is Screen.SkillSplash || it is Screen.Score || it is Screen.End || it is Screen.FixIntro || it is Screen.Bye }
     val bottomInset = padding.calculateBottomPadding()
     // A tap anywhere asks the Mach 3 pass for another run; the root only counts it (the Initial pass), the buttons still get it.
@@ -500,7 +503,13 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val keypad = page.kind == PageKind.Translate && !tutorOpen
     val negatives = page.tiles.any { it < 0 }
     val promptText = if (fly) Words.machine(page.prompt) else page.prompt
-    val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else if (!flow.inSkill) flow.verdict ?: promptText else promptText
+    // A move: Humo says one short cue (his bubble shows it; a touch cuts it off).
+    LaunchedEffect(flow.remarkN) {
+        val cue = flow.remark ?: return@LaunchedEffect
+        if (flow.inSkill || demo || !humo.alive || !voice.on) return@LaunchedEffect
+        humo.talking = true; voice.say(cue); humo.talking = false
+    }
+    val headerText = if (demo) flow.bubble ?: LessonLines.plain(L11.fx("fixLook").first(), fly) else if (!flow.inSkill) flow.verdict ?: flow.remark ?: promptText else promptText
     val askHumo: (() -> Unit)? = if (flow.inSkill || demo) null else { { LessonSounds.play(Cue.Tick); flow.chat.openClean() } }
     // the room under the page for the glass bar, so the verdict panel (drawn over it) never moves the board
     val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp

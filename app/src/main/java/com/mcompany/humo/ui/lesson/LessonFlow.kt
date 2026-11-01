@@ -177,7 +177,10 @@ class LessonFlow(val lesson: LessonContent = L11) {
     }
 
     // ---- input ----
-    fun dropAt(n: Node) { if (!locked) dragAt = n }
+    fun dropAt(n: Node) { if (!locked) { dragAt = n; remark = fresh(LessonLines.moveCues); remarkN++ } }
+    /** Humo's short cue after a move: shown in his bubble in place of the task until the next page or try. */
+    var remark by mutableStateOf<String?>(null); private set
+    var remarkN by mutableIntStateOf(0); private set
     fun tapTile(v: Int) { if (!locked) slots = slots.place(v) }
     fun tapSlot(i: Int) { if (!locked) slots = slots.select(i) }
     fun startOver() { if (!locked) { dragAt = null; slots = page?.let { Slots.start(it) } ?: Slots() } }
@@ -244,7 +247,7 @@ class LessonFlow(val lesson: LessonContent = L11) {
 
     /** Try again clears the verdict, Humo's marks and (on a translate page) both numbers, so the machines fly home. */
     fun tryAgain() {
-        phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList(); braces = emptyList(); showHow = false
+        remark = null; phase = Phase.Idle; verdict = null; bubble = null; marks = emptyList(); braces = emptyList(); showHow = false
         val p = page
         if (p?.kind == PageKind.Translate) slots = Slots.start(p)
     }
