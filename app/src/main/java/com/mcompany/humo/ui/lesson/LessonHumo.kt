@@ -52,6 +52,8 @@ enum class HumoMove { Jump, Celebrate, Nod, Shake, Surprise }
  */
 @Stable
 class HumoState(val alive: Boolean) {
+    /** Bubble lines already written out in full this lesson. */
+    val revealed = HashSet<String>()
     /** Counts the times a touch cut Humo off mid-sentence; the bubble trims to the words already spoken. */
     var hush by androidx.compose.runtime.mutableIntStateOf(0)
     var face by mutableStateOf(HumoFace.Rest)

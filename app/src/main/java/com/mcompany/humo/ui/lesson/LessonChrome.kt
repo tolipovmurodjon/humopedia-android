@@ -248,15 +248,17 @@ private const val WORD_MS = 330L
 @Composable
 internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
     val words = remember(text) { text.replace("*", "").trim().split(Regex("\\s+")).size }
-    var shown by remember(text) { mutableIntStateOf(if (humo.alive) 0 else words) }
+    // a line already shown in full is shown whole again (after Try again the task is not written out a second time)
+    var shown by remember(text) { mutableIntStateOf(if (humo.alive && text !in humo.revealed) 0 else words) }
     var cutAt by remember(text) { mutableIntStateOf(-1) }
     val hush = humo.hush
     LaunchedEffect(hush) { if (hush > 0 && humo.alive && shown < words && cutAt < 0) cutAt = shown }
     LaunchedEffect(text) {
-        if (!humo.alive) return@LaunchedEffect
+        if (!humo.alive || text in humo.revealed) return@LaunchedEffect
         shown = 0
         delay(180)
         while (shown < words && cutAt < 0) { shown++; delay(WORD_MS) }
+        if (shown >= words) humo.revealed.add(text)
     }
     val spoken = if (cutAt >= 0) text.replace("*", "").trim().split(Regex("\\s+")).take(cutAt).joinToString(" ") else text
     Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -282,7 +284,7 @@ internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, mod
     }
 }
 
-private val KeyWords = Regex("\\d+|\\b(steps?|right|left|up|down)\\b")
+private val KeyWords = Regex("(?<![\\w-])\\d+(?![\\w-])|\\b(steps?|right|left|up|down)\\b")
 
 /** The line as styled text: numbers and direction words tinted, digits and *letters* in the maths serif; every word after the [shown]th is invisible but still takes its room. */
 private fun task(text: String, shown: Int): AnnotatedString {
@@ -310,8 +312,8 @@ private fun task(text: String, shown: Int): AnnotatedString {
 
 /** The two slots' colours (Boss's K1 pick): a blue, b mint. Digits are the darker ink (4.5:1 on the fill); marks and rings use the brighter one. */
 internal object SlotColors {
-    val BlueMark = Color(0xFF2F6FE4); val BlueFill = Color(0xFFEAF1FD); val BlueInk = Color(0xFF2A62CC); val BlueLip = Color(0xFFC3D6F7)
-    val MintMark = Color(0xFF1C9A74); val MintFill = Color(0xFFE6F5EF); val MintInk = Color(0xFF12755A); val MintLip = Color(0xFFBFE3D5)
+    val BlueMark = Color(0xFF2F6FE4); val BlueFill = Color(0xFFEAF1FD); val BlueInk = Color(0xFF2A62CC); val BlueLip = Color(0x662A62CC)
+    val MintMark = Color(0xFF1C9A74); val MintFill = Color(0xFFE6F5EF); val MintInk = Color(0xFF12755A); val MintLip = Color(0x661C7E69)
     fun mark(i: Int) = if (i == 0) BlueMark else MintMark
     fun fill(i: Int) = if (i == 0) BlueFill else MintFill
     fun ink(i: Int) = if (i == 0) BlueInk else MintInk
