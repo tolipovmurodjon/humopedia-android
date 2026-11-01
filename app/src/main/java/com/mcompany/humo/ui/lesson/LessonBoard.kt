@@ -200,9 +200,8 @@ internal fun DrawScope.humoMarks(g: BoardGeo, points: List<Node>) {
     val s = g.s
     for (n in points) {
         val c = g.px(n)
-        val tl = Offset(c.x - 13f * s, c.y - 13f * s)
-        drawRoundRect(Color(0x1F2CBFA7), tl, Size(26f * s, 26f * s), CornerRadius(6f * s))
-        drawRoundRect(Color(0xFF2CBFA7), tl, Size(26f * s, 26f * s), CornerRadius(6f * s), style = Stroke(2f * s))
+        drawCircle(Color(0x1F2CBFA7), 14f * s, c)
+        drawCircle(Color(0xFF2CBFA7), 14f * s, c, style = Stroke(2f * s))
     }
 }
 

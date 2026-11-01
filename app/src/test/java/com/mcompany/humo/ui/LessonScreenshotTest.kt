@@ -143,7 +143,7 @@ class LessonScreenshotTest {
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
         compose.onNodeWithText("Nice, that's it!").assertExists()
-        compose.onNodeWithText("Show me how").performClick()
+        compose.onNodeWithText("Why?").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("how-card").assertIsDisplayed()
         shot("plain-P1-show-me-how")
@@ -177,7 +177,7 @@ class LessonScreenshotTest {
         assertEquals(Node(2, 1), flow.slots.move)
         compose.onNodeWithText("Check").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Show me how").performClick()
+        compose.onNodeWithText("Why?").performClick()
         compose.waitForIdle()
         shot("plain-P5-show-me-how")
     }

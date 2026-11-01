@@ -123,11 +123,11 @@ internal fun ButtonBar(bottomInset: Dp, content: @Composable RowScope.() -> Unit
 
 /** The verdict panel: mint glass with a tick for right, amber glass with a cross for wrong (never red); a short label, a small flag top right. What Humo says is in his bubble, not here. */
 @Composable
-internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() -> Unit)?, buttons: @Composable RowScope.() -> Unit) {
-    val ink = if (ok) Chrome.MintInk else Chrome.YellowInk
+internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() -> Unit)?, calm: Boolean = false, buttons: @Composable RowScope.() -> Unit) {
+    val ink = if (calm) Color(0xFF4A5159) else if (ok) Chrome.MintInk else Chrome.YellowInk
     Column(
         Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp + bottomInset).testTag("feedback-panel")
-            .chromeGlass(28.dp, if (ok) Tint.Mint else Tint.Amber).padding(start = 18.dp, end = 8.dp, top = 16.dp, bottom = 14.dp),
+            .chromeGlass(28.dp, if (calm) Tint.Clear else if (ok) Tint.Mint else Tint.Amber).padding(start = 18.dp, end = 8.dp, top = 16.dp, bottom = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Canvas(Modifier.size(34.dp)) {
@@ -135,6 +135,10 @@ internal fun GlassPanel(ok: Boolean, text: String, bottomInset: Dp, onFlag: (() 
                 if (ok) {
                     drawCircle(Chrome.Mint, size.minDimension / 2f)
                     drawPath(Path().apply { moveTo(9f * k, 17.5f * k); lineTo(14.5f * k, 23f * k); lineTo(25f * k, 11f * k) }, Color.White, style = Stroke(3.6f * k, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                } else if (calm) {
+                    drawCircle(Color(0xFF8A929A), size.minDimension / 2f)
+                    drawLine(Color.White, Offset(11f * k, 11f * k), Offset(23f * k, 23f * k), 3.6f * k, StrokeCap.Round)
+                    drawLine(Color.White, Offset(23f * k, 11f * k), Offset(11f * k, 23f * k), 3.6f * k, StrokeCap.Round)
                 } else {
                     drawCircle(Chrome.Yellow, size.minDimension / 2f)
                     drawLine(Color(0xFF4A3600), Offset(11f * k, 11f * k), Offset(23f * k, 23f * k), 3.6f * k, StrokeCap.Round)

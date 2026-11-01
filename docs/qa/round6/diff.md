@@ -112,3 +112,13 @@ The web plays nothing for the Check press, the panel slide, quit or the tutor sh
 
 N10: Show me, Show me how and Get help are icon buttons (bulb, bulb, question mark; description and text kept for screen readers) taking 1/4 of the row; Check, Continue and Try again take 3/4.
 N11: every bare screen (gate, fix intro, score, end, See you soon) puts its buttons in the same bottom bar as Check, secondary above, the primary lowest. The quit sheet holds End lesson above Keep learning at the same bottom. `LessonRound6Test` asserts each lowest button is within 4 dp of Check's bottom.
+
+## Round 6e (alpha13)
+
+- P3: `LessonKeepLearningTest` holds the dropped point, phase, verdict, screen and tutor state across Quit then Keep learning. Reading the code, Keep learning only closes the sheet, so I found no reset to fix; if the test is green the checker's reset came from something else (for example Back closing the tutor first).
+- P2 (dark jet blobs after the sheet): not reproduced and not fixed. The emulator is software-rendered; this needs the A05s.
+- P1/R2: Humo's eyes now follow the jet at 12 Hz instead of every frame. No Macrobenchmark was added and there are no before/after frame numbers; `gfxinfo` in the smoke is the measure.
+- HumoSound: the smoke clears logcat before the first P1 drag, counts `cue=Toggle` after the second and fails under 4.
+- P4 done: the right panel's bulb button is "Why?"; the skill-check wrong panel is calm grey with a dark Continue; Humo's marks are rings; the end card reads "N XP earned" (no sparks).
+- P4 not done: one language per run (home map and lesson sheet are Uzbek, the lesson English).
+- N13 digit ink: blue #2A62CC on #EAF1FD is about 4.9:1 and mint #12755A on #E6F5EF about 4.9:1 (ring and marks keep Boss's brighter #2F6FE4 and #1C9A74).

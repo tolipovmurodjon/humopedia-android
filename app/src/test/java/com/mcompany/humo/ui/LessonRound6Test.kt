@@ -119,7 +119,7 @@ class LessonRound6Test {
         act { flow.dropAt(Node(5, 3)); flow.check() }; settle()
         assertEquals(15, flow.sparks)
         shot("P1-right")
-        click("Show me how"); settle()
+        click("Why?"); settle()
         compose.onNodeWithTag("how-card").assertIsDisplayed()
         shot("P1-show-me-how")
         click("Continue lesson")

@@ -152,7 +152,8 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
                     last = now
                     val moving = Flying.glue(craft, handle.value, dt, now, g.cell, len / 0.857f, 5f * density.density, steering = dragging || busy, flying = busy || dragging, rnd = rnd)
                     live = moving || dragging || busy || armed
-                    flow.look(if (busy) humoLookAt(craft.pos.x, craft.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) else null)
+                    // Humo's eyes follow the jet at 12 Hz, not every frame: his own picture redraws when they move
+                    if (now / 16 % 5 == 0L) flow.look(if (busy) humoLookAt(craft.pos.x, craft.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) else null)
                     tick.longValue = now
                 }
             }
@@ -411,7 +412,7 @@ internal fun WorkspaceBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, mo
                         any = any || c.flight != null || c.puffs.isNotEmpty()
                     }
                     live = any
-                    flow.look(crafts.firstOrNull { it.flight != null }?.let { humoLookAt(it.pos.x, it.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) })
+                    if (now / 16 % 5 == 0L) flow.look(crafts.firstOrNull { it.flight != null }?.let { humoLookAt(it.pos.x, it.pos.y, wPx, wPx * page.graph.boxH / page.graph.boxW) })
                     tick.longValue = now
                 }
             }

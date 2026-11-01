@@ -131,7 +131,7 @@ internal object Chrome {
 
 enum class LessonTheme { Plain, Fly }
 
-internal enum class Kind { Primary, Secondary, Warn }
+internal enum class Kind { Primary, Secondary, Warn, Dark }
 
 /**
  * A Brilliant lesson (L1.1 "Translating Points", L1.2 "Negative Translations"), rebuilt natively in Boss's picked mobile design:
@@ -363,6 +363,7 @@ internal fun Chunky(
         !enabled -> Triple(Chrome.OffFace, Chrome.OffFace, Chrome.OffText)
         kind == Kind.Primary -> Triple(Chrome.Mint, Chrome.MintEdge, Color.White)
         kind == Kind.Warn -> Triple(Chrome.Yellow, Chrome.YellowEdge, Color(0xFF4A3600))
+        kind == Kind.Dark -> Triple(Color(0xFF2B2F33), Color(0xFF15181A), Color.White)
         else -> Triple(Color.White, Chrome.Line, Chrome.MintInk)
     }
     val sink = !enabled || pressed
@@ -574,8 +575,8 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                         val j = (flow.screen as Screen.Skill).j
                         val ok = flow.skillResults[j] == true
                         val last = j == flow.skill.size - 1
-                        GlassPanel(ok, flow.verdict.orEmpty(), bottomInset, onFlag = { reporting = true }) {
-                            Chunky(if (last) "Finish" else "Continue", if (ok) Kind.Primary else Kind.Warn, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
+                        GlassPanel(ok, flow.verdict.orEmpty(), bottomInset, onFlag = { reporting = true }, calm = !ok) {
+                            Chunky(if (last) "Finish" else "Continue", if (ok) Kind.Primary else Kind.Dark, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
                         }
                     }
                     key == "skill" -> ButtonBar(bottomInset) {
@@ -584,7 +585,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
                     }
                     key == "go" -> ButtonBar(bottomInset) { Chunky("Continue", Kind.Primary, true, Modifier.weight(1f)) { LessonSounds.play(Cue.Continue); flow.next() } }
                     key == "right" -> GlassPanel(true, "Correct!", bottomInset, onFlag = { reporting = true }) {
-                        Chunky("Show me how", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
+                        Chunky("Why?", Kind.Secondary, true, Modifier.weight(1f), icon = ChunkyIcon.Bulb) { LessonSounds.play(Cue.Hint); flow.showHow = true }
                         Chunky("Continue", Kind.Primary, true, Modifier.weight(3f)) { LessonSounds.play(Cue.Continue); flow.next() }
                     }
                     key == "fixright" -> GlassPanel(true, "Correct!", bottomInset, onFlag = null) {
@@ -727,8 +728,8 @@ private fun EndView(flow: LessonFlow, humo: HumoState) {
     }
     CenterScreen(
         humo,
-        big = { Text("+${flow.sparks}", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 64.sp, lineHeight = 64.sp, color = Chrome.MintInk) },
-        title = "Lesson complete", line = flow.endLine ?: "${flow.sparks} sparks earned.", buttons = listOf(BtnSpec("Restart lesson", Kind.Secondary) { flow.restart() }),
+        big = { Text("${flow.sparks} XP earned", fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp, lineHeight = 44.sp, color = Chrome.MintInk) },
+        title = "Lesson complete", line = flow.endLine, buttons = listOf(BtnSpec("Restart lesson", Kind.Secondary) { flow.restart() }),
     )
 }
 

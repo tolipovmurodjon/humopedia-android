@@ -218,14 +218,18 @@ tapnode() { board; local a; a=$(npx "$1" "$2"); $T adb shell input tap $a; }
 shot P1-start; has "Move the SR-71 4 steps to the right and 1 up."
 has "Ask Humo"
 $T adb shell dumpsys gfxinfo "$PKG" reset > /dev/null
+$T adb logcat -c
 drag 1 2 2 5; press Check; shot P1-wrong 1.3
 has "Try again"
 press "Get help" 2.5; shot P1-tutor; has "Done"; has "Show me"
 press "Show me" 2.5; shot P1-tutor-show-me
 press Done 1
 press "Try again"; drag 2 5 5 3; press Check; shot P1-correct 1.3
+ticks=$($T adb logcat -d -s HumoSound:I | grep -c 'cue=Toggle')
+log "HumoSound: $ticks drag ticks (cue=Toggle) over the two P1 drags; $($T adb logcat -d -s HumoSound:I | grep -c 'cue=DragStart') pickups, $($T adb logcat -d -s HumoSound:I | grep -c 'cue=DragEnd') drops"
+[ "$ticks" -ge 4 ] || fail "a P1 drag logged only $ticks tick sounds (need 4 or more)"
 has "Nice, that.s it!"
-press "Show me how"; shot P1-show-me-how; has "Continue lesson"; press "Continue lesson"
+press "Why[?]"; shot P1-show-me-how; has "Continue lesson"; press "Continue lesson"
 shot P2-start
 log "-- tap the jet, then a spot: the nose turns, then it flies there; the screen is caught in the air"
 tapnode 2 4; snap P2-armed 0.5
@@ -301,7 +305,7 @@ num -2; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
 num 3; press Check 0.1; waitfor "Correct!" 15; press Continue 1.5
 num -2 0.4; num 0; press Check 0.1; waitfor "Correct!" 15; press Finish 1.5
 waitfor "Perfect!" 20; shot l12-score; has "Perfect!"
-tapsnap Continue l12-mach3 1.6; sleep 4; shot l12-end; has "Lesson complete"; has "120 sparks earned."
+tapsnap Continue l12-mach3 1.6; sleep 4; shot l12-end; has "Lesson complete"; has "120 XP earned"
 press "Exit lesson" 2; shot back-from-l12
 has "Lesson 1.2, Negative Translations, done"
 has "Lesson 1.3, Translating Shapes, current"
