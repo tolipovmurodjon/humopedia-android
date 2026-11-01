@@ -35,6 +35,8 @@ class LessonDragSmokeTest {
             GlassTheme { LessonPlayer(PaddingValues(), onExit = {}, onFinish = {}, theme = LessonTheme.Fly, lesson = flow.lesson, flow = flow, motion = true, humoAlive = false) }
         }
         compose.waitForIdle()
+        // the jet's frame loop never idles while a finger is down: drive the clock by hand
+        compose.mainClock.autoAdvance = false
         val spec = L11.pages[0].graph
         val r = compose.onNodeWithTag("board").fetchSemanticsNode().boundsInRoot
         val k = r.width / spec.boxW
