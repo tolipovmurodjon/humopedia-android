@@ -519,7 +519,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
     val compact = screenH < 700
     val keyHeight = when { screenH < 640 -> 34.dp; screenH < 760 -> 40.dp; else -> 46.dp }
     // a drag page has no keypad under the board, so the verdict panel (taller than the bar) would sit on the graph: keep its room
-    val panelRoom = if (page.kind == PageKind.Drag) 80.dp + 80.dp * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f) else 0.dp
+    val panelRoom = if (page.kind == PageKind.Drag) 112.dp + 80.dp * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f) else 0.dp
     val dockRoom = (if (compact) 78.dp else 84.dp) + bottomInset + panelRoom
 
     Box(Modifier.fillMaxSize()) {
@@ -570,7 +570,7 @@ private fun PageView(flow: LessonFlow, fly: Boolean, motion: Boolean, humo: Humo
             val sheet: SheetSpec? = when {
                 barKey.startsWith("skill-") && skillJ != null -> {
                     val ok = flow.skillResults[skillJ] == true
-                    SheetSpec("skill-$skillJ", ok, !ok, if (ok) "Correct!" else "Incorrect", flow.verdict.orEmpty(), if (ok) Kind.Primary else Kind.Dark, if (skillJ == flow.skill.size - 1) "FINISH" else "CONTINUE", null, true) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
+                    SheetSpec("skill-$skillJ", ok, !ok, flow.verdict ?: if (ok) "Correct!" else "Incorrect", "", if (ok) Kind.Primary else Kind.Dark, if (skillJ == flow.skill.size - 1) "FINISH" else "CONTINUE", null, true) { LessonSounds.play(Cue.Continue); flow.nextSkill() }
                 }
                 barKey == "right" -> SheetSpec("right", true, false, "Correct!", flow.verdict.orEmpty(), Kind.Primary, "CONTINUE", ChunkyIcon.Bulb, true) { LessonSounds.play(Cue.Continue); flow.next() }
                 barKey == "fixright" -> SheetSpec("fixright", true, false, "Correct!", flow.verdict.orEmpty(), Kind.Primary, "CONTINUE", null, false) { LessonSounds.play(Cue.Continue); flow.next() }

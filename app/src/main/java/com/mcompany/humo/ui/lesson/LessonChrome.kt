@@ -165,7 +165,7 @@ internal fun FeedbackSheet(spec: SheetSpec, bottomInset: Dp, translateRow: Boole
             .animateContentSize(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)),
     ) {
         Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp).size(36.dp, 4.dp).clip(CircleShape).background(ink.copy(alpha = 0.28f)))
-        Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Canvas(Modifier.size(34.dp)) {
                 val k = size.width / 34f
                 if (spec.ok) {
@@ -193,7 +193,7 @@ internal fun FeedbackSheet(spec: SheetSpec, bottomInset: Dp, translateRow: Boole
         if (expanded) {
             Text(spec.detail, Modifier.padding(start = 66.dp, end = 20.dp, top = 6.dp), fontFamily = LessonType.Figtree, fontSize = 16.sp, lineHeight = 23.sp, color = ink)
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
         Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp + bottomInset).testTag("sheet-buttons"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (translateRow) Box(Modifier.weight(1f)) { secondary?.invoke(Modifier.fillMaxWidth()) }
             Chunky(spec.primary, spec.kind, true, Modifier.weight(if (translateRow) 3f else 1f), onClick = spec.onPrimary)
