@@ -170,3 +170,12 @@ Not done: one language per run. There is no language setting in the app (one `va
 - MED x and y: a small blue arrow right under slot a and a mint arrow up under slot b.
 - LOW: task reveal 55 ms a word (about 0.6 s a line), the sheet is a tinted glass wash with a lit rim.
 - MED frames (drag p50 34 ms, 3-jet flight 40 % janky, 400 ms stall on Check): perf_v2 from alpha14 is the only change so far; the phone run decides. Cold start 2.69 s: not worked yet. The softlock re-test is pending; watchdog and test stay.
+
+## Round 6k (alpha16)
+
+- Before/after set: `docs/qa/round6/before-after/` holds the 390 x 844 Roborazzi pictures of alpha11 (before) and alpha15 (after) for: the start page (close button, progress bar, Humo and bubble, the Check button), a wrong try, a right answer, the translate row with the pad, the skill-check miss, the quit sheet, the goodbye and the end card.
+- Mic: Humo gives his reason once, the first time the talk pill is used ("I would like to hear you. Tap Allow."), with an Emma clip; after that only the system asks.
+- Fix-it lines: all are already 6 words or fewer; `LessonBubbleAndHintTest.fixItLinesAreShort` keeps them at 8 or fewer.
+- Cold start: the app now logs `app-oncreate`, `activity-oncreate` and `first-frame since process start` (all `HumoPerf`), and the smoke prints them. Nothing is moved yet; the numbers decide.
+- Drag and flight: a debug counter logs, every 2 s, how many times the board, Humo and the bubble were drawn or composed (`HumoPerf counts`). The smoke prints it; the top two causes are fixed from those numbers in the next round.
+- Not done: one language per run (the app has no language setting; this needs a design decision), first frame under 500 ms (not traced), cold start 1.5 s.

@@ -546,6 +546,7 @@ fun Humo(state: HumoState, modifier: Modifier = Modifier) {
             val vbH = 1024f * 1.14f
             val s = min(size.width / 1024f, size.height / vbH)
             onDrawBehind {
+                PerfCounters.humoDraw++
                 state.frame.longValue
                 withTransform({ translate((size.width - 1024f * s) / 2f, (size.height - vbH * s)); scale(s, s, Offset.Zero); translate(0f, HEAD) }) { humoPicture(state, layers) }
             }

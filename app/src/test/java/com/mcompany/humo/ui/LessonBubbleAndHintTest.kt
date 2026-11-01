@@ -33,4 +33,10 @@ class LessonBubbleAndHintTest {
         flow.hint()
         assertTrue("after the third miss the bulb shows the worked answer", flow.showHow)
     }
+
+    /** Humo's fix-it and gate lines stay short: at most 8 words each. */
+    @Test fun fixItLinesAreShort() {
+        for (key in listOf("gate", "fixTitle", "fixLook", "fixLook2", "fixNone", "fixThen", "fixNew", "fixPass")) for (line in L11.fx(key))
+            assertTrue("\"$line\" has more than 8 words", line.split(" ").size <= 8)
+    }
 }

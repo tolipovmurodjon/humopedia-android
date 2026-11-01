@@ -18,7 +18,7 @@ internal object LessonLines {
     const val OPEN_FALLBACK = "Ok, let's go. What do you need?"
     const val QUIT = "Leaving so soon? Your spot is saved. Come back when you are ready."
     const val AGAIN = "Say it another way?"
-    const val MIC_ASK = "I need to hear you. Tap Allow, please."
+    const val MIC_ASK = "I would like to hear you. Tap Allow."
     const val MIC_DENIED = "No problem. You can type, or tap one of these."
     const val SKILL_YOURS = "This one is yours. Take your time, you can do it."
 

@@ -14,9 +14,11 @@ import dagger.hilt.android.HiltAndroidApp
 class HumoApp : Application() {
 
     override fun onCreate() {
+        val t0 = android.os.SystemClock.elapsedRealtime()
         super.onCreate()
         // First, so a crash anywhere after this line is written to files/crashes/ (copied from PAGEL).
         CrashRecorder.install(this)
+        android.util.Log.i("HumoPerf", "app-oncreate ms=${android.os.SystemClock.elapsedRealtime() - t0} (process start to here ms=${android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime()})")
     }
 
     /** Everything that is not needed to draw the first frame: the push channel, App Check and the one topic. MainActivity calls it after the first frame. */

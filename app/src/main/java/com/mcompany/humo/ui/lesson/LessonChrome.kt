@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -249,6 +250,7 @@ private const val WORD_MS = 55L
  */
 @Composable
 internal fun HumoHeader(text: String, humo: HumoState, onTap: (() -> Unit)?, modifier: Modifier = Modifier, compact: Boolean = false) {
+    SideEffect { PerfCounters.header++ }
     val words = remember(text) { text.replace("*", "").trim().split(Regex("\\s+")).size }
     // a line already shown in full is shown whole again (after Try again the task is not written out a second time)
     var shown by remember(text) { mutableIntStateOf(if (humo.alive && text !in humo.revealed) 0 else words) }

@@ -37,9 +37,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // The glass bar draws under the navigation bar; Android must not paint its own scrim over it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
+        val t0 = android.os.SystemClock.elapsedRealtime()
         GlassStage.coldStart()
         com.mcompany.humo.ui.lesson.LessonWarmup.start(this)
         setContent { GlassTheme { AppShell(onTopOverlay = { UpdatePill(playUpdate) }) } }
+        android.util.Log.i("HumoPerf", "activity-oncreate ms=${android.os.SystemClock.elapsedRealtime() - t0}")
+        window.decorView.viewTreeObserver.addOnDrawListener(object : android.view.ViewTreeObserver.OnDrawListener {
+            private var done = false
+            override fun onDraw() {
+                if (done) return
+                done = true
+                android.util.Log.i("HumoPerf", "first-frame since process start ms=${android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime()}")
+            }
+        })
         if (savedInstanceState == null) afterFirstFrame()
         // Debug builds only: the CI smoke forces a crash to prove CrashRecorder writes it down.
         if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_TEST_CRASH, false) == true) {

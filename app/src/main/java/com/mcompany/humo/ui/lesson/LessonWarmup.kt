@@ -19,6 +19,7 @@ object LessonWarmup {
         val app = context.applicationContext
         Thread({
             LessonSounds.loadLocalPack(app)
+            if (com.mcompany.humo.BuildConfig.DEBUG) PerfCounters.startLogging()
             PerfV2.on = !File(app.filesDir, "perf_v2_off").exists()
             if (File(app.filesDir, "no-warmup").exists()) return@Thread
             val t0 = System.nanoTime()

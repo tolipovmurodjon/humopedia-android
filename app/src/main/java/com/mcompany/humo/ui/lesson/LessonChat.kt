@@ -185,7 +185,12 @@ internal fun TutorSheet(
             mic.listening -> mic.stop()
             !mic.available -> chat.say(LessonLines.MIC_DENIED)
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED -> listen()
-            else -> { chat.say(LessonLines.MIC_ASK); permission.launch(Manifest.permission.RECORD_AUDIO) }
+            else -> {
+                // Humo gives his reason once, the first time the talk pill is used; after that the system asks by itself
+                val prefs = context.getSharedPreferences("humo-voice", android.content.Context.MODE_PRIVATE)
+                if (!prefs.getBoolean("mic_reason_given", false)) { prefs.edit().putBoolean("mic_reason_given", true).apply(); chat.say(LessonLines.MIC_ASK) }
+                permission.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
     }
 

@@ -260,6 +260,7 @@ internal fun DragBoard(page: LessonPage, flow: LessonFlow, fly: Boolean, motion:
         // The graph never changes while a finger moves: its own canvas reads no state, so only the jet's canvas redraws per frame.
         Canvas(Modifier.matchParentSize()) { graph(g, text) }
         Canvas(Modifier.matchParentSize()) {
+        PerfCounters.board++
         tick.longValue
         humoMarks(g, flow.marks)
         val s = g.s
