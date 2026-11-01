@@ -266,8 +266,8 @@ waitfor "Correct!" 15; shot skill-SC3-right 1.0
 has "FINISH"; press FINISH 1.5
 # The gate: a miss is never a fail screen. Humo says "Almost! Let's fix one.", replays the miss on the board, serves two
 # fresh problems; one wrong sends him to replay it and serve a new pair; two right pass without the jet pass.
-waitfor "Almost! Let.s fix one\." 20; shot fix-intro; has "Fix it with Humo"
-press "Fix it with Humo" 2.5; shot fix-demo-a 0.5; sleep 3; shot fix-demo-b 0.5
+waitfor "Almost! Let.s fix one\." 20; shot fix-intro; has "CONTINUE"
+press "CONTINUE" 2.5; shot fix-demo-a 0.5; sleep 3; shot fix-demo-b 0.5
 press CONTINUE 1.5; shot fix-1-start
 num 0 0.4; num 0; tapsnap CHECK fix-1-flight 0.9
 waitfor "CONTINUE" 15; shot fix-1-wrong; press CONTINUE 1.5

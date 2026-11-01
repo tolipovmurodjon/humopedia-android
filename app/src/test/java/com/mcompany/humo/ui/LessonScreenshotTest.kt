@@ -226,7 +226,7 @@ class LessonScreenshotTest {
         compose.waitForIdle()
         compose.onNodeWithText("Almost! Let's fix one.").assertIsDisplayed()
         shot("fix-intro")
-        compose.onNodeWithText("Fix it with Humo").performClick()
+        compose.onNodeWithText("CONTINUE").performClick()
         wait(300)
         assertEquals(Screen.Demo, flow.screen)
         shot("fix-demo-end")

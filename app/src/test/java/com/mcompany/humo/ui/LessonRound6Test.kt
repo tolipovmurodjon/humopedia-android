@@ -179,7 +179,7 @@ class LessonRound6Test {
         compose.onNodeWithText("Almost! Let's fix one.").assertIsDisplayed()
         shot("fix-intro")
         actionAtCheck("fix intro")
-        click("Fix it with Humo"); settle()
+        click("CONTINUE"); settle()
         assertEquals(Screen.Demo, flow.screen)
         shot("fix-demo")
         click("CONTINUE")
