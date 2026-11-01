@@ -69,8 +69,7 @@ class LessonFeedbackSheetTest {
     /** Boss: primary buttons say one or two words in capitals. */
     @Test fun primaryLabelsAreCapitalsAndShort() {
         val files = listOf("LessonScreen.kt", "LessonChat.kt").map { File("src/main/java/com/mcompany/humo/ui/lesson/$it").readText() }
-        val text = files.joinToString("
-")
+        val text = files.joinToString(" ")
         val a = Regex("""(?:Chunky|BtnSpec)\("([^"]+)", Kind\.(?:Primary|Warn|Dark)""").findAll(text).map { it.groupValues[1] }
         val b = Regex("""Kind\.(?:Primary|Warn|Dark), (?:if \([^)]*\) )?"([^"]+)"(?: else "([^"]+)")?""").findAll(text).flatMap { listOf(it.groupValues[1], it.groupValues[2]).filter { l -> l.isNotEmpty() } }
         val labels = (a + b).toList()
