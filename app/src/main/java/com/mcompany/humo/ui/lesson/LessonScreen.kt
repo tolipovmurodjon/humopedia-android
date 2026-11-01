@@ -327,7 +327,6 @@ private data class BtnSpec(val label: String, val kind: Kind, val enabled: Boole
  * under it, both drawn by this one node; the face presses into the lip while held. Disabled is flat light grey. The label is
  * sentence case, medium weight, no letter spacing (the web phone's Check).
  */
-@Composable
 internal enum class ChunkyIcon { Bulb, Help }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawChunkyIcon(icon: ChunkyIcon, ink: Color) {

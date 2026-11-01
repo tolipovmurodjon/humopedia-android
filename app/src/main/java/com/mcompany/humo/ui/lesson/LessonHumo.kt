@@ -180,7 +180,7 @@ private fun HumoMotion(h: HumoState) {
             val ms = (now - t0) / 1_000_000f
             val tg = h.targets(face)
             val lk = h.lookSource?.invoke() ?: h.look
-            if (lk != null && h.tracking && face == HumoFace.Rest) { tg[HumoState.Ch.LookX.ordinal] = lk.x; tg[HumoState.Ch.LookY.ordinal] = lk.y }
+            if (lk != null && h.tracking && face == HumoFace.Rest) { tg[HumoState.Ch.LookX.ordinal] = if (lk.x.isFinite()) lk.x.coerceIn(-1f, 1f) else 0f; tg[HumoState.Ch.LookY.ordinal] = if (lk.y.isFinite()) lk.y.coerceIn(-1f, 1f) else 0f }
             var moving = h.tracking || face == HumoFace.Talk || h.pose != HumoPose.None
             var keyMouth: String? = null
             if (keys != null && ms <= keys.last().ms + 200) {
@@ -302,8 +302,9 @@ private fun DrawScope.eye(e: Eye, h: HumoState, left: Boolean, layers: HumoLayer
     val happy = h.x[(if (left) HumoState.Ch.Happy else HumoState.Ch.HappyR).ordinal].coerceIn(0f, 1f)
     val blink = h.blink
     val side = h.x[(if (left) HumoState.Ch.OpenL else HumoState.Ch.OpenR).ordinal].coerceIn(0f, 1f)
-    val lookX = h.x[HumoState.Ch.LookX.ordinal]
-    val lookY = h.x[HumoState.Ch.LookY.ordinal]
+    // A look that is NaN (a board of zero width) would slide the pupils out of the eye for good: the whites stay, the pupils vanish.
+    val lookX = h.x[HumoState.Ch.LookX.ordinal].let { if (it.isFinite()) it.coerceIn(-1.5f, 1.5f) else 0f }
+    val lookY = h.x[HumoState.Ch.LookY.ordinal].let { if (it.isFinite()) it.coerceIn(-1.5f, 1.5f) else 0f }
     val brow = h.x[HumoState.Ch.Brow.ordinal].coerceIn(0f, 1f)
     val sad = h.x[HumoState.Ch.Sad.ordinal].coerceIn(0f, 1f)
     val bw = 0.55f * e.rx
