@@ -118,8 +118,8 @@ object LessonSounds {
 
     /** The manifest's event -> file table. */
     internal fun parseManifest(json: String): Map<Cue, String> {
-        val events = org.json.JSONObject(json).getJSONObject("events")
-        return events.keys().asSequence().associate { Cue.valueOf(it) to events.getString(it) }
+        val events = json.substringAfter("\"events\"")
+        return Regex("\"([A-Za-z]+)\"\\s*:\\s*\"([a-z0-9-]+)\"").findAll(events).associate { Cue.valueOf(it.groupValues[1]) to it.groupValues[2] }
     }
 
     /** Preloads every file the manifest names, once at start; call it off the main thread. */

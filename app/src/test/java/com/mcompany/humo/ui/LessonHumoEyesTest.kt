@@ -29,9 +29,10 @@ class LessonHumoEyesTest {
     @get:Rule val compose = createComposeRule()
 
     private fun check() {
+        val humo = HumoState(alive = true)
+        compose.setContent { Humo(humo, Modifier.size(76.dp).testTag("humo")) }
         for (face in HumoFace.entries) {
-            val humo = HumoState(alive = true).also { it.face = face }
-            compose.setContent { Humo(humo, Modifier.size(76.dp).testTag("humo")) }
+            compose.runOnIdle { humo.face = face }
             compose.mainClock.advanceTimeBy(1200)
             compose.waitForIdle()
             val img = compose.onNodeWithTag("humo").captureToImage()
