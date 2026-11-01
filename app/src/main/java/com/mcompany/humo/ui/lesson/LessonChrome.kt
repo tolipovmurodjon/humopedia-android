@@ -180,6 +180,8 @@ internal fun FeedbackSheet(spec: SheetSpec, bottomInset: Dp, translateRow: Boole
             }
             Spacer(Modifier.width(12.dp))
             Text(spec.label, Modifier.weight(1f), fontFamily = LessonType.Figtree, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, lineHeight = 26.sp, color = ink)
+            // off a translate page the primary button is full width (like Check), so the icon button sits up here, in the peek too
+            if (!translateRow && secondary != null) Box(Modifier.width(64.dp).padding(end = 8.dp)) { secondary(Modifier.fillMaxWidth()) }
             if (onFlag != null) Box(Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Button, onClickLabel = "Report this page", onClick = onFlag).semantics { contentDescription = "Report this page" }, contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(22.dp)) {
                     val k = size.width / 24f
@@ -190,7 +192,6 @@ internal fun FeedbackSheet(spec: SheetSpec, bottomInset: Dp, translateRow: Boole
         }
         if (expanded) {
             Text(spec.detail, Modifier.padding(start = 66.dp, end = 20.dp, top = 6.dp), fontFamily = LessonType.Figtree, fontSize = 16.sp, lineHeight = 23.sp, color = ink)
-            if (!translateRow && secondary != null) Box(Modifier.padding(start = 16.dp, top = 12.dp).width(96.dp)) { secondary(Modifier.fillMaxWidth()) }
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp + bottomInset).testTag("sheet-buttons"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
