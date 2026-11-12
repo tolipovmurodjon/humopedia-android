@@ -19,20 +19,6 @@
         <receiver
             android:name=".update.InstallResultReceiver"
             android:exported="false" />
-        <!-- Icon comparison (2026-11-12): a second home-screen entry "Humo B" with the face-zoom icon. Test builds only;
-             it opens the same app. Remove after Boss picks A or B. -->
-        <activity-alias
-            android:name=".IconFaceZoomTest"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_face"
-            android:label="Humo B"
-            android:roundIcon="@mipmap/ic_launcher_face"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
     </application>
 
 </manifest>
