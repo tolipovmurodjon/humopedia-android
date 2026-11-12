@@ -4,9 +4,7 @@
 Why a script and not hand-made files: the tile is a radial OKLCH light with grain (an XML gradient can only mix 3 sRGB stops
 in a straight line, which Boss called flat), and every density, the themed layer and the Play picture must come from one source.
 Humo is the approved drawing rendered 1:1 (right eye and its glow = copies of the left; pupils and smile in one soft
-ink #133132 instead of near-black); his body carries clay volume (a darker rim, a core shadow, one
-soft highlight: lightness range 0.22 in the visible window, because the soft 2.5D shading at 0.10 read as one flat
-mint on a real phone, Boss 2/10); only the camera moves: he sits low and the
+ink #133132 instead of near-black); only the camera moves: he sits low and the
 bottom edge of the visible square cuts him flat, so no legs show under any launcher mask.
 
 Run from the android repo:  python scripts/art/build_launcher_icon_navy.py [path to the 2048 px Humo render]
@@ -22,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 RES = os.path.join(ROOT, "app", "src", "main", "res")
-HUMO = sys.argv[1] if len(sys.argv) > 1 else "D:/Humopedia/docs/design/2026-11-12-app-icon/humo-real-clay-2048.png"
+HUMO = sys.argv[1] if len(sys.argv) > 1 else "D:/Humopedia/docs/design/2026-11-12-app-icon/humo-real-soft-ink-2048.png"
 Q = 4  # supersampling: the 108 dp canvas is drawn at 432 * Q px
 N = 432 * Q
 K, EYE_Y, CUT = 0.39, 274, 362  # Humo scale (canvas px per drawing unit), eye line and flat cut, on the 432 px canvas
