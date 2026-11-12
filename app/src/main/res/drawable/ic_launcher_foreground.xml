@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Clean Humo with the sprout (scripts/art/build_launcher_icon.mjs, one PNG per density); Humo sits inside the 72 dp visible circle. -->
+<!-- The real Humo, sitting low and cut flat by the bottom of the visible 72 dp square, so no legs show under any
+     launcher mask (scripts/art/build_launcher_icon_navy.py, one PNG per density). -->
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
     android:gravity="fill"
     android:src="@drawable/ic_launcher_humo" />
